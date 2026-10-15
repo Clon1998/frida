@@ -1,5 +1,45 @@
 # Changelog
 
+## M1: Storage, tree, requests, sending (2026-10-15, awaiting manual acceptance)
+
+### What was built
+- **On-disk format** (`crates/frida-core/src/model/`, `yaml.rs`): typed models for every §4 file, YAML via
+  serde-saphyr, a format-version check before parsing, and atomic writes. The §4 examples live in `testdata/format/`
+  and are round-trip and snapshot tested.
+- **Storage** (`crates/frida-core/src/storage/`): workspaces, collections, folders and requests. Tree scan (broken
+  files show up as "invalid" instead of failing), create/rename/duplicate/delete/move/reorder with slugged, unique
+  file names. Paths from the UI can't escape the collection folder.
+- **HTTP** (`crates/frida-core/src/http/`): `prepare` merges headers collection → folders → request, fills `:path`
+  params, builds every body mode and resolves the timeout chain. `send` uses reqwest with redirects, custom CAs
+  merged into the OS roots, a TLS-verify toggle and cancellation. `ResponseView` shapes the result for the UI
+  (text or base64, truncated above 5 MB, full body kept for "Save").
+- **Local state** (`local_state.rs`): settings and recent workspaces, plus per-collection open tabs and expanded
+  folders, as JSON in the app data dir.
+- **File watcher** (`watch.rs`): debounced, ignores `.git` and Frida's own temp files.
+- **Tauri commands** (`app/src-tauri/src/commands/`): 30 thin commands returning structured `ApiError
+  { code, message, hint }`, plus the `fs-changed` event.
+- **UI**: start screen, sidebar (collection switcher, tree with context menu and drag-and-drop), per-collection tabs
+  with unsaved-changes dots, request editor (URL ↔ query sync, path params, headers, all body modes, timeout),
+  response viewer (status/time/size, pretty/raw, image and sandboxed HTML preview, headers, copy, save), collection
+  settings (timeout, TLS, CA certificates), keep/reload prompt when a dirty tab changes on disk.
+- **Testing aids**: `crates/frida-testserver` (echo server, HTTPS mode with a throwaway CA) and
+  `testdata/sample-workspace`, whose every request is sent end to end in `tests/sample_workspace.rs`.
+
+### Rust things worth understanding in this milestone
+1. **Enums with data and `#[serde(tag = ...)]`** (`model/common.rs` `Auth`, `storage/collection.rs` `TreeNode`).
+   Each variant carries its own fields, like a sealed interface with records in Java. serde's internal tagging
+   writes the variant name into a field (`mode: custom`), and specta turns it into a TS discriminated union.
+   `Box<OAuth2Config>` keeps the enum small, because an enum is as big as its largest variant.
+2. **`?` and `From`** (`error.rs` `#[from]`, `app/src-tauri/src/error.rs`). `?` returns early on an error *and*
+   converts it with `From`. That's how a reqwest error becomes a `SendError`, then a `CoreError`, then an `ApiError`
+   for the UI, without any explicit wrapping code in the commands.
+3. **Lifetimes on a borrowing struct** (`http/prepare.rs` `RequestContext<'a>`). The struct holds references
+   instead of copies, and `'a` lets the compiler prove the referenced collection and folders outlive it.
+4. **Sharing state across threads** (`watch.rs`, `app/src-tauri/src/state.rs`). `Arc<Mutex<T>>` for the watcher roots
+   shared with its callback thread; `Mutex` fields in Tauri-managed state; and why a `std::sync::Mutex` is fine as
+   long as it is never held across an `.await`. `tokio::select!` plus a `CancellationToken` cancels a request by
+   dropping its future (`http/send.rs`).
+
 ## M0: Scaffold & CI (2026-10-15)
 
 ### What was built

@@ -480,16 +480,19 @@ the UI typechecked and linted, PLAN.md checkboxes updated, and a short summary i
 *Status 2026-10-15: done. CI is green on all 4 targets with artifacts. The window was verified on macOS; Windows and Linux are covered by CI builds only, which is accepted for now.*
 
 ### M1: Storage, tree, requests, sending
-- [ ] Domain model + YAML (de)serialization for workspace, collection, folder, request, env (§4), with round-trip tests.
-- [ ] Open, create and close a workspace. Add an existing collection folder or create a new one.
-- [ ] Sidebar tree with CRUD, drag-and-drop reordering and moving, and a context menu.
-- [ ] Tabs per collection, persisted in local state.
-- [ ] Request editor: method, URL ↔ query params sync, path params, headers, all body modes.
-- [ ] HTTP execution (§7) without auth, scripts or vars. Timeouts, TLS toggle, custom CA, cancel.
-- [ ] Response viewer: pretty/raw body, headers, status/time/size, image and HTML preview, save, copy.
-- [ ] File watcher with reload and a conflict prompt.
+- [x] Domain model + YAML (de)serialization for workspace, collection, folder, request, env (§4), with round-trip tests.
+- [x] Open, create and close a workspace. Add an existing collection folder or create a new one.
+- [x] Sidebar tree with CRUD, drag-and-drop reordering and moving, and a context menu.
+- [x] Tabs per collection, persisted in local state.
+- [x] Request editor: method, URL ↔ query params sync, path params, headers, all body modes.
+- [x] HTTP execution (§7) without auth, scripts or vars. Timeouts, TLS toggle, custom CA, cancel.
+- [x] Response viewer: pretty/raw body, headers, status/time/size, image and HTML preview, save, copy.
+- [x] File watcher with reload and a conflict prompt.
 
 **Acceptance:** you can create a collection, add requests, send all methods with each body type against the local test server, and the files on disk look like §4 examples.
+*Status 2026-10-15: implemented. Automated: `tests/sample_workspace.rs` sends every method and body type of
+`testdata/sample-workspace` to the test server, and `tests/format_roundtrip.rs` snapshots the files. Waiting for a
+manual pass through the UI.*
 
 ### M2: Environments, variables, secrets, inspector
 - [ ] Global and collection environments, selectors, and the env editor.
@@ -598,6 +601,12 @@ Deviations from and clarifications of this plan, newest last.
 - **2026-10-15 (M1) HTTP details.** The URL is the source of truth for the query string when sending (`params.query`
   mirrors it for the UI). A URL without a scheme gets `http://`. A new reqwest client is built per send in M1; connection
   reuse and cookie jars come with M2. reqwest's default system-proxy detection is left on (no proxy UI, per non-goals).
+- **2026-10-15 (M1) Optional fields in generated TS.** specta marks `#[serde(default)]` fields as optional in TS (they
+  may be missing on input). Values from Rust are always complete, so the UI converts them once with `Complete<T>`
+  (`app/ui/src/lib/model.ts`), a type derived from the generated bindings rather than a hand-written copy.
+- **2026-10-15 (M1) Editors.** A small CodeMirror 6 wrapper of our own (`components/editor/CodeEditor.tsx`) instead of a
+  React wrapper package, to keep control for `{{var}}` decorations in M2. Split panes use `react-resizable-panels`
+  (via shadcn Resizable); toasts use `sonner`.
 
 ## 17. Testing strategy
 

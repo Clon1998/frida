@@ -29,6 +29,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cd app/ui && pnpm install && pnpm typecheck && pnpm lint && pnpm test
 cd app && pnpm tauri dev       # run the app
+cargo run -p frida-testserver  # local echo server on :8787 for manual testing (testdata/sample-workspace uses it)
 cd app && pnpm tauri build     # bundle
 ```
 A milestone is only done when all of these pass.
