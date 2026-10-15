@@ -506,10 +506,11 @@ in the UI; further UI polish is deferred.*
 `tests/vars.rs` covers the resolver. Waiting for a manual pass through the UI (sample workspace, "Variables" folder).*
 
 ### M3: Auth
-- [ ] Basic, bearer, API key, OAuth2 (client credentials, password, auth code + PKCE), combined schemes and inheritance.
-- [ ] Token cache, auto-refresh, token viewer.
+- [x] Basic, bearer, API key, OAuth2 (client credentials, password, auth code + PKCE), combined schemes and inheritance.
+- [x] Token cache, auto-refresh, token viewer.
 
 **Acceptance:** integration tests run against a mock OAuth2 server (client credentials + password + auth code with the browser step simulated) and the OAuth2 + API key combination sends both.
+*Status 2026-10-15: done (automated): `crates/frida-core/tests/auth.rs` against the mock provider in `frida-testserver`.*
 
 ### M4: curl export/import + history
 - [ ] curl export with the options from §11.3, and curl import (paste + dialog).
@@ -636,6 +637,13 @@ Deviations from and clarifications of this plan, newest last.
   Key/value table inputs are not highlighted yet (plain inputs).
 - **2026-10-15 (M2) Cookies** live in memory per collection and are shown in a "Cookies" sub-tab of the collection
   tab. The response-level "Cookies" tab from §14 is still open.
+- **2026-10-15 (M3) Auth details.** Auth replaces a header of the same name set elsewhere. API keys in the query are
+  URL-encoded and appended. Token endpoint requests use the collection's TLS settings. Tokens live in memory only (no
+  keychain persistence yet). The redirect URI must be `127.0.0.1`/`localhost`; `{port}` picks a free port. The token
+  viewer lists all cached tokens. "Get new token" on folders/collections uses their saved settings.
+- **2026-10-15 (UI feedback) Table layout and environment picker.** Key/value editors are bordered tables (no
+  description column: that would change the on-disk format, pending Patrick's call). One environment button with a
+  menu for both scopes replaces the two selects.
 
 ## 17. Testing strategy
 

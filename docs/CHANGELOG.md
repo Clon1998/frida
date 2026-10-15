@@ -1,5 +1,32 @@
 # Changelog
 
+## M3: Auth (2026-10-15)
+
+### What was built
+- **Schemes** (`crates/frida-core/src/auth/`): Basic, Bearer, API key (header or query) and OAuth2, combinable and
+  applied in order (OAuth2 + API key sends both); inherited request → folders → collection; `{{variables}}` resolved in
+  every auth field.
+- **OAuth2** (`auth/oauth2.rs`): client credentials, password, and authorization code + PKCE (S256) with a loopback
+  listener on 127.0.0.1 and the system browser; client auth via Basic header or body; token cache keyed by token URL,
+  client, scope, grant and user; refresh 30 s before expiry using the refresh token, falling back to a new token.
+- **Mock provider** in `frida-testserver` (`/oauth/authorize`, `/oauth/token`) and acceptance tests in `tests/auth.rs`.
+- **App/UI**: the Auth tab for requests, folders and the collection (primary scheme + "Add API key"), OAuth2 fields,
+  "Get new token" (cancellable) and a token viewer with expiry and decoded JWT claims. Also from UI feedback: table
+  layout for key/value editors and a single environment picker.
+
+### Rust things worth understanding in this milestone
+1. **Closures stored as trait objects** (`auth/oauth2.rs` `BrowserOpener = Arc<dyn Fn(&str) -> ... + Send + Sync>`).
+   The core crate doesn't know Tauri, so the app passes in "how to open a browser" as a function value. Tests pass a
+   fake that follows the redirect instead.
+2. **`tokio::select!` with timeouts and cancellation** (`oauth2.rs` `authorize`). Waiting for the browser races three
+   things: the redirect arriving, a 5-minute timeout, and the user clicking Cancel. Whichever finishes first wins and the
+   others are dropped.
+3. **Temporaries and borrows** (`tests/http_send.rs`). `&OAuth2Manager::new(..)` inside a closure borrowed a value that
+   died when the closure returned; the compiler refused it. Creating the manager once outside and borrowing that is
+   the fix, a typical first encounter with Rust's lifetime rules.
+4. **Scoped mutable borrows** (`oauth2.rs` `query_pairs_mut` in its own `{ }` block). The URL is borrowed mutably while
+   query pairs are appended; ending the block ends the borrow so the URL can be used again.
+
 ## M2: Environments, variables, secrets, inspector (2026-10-15, awaiting manual acceptance)
 
 ### What was built
