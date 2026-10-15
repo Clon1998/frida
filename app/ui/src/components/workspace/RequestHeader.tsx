@@ -1,7 +1,10 @@
 import { ChevronRight, Save } from "lucide-react";
 import { EnvironmentPicker } from "@/components/env/EnvironmentPicker";
 import { Button } from "@/components/ui/button";
+import { envColor } from "@/lib/envColors";
 import { folderTrail } from "@/lib/tree";
+import { useEnvs } from "@/stores/envs";
+import { cn } from "cn";
 import * as actions from "@/stores/actions";
 import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
@@ -21,9 +24,16 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
       ? folderTrail(tree, tab.path)
       : [];
   const dirty = tab !== null && isDirty(tab);
+  const color = useActiveEnvColor();
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-0.5 border-b px-3 text-sm">
+    <div
+      className={cn(
+        "flex h-10 shrink-0 items-center gap-0.5 border-b px-3 text-sm",
+        // A colored line in the active environment's color, e.g. red for production.
+        color && ["border-b-2", color.line],
+      )}
+    >
       {/* Only the open entry can be renamed: the collection only from its settings tab. */}
       {collection && tab?.kind === "collection" ? (
         <EditableCrumb
@@ -71,4 +81,13 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
       <EnvironmentPicker dir={dir} />
     </div>
   );
+}
+
+/** The color of the active environment (collection env first, then global), if any. */
+function useActiveEnvColor() {
+  return useEnvs((s) => {
+    const find = (list: typeof s.collection, name: string | null) =>
+      envColor(list.find((e) => e.environment.name === name)?.environment.color);
+    return find(s.collection, s.activeCollection) ?? find(s.global, s.activeGlobal);
+  });
 }

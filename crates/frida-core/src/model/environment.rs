@@ -10,6 +10,11 @@ use super::common::{FORMAT_VERSION, is_false};
 pub struct Environment {
     pub version: u32,
     pub name: String,
+    /// Optional highlight color (e.g. `red` for production), shown on the environment picker so
+    /// it is obvious which environment requests go to. One of the UI's named colors; unknown
+    /// names are ignored by the UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
     #[serde(default)]
     pub variables: Vec<EnvVariable>,
 }
@@ -19,6 +24,7 @@ impl Environment {
         Self {
             version: FORMAT_VERSION,
             name: name.into(),
+            color: None,
             variables: Vec::new(),
         }
     }

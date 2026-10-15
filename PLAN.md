@@ -208,6 +208,7 @@ docs: |
 ```yaml
 version: 1
 name: dev
+color: green                   # optional: highlight color in the UI (e.g. red for prod)
 variables:
   - name: baseUrl
     value: https://orders.dev.example.com
@@ -644,6 +645,9 @@ Deviations from and clarifications of this plan, newest last.
 - **2026-10-15 (UI feedback) Table layout and environment picker.** Key/value editors are bordered tables (no
   description column: that would change the on-disk format, pending Patrick's call). One environment button with a
   menu for both scopes replaces the two selects.
+- **2026-10-15 Environment colors (on-disk format, additive).** Environments have an optional `color` (a named UI
+  color such as `red`), stored in the environment file so a team shares "prod is red". Old files stay valid; the
+  field is omitted when unset. Requested by Patrick.
 
 ## 17. Testing strategy
 

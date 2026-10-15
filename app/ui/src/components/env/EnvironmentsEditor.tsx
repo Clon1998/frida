@@ -13,6 +13,7 @@ import { showError, unwrap } from "@/lib/api";
 import { forDisk, secretOps } from "@/lib/envs";
 import { type EnvEntry, type EnvModel, type EnvVar, scopeOf, useEnvs } from "@/stores/envs";
 import { useActiveCollection } from "@/stores/workspace";
+import { ENV_COLORS, envColor } from "@/lib/envColors";
 import { cn } from "cn";
 
 type ScopeKind = "global" | "collection";
@@ -76,7 +77,15 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
                   current?.environment.name === e.environment.name && "bg-accent font-medium",
                 )}
               >
-                {e.environment.name}
+                <span className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "size-2 shrink-0 rounded-full",
+                      envColor(e.environment.color)?.dot ?? "border",
+                    )}
+                  />
+                  <span className="truncate">{e.environment.name}</span>
+                </span>
               </button>
             ))}
             {entries.length === 0 && (
@@ -246,6 +255,35 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
           />
         </label>
+        <div className="flex flex-col gap-1 text-sm">
+          Color
+          <div className="flex h-8 items-center gap-1">
+            <button
+              type="button"
+              title="No color"
+              aria-label="No color"
+              onClick={() => setDraft((d) => ({ ...d, color: null }))}
+              className={cn(
+                "size-5 rounded-full border border-dashed",
+                draft.color === null && "ring-2 ring-ring ring-offset-1",
+              )}
+            />
+            {ENV_COLORS.map((c) => (
+              <button
+                key={c.name}
+                type="button"
+                title={c.name}
+                aria-label={c.name}
+                onClick={() => setDraft((d) => ({ ...d, color: c.name }))}
+                className={cn(
+                  "size-5 rounded-full",
+                  c.dot,
+                  draft.color === c.name && "ring-2 ring-ring ring-offset-1",
+                )}
+              />
+            ))}
+          </div>
+        </div>
         <div className="flex-1" />
         <Button
           variant="outline"

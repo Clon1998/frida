@@ -10,7 +10,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { envColor } from "@/lib/envColors";
 import { scopeOf, useEnvs } from "@/stores/envs";
+import { cn } from "cn";
 import { ENVIRONMENTS_TAB, useTabs } from "@/stores/tabs";
 
 const NONE = "__none__";
@@ -27,6 +29,11 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
     activeCollection && activeGlobal
       ? `${activeCollection} · ${activeGlobal}`
       : (activeCollection ?? activeGlobal ?? "No environment");
+
+  // The collection environment overrides the global one, so its color wins.
+  const colorOf = (list: typeof collection, name: string | null) =>
+    envColor(list.find((e) => e.environment.name === name)?.environment.color);
+  const color = colorOf(collection, activeCollection) ?? colorOf(global, activeGlobal);
 
   const configure = (scope: "collection" | "global") => {
     setEditorScope(scope);
@@ -48,6 +55,12 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
           <DropdownMenuRadioItem value={NONE}>No environment</DropdownMenuRadioItem>
           {entries.map((e) => (
             <DropdownMenuRadioItem key={e.environment.name} value={e.environment.name}>
+              <span
+                className={cn(
+                  "size-2 shrink-0 rounded-full",
+                  envColor(e.environment.color)?.dot ?? "border",
+                )}
+              />
               {e.environment.name}
             </DropdownMenuRadioItem>
           ))}
@@ -65,7 +78,7 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
         <Button
           variant="outline"
           size="sm"
-          className="h-7 max-w-64 gap-1.5 text-xs"
+          className={cn("h-7 max-w-64 gap-1.5 text-xs", color?.button)}
           title="Environments"
         >
           <Layers className="size-3.5" />

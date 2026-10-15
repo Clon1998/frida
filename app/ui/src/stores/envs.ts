@@ -16,6 +16,7 @@ export type EnvVar = Complete<EnvVariable_Deserialize>;
 export interface EnvModel {
   version: number;
   name: string;
+  color: string | null;
   variables: EnvVar[];
 }
 
@@ -34,6 +35,7 @@ export function normalizeEnv(env: Environment): EnvModel {
   return {
     version: env.version,
     name: env.name,
+    color: env.color ?? null,
     variables: (env.variables ?? []).map((v) => ({
       name: v.name,
       value: v.value ?? null,

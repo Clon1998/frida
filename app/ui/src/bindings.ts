@@ -316,12 +316,24 @@ export type EnvironmentInfo_Serialize = {
 export type Environment_Deserialize = {
 	version: number,
 	name: string,
+	/**
+	 *  Optional highlight color (e.g. `red` for production), shown on the environment picker so
+	 *  it is obvious which environment requests go to. One of the UI's named colors; unknown
+	 *  names are ignored by the UI.
+	 */
+	color?: string | null,
 	variables?: EnvVariable_Deserialize[],
 };
 
 export type Environment_Serialize = {
 	version: number,
 	name: string,
+	/**
+	 *  Optional highlight color (e.g. `red` for production), shown on the environment picker so
+	 *  it is obvious which environment requests go to. One of the UI's named colors; unknown
+	 *  names are ignored by the UI.
+	 */
+	color?: string | null,
 	variables: EnvVariable_Serialize[],
 };
 

@@ -1,5 +1,6 @@
 version: 1
 name: dev
+color: green
 variables:
   - name: baseUrl
     value: https://orders.dev.example.com

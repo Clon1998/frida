@@ -8,7 +8,12 @@ const v = (name: string, value: string | null, secret = false): EnvVar => ({
   secret,
   source: null,
 });
-const env = (...variables: EnvVar[]): EnvModel => ({ version: 1, name: "dev", variables });
+const env = (...variables: EnvVar[]): EnvModel => ({
+  version: 1,
+  name: "dev",
+  color: null,
+  variables,
+});
 
 describe("secretOps", () => {
   it("writes newly typed secret values only", () => {

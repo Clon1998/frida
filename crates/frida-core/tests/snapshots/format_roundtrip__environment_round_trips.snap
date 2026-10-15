@@ -1,10 +1,11 @@
 ---
 source: crates/frida-core/tests/format_roundtrip.rs
-assertion_line: 77
+assertion_line: 83
 expression: yaml
 ---
 version: 1
 name: dev
+color: green
 variables:
 - name: baseUrl
   value: https://orders.dev.example.com
