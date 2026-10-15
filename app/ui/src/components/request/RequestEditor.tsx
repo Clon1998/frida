@@ -1,10 +1,11 @@
-import { Braces, Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { Loader2, Send, SquareTerminal, X } from "lucide-react";
 import { toast } from "sonner";
 import { commands } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
 import { fromRust } from "@/lib/model";
 import { useDialogs } from "@/stores/dialogs";
-import { useState } from "react";
+import { useUi } from "@/stores/ui";
+import { useEffect } from "react";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { InspectorPanel } from "@/components/inspector/InspectorPanel";
 import { useInspection } from "@/components/inspector/useInspection";
@@ -34,9 +35,15 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
   const cancel = useTabs((s) => s.cancel);
   const request = tab.draft;
   const sending = tab.requestId !== null;
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const inspectorOpen = useUi((s) => s.inspectorOpen);
+  const setInspectorOpen = useUi((s) => s.setInspectorOpen);
   const { report, variables } = useInspection(dir, tab.path, request);
   const unresolved = report?.vars.filter((v) => !v.resolved).length ?? 0;
+  // The inspector button lives in the header bar; tell it how many variables are unresolved.
+  useEffect(() => {
+    useUi.getState().setUnresolved(unresolved);
+    return () => useUi.getState().setUnresolved(0);
+  }, [unresolved]);
   const openCurlExport = useDialogs((s) => s.openCurlExport);
 
   /** Pasting a curl command into the URL bar turns this request into it (PLAN.md §11.3). */
@@ -108,21 +115,6 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
           onClick={() => openCurlExport(dir, tab.path)}
         >
           <SquareTerminal />
-        </Button>
-        <Button
-          variant={inspectorOpen ? "secondary" : "ghost"}
-          size="icon"
-          className="relative size-9 shrink-0"
-          title="Variables inspector"
-          aria-label="Variables inspector"
-          onClick={() => setInspectorOpen((o) => !o)}
-        >
-          <Braces />
-          {unresolved > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] text-white">
-              {unresolved}
-            </span>
-          )}
         </Button>
         {sending ? (
           <Button variant="outline" onClick={() => void cancel(dir, tab.path)}>

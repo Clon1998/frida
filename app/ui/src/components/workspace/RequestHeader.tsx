@@ -1,9 +1,10 @@
-import { ChevronRight, Save } from "lucide-react";
+import { Braces, ChevronRight, Save } from "lucide-react";
 import { EnvironmentPicker } from "@/components/env/EnvironmentPicker";
 import { Button } from "@/components/ui/button";
 import { envColor } from "@/lib/envColors";
 import { folderTrail } from "@/lib/tree";
 import { useEnvs } from "@/stores/envs";
+import { useUi } from "@/stores/ui";
 import { cn } from "cn";
 import * as actions from "@/stores/actions";
 import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
@@ -78,6 +79,7 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
         </Button>
       )}
       <div className="flex-1" />
+      {tab?.kind === "request" && <InspectorButton />}
       <EnvironmentPicker dir={dir} />
     </div>
   );
@@ -90,4 +92,28 @@ function useActiveEnvColor() {
       envColor(list.find((e) => e.environment.name === name)?.environment.color);
     return find(s.collection, s.activeCollection) ?? find(s.global, s.activeGlobal);
   });
+}
+
+/** Opens the variables inspector of the active request; the badge counts unresolved variables. */
+function InspectorButton() {
+  const open = useUi((s) => s.inspectorOpen);
+  const toggle = useUi((s) => s.toggleInspector);
+  const unresolved = useUi((s) => s.unresolved);
+  return (
+    <Button
+      variant={open ? "secondary" : "ghost"}
+      size="icon"
+      className="relative mr-1 size-7"
+      title="Variables inspector"
+      aria-label="Variables inspector"
+      onClick={toggle}
+    >
+      <Braces />
+      {unresolved > 0 && (
+        <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] text-white">
+          {unresolved}
+        </span>
+      )}
+    </Button>
+  );
 }
