@@ -64,9 +64,9 @@ export function moveTarget(
   return { parent, index: position === "after" ? index + 1 : index };
 }
 
-/** Display names of the folders containing `path`, outermost first. */
-export function folderTrail(tree: TreeNode[], path: string): string[] {
-  const trail: string[] = [];
+/** The folders containing `path` (names and paths), outermost first. */
+export function folderTrail(tree: TreeNode[], path: string): { name: string; path: string }[] {
+  const trail: { name: string; path: string }[] = [];
   let nodes = tree;
   const parent = parentOf(path);
   const parts = parent === "" ? [] : parent.split("/");
@@ -75,7 +75,7 @@ export function folderTrail(tree: TreeNode[], path: string): string[] {
     current = current ? `${current}/${part}` : part;
     const folder = nodes.find((n) => n.kind === "folder" && n.path === current);
     if (!folder || folder.kind !== "folder") break;
-    trail.push(folder.name);
+    trail.push({ name: folder.name, path: folder.path });
     nodes = folder.children;
   }
   return trail;

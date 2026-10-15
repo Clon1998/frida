@@ -60,6 +60,11 @@ interface TabsState {
   closeTab: (dir: string, path: string) => void;
   /** Closes several tabs at once (close others / to the right / saved / all). */
   closeTabs: (dir: string, paths: string[]) => void;
+  /**
+   * A request, folder or the collection (`""`) at `path` was renamed to `name` on disk: update
+   * the open tab's saved and edited name, so the change isn't mistaken for an external edit.
+   */
+  applyRename: (dir: string, path: string, name: string) => void;
   /** Throws away unsaved edits of a tab. */
   revert: (dir: string, path: string) => void;
   setActive: (dir: string, path: string) => void;
@@ -242,6 +247,18 @@ export const useTabs = create<TabsState>((set, get) => {
         }
         return { ...c, tabs, active };
       }),
+
+    applyRename: (dir, path, name) =>
+      updateTab(
+        dir,
+        path,
+        (t) =>
+          ({
+            ...t,
+            original: { ...t.original, name },
+            draft: { ...t.draft, name },
+          }) as DocumentTab,
+      ),
 
     revert: (dir, path) =>
       updateTab(dir, path, (t) => ({ ...t, draft: t.original, conflict: null }) as DocumentTab),

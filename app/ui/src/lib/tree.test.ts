@@ -62,7 +62,10 @@ describe("tree helpers", () => {
 
 describe("folderTrail", () => {
   it("returns the folder names leading to a path", () => {
-    expect(folderTrail(tree, "orders/eu/y.yaml")).toEqual(["orders", "orders/eu"]);
+    expect(folderTrail(tree, "orders/eu/y.yaml").map((f) => f.path)).toEqual([
+      "orders",
+      "orders/eu",
+    ]);
     expect(folderTrail(tree, "a.yaml")).toEqual([]);
   });
 });

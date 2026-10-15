@@ -40,9 +40,18 @@ export const renameItem = (dir: string, path: string, name: string) =>
   run(async () => {
     const newPath = await unwrap(commands.renameItem(dir, path, name));
     tabs().renamePaths(dir, path, newPath);
-    // The display name lives in the file, so open tabs re-read it.
-    await tabs().syncFromDisk(dir);
+    // The name lives in the file; update the open tab so it doesn't look like an external edit.
+    tabs().applyRename(dir, newPath, name.trim());
     await reload(dir);
+  });
+
+/** Renames the collection (its `name` in collection.yaml; the folder stays the same). */
+export const renameCollection = (dir: string, name: string) =>
+  run(async () => {
+    const collection = await unwrap(commands.readCollection(dir));
+    await unwrap(commands.saveCollection(dir, { ...collection, name: name.trim() }));
+    tabs().applyRename(dir, "", name.trim());
+    await useWorkspace.getState().reloadWorkspace();
   });
 
 export const duplicateRequest = (dir: string, path: string) =>
