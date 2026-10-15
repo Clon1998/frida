@@ -55,6 +55,21 @@ const theme = EditorView.theme({
   },
 });
 
+/**
+ * Single-line editors (the URL bar) scroll sideways like a normal input: no scrollbar strip and
+ * no vertical scrolling, which would otherwise show up inside the small field.
+ */
+const singleLineTheme = EditorView.theme({
+  ".cm-scroller": {
+    overflowX: "auto",
+    overflowY: "hidden",
+    scrollbarWidth: "none",
+    lineHeight: "1.5rem",
+  },
+  ".cm-scroller::-webkit-scrollbar": { display: "none" },
+  ".cm-content, .cm-line": { padding: "0 2px" },
+});
+
 /** Keeps a single-line editor on one line: pasted newlines become spaces. */
 const singleLineFilter = EditorState.transactionFilter.of((tr) => {
   if (!tr.docChanged || tr.newDoc.lines === 1) return tr;
@@ -96,6 +111,7 @@ export function CodeEditor({
       ? [
           minimalSetup,
           singleLineFilter,
+          singleLineTheme,
           Prec.highest(keymap.of([{ key: "Enter", run: () => (onEnterRef.current?.(), true) }])),
         ]
       : [basicSetup, EditorView.lineWrapping];
