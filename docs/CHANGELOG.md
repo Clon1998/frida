@@ -1,5 +1,44 @@
 # Changelog
 
+## M2: Environments, variables, secrets, inspector (2026-10-15, awaiting manual acceptance)
+
+### What was built
+- **Resolver** (`crates/frida-core/src/vars/`): `{{name}}` with optional whitespace, the six layers of PLAN.md §5.1
+  (runtime → request → folders, nearest first → collection env → collection → global env), recursion up to depth 10,
+  cycles reported as `a → b → a`, `{{$uuid}}` and the other dynamic variables (fresh per occurrence),
+  `{{process.env.NAME}}`. Unresolved names stay as written. Every part of a request is resolved, including inherited
+  folder and collection headers. The report lists each variable's value, source, shadowed definitions and usage, and
+  can be masked for the UI.
+- **Environments** (`storage/environments.rs`): global ones in `<workspace>/environments`, collection ones in
+  `<collection>/environments`; create, rename (moves secrets), delete (deletes secrets). Secret values are stripped
+  before every write.
+- **Secrets** (`crates/frida-secrets`): OS keychain via `keyring` 4; an encrypted file (Argon2id +
+  XChaCha20-Poly1305) when no keychain exists, unlocked with a master password; values are filled in only in memory
+  just before sending or inspecting.
+- **Cookie jar** (`http/cookies.rs`): one per collection, shared by every send; list and clear per domain or all.
+- **Tauri commands** for environments, secrets (set, delete, reveal), the active selection, `inspect_request`,
+  runtime variables and cookies. Keychain access runs in `spawn_blocking`.
+- **UI**: environment selectors in the header bar; an Environments tab (secret toggle, unset badges, click-to-reveal,
+  unlock form for the file fallback); a variables inspector (`{}` button, with a badge counting unresolved variables);
+  `{{var}}` highlighting with hover tooltips and red underlines in the URL bar and body editors; cookie viewer and
+  "clear runtime variables" in the collection tab.
+- **Fixtures**: `testdata/six-layers` (M2 acceptance) and a "Variables" folder plus `local`/`shared` environments in
+  the sample workspace.
+
+### Rust things worth understanding in this milestone
+1. **Traits and trait objects** (`crates/frida-secrets/src/lib.rs`, `app/src-tauri/src/state.rs`). `SecretStore` is an
+   interface; `Arc<dyn SecretStore>` holds "some store" chosen at runtime (keychain or encrypted file), like a Java
+   interface reference. `Send + Sync` on the trait is what allows sharing it across Tauri's threads.
+2. **Blocking work in async code** (`app/src-tauri/src/error.rs` `blocking`, `commands/env.rs`). Keychain calls block
+   the thread. `tokio::task::spawn_blocking` moves them to a thread pool meant for that, so the async runtime keeps
+   serving other commands. The closure must be `'static`, which is why commands clone the `Arc` before moving it in.
+3. **Borrowing iterators and lifetimes in the resolver** (`vars/scope.rs` `definitions`, `vars/resolver.rs`).
+   `definitions` returns an iterator that borrows the scope (`impl Iterator<Item = (&VarSource, &VarDef)> + 's`) instead
+   of copying every definition; the `'s` ties the iterator's lifetime to the scope it reads from.
+4. **Errors converting with `#[from]` across crates** (`crates/frida-core/src/error.rs` `Secret`, app `error.rs`).
+   A `SecretError` becomes a `CoreError` via `?`, and then an `ApiError` with its own code (`secret_locked`,
+   `wrong_password`) and hint, without any glue code at the call sites.
+
 ## M1: Storage, tree, requests, sending (2026-10-15)
 
 ### What was built

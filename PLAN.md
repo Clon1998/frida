@@ -495,13 +495,15 @@ the UI typechecked and linted, PLAN.md checkboxes updated, and a short summary i
 in the UI; further UI polish is deferred.*
 
 ### M2: Environments, variables, secrets, inspector
-- [ ] Global and collection environments, selectors, and the env editor.
-- [ ] The resolver (§5) with precedence, recursion, cycle detection, dynamic vars and `process.env`. Extensive unit tests.
-- [ ] Keychain secrets (§6) with the encrypted-file fallback. Test that secrets never appear in YAML.
-- [ ] Inspector panel, hover tooltips and unresolved-variable highlighting.
-- [ ] Cookie jar and viewer.
+- [x] Global and collection environments, selectors, and the env editor.
+- [x] The resolver (§5) with precedence, recursion, cycle detection, dynamic vars and `process.env`. Extensive unit tests.
+- [x] Keychain secrets (§6) with the encrypted-file fallback. Test that secrets never appear in YAML.
+- [x] Inspector panel, hover tooltips and unresolved-variable highlighting.
+- [x] Cookie jar and viewer.
 
 **Acceptance:** the inspector shows the correct source and shadowing for a fixture that defines the same variable in all 6 layers.
+*Status 2026-10-15: implemented. Automated: `crates/frida-core/tests/six_layers.rs` against `testdata/six-layers`;
+`tests/vars.rs` covers the resolver. Waiting for a manual pass through the UI (sample workspace, "Variables" folder).*
 
 ### M3: Auth
 - [ ] Basic, bearer, API key, OAuth2 (client credentials, password, auth code + PKCE), combined schemes and inheritance.
@@ -618,6 +620,22 @@ Deviations from and clarifications of this plan, newest last.
   now; vars are applied from M2, auth from M3, scripts and tests from M5, and each tab says so. The tab kind is
   derived from the path (`""` collection, `*.yaml` request, otherwise folder), so persisted tab state stays a list of
   paths. Hover "+" buttons on folders and the tree root, and an empty-state with New request / New folder.
+- **2026-10-15 (M2) Secret store API.** `frida-secrets` has a synchronous `SecretStore` trait (keychain via `keyring` 4,
+  an Argon2id + XChaCha20-Poly1305 encrypted file, and an in-memory store for tests). Callers run it in
+  `spawn_blocking`. The async `SecretProvider` for AWS Secrets Manager (§6) is added in M8 on top of it. Keychain
+  entries use service `frida` and account `{scopeId}/{env}/{var}`. Global environments use `ws-<sha256(path)[..16]>`
+  as scope id.
+- **2026-10-15 (M2) Resolver details.** The highest layer that *defines* a name wins; a secret defined there without a
+  value is reported as unresolved instead of falling back to a lower layer (so a missing secret is noticed). Depth 10
+  means `{{v0}}` may reference down to `{{v10}}`. A variable whose value contains a secret counts as secret too.
+  `process.env.*` and `$dynamic` names can't be shadowed by layers. Auth fields are resolved with M3.
+- **2026-10-15 (M2) Active environments** are local state: the collection's in `state/{collectionId}.json`
+  (`activeEnvironment`), the global one per workspace folder in `settings.json`.
+- **2026-10-15 (M2) Environment editor is a tab** (path `@environments`), following the M1 feedback that settings
+  should open as tabs rather than dialogs. The URL bar became a single-line CodeMirror editor for `{{var}}` highlighting.
+  Key/value table inputs are not highlighted yet (plain inputs).
+- **2026-10-15 (M2) Cookies** live in memory per collection and are shown in a "Cookies" sub-tab of the collection
+  tab. The response-level "Cookies" tab from §14 is still open.
 
 ## 17. Testing strategy
 
