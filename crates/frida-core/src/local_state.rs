@@ -19,6 +19,8 @@ pub struct AppSettings {
     /// Absolute workspace folders, most recent first.
     pub recent_workspaces: Vec<String>,
     pub theme: ThemePreference,
+    /// The active global environment per workspace folder.
+    pub active_global_environments: std::collections::BTreeMap<String, String>,
 }
 
 impl AppSettings {
@@ -48,6 +50,8 @@ pub struct CollectionState {
     pub active_tab: Option<String>,
     /// Folders expanded in the sidebar tree.
     pub expanded_folders: Vec<String>,
+    /// The active collection environment.
+    pub active_environment: Option<String>,
 }
 
 /// Reads and writes the local state files below one base directory (the app data dir).
@@ -153,6 +157,7 @@ mod tests {
             open_tabs: vec!["a.yaml".into(), "orders/b.yaml".into()],
             active_tab: Some("a.yaml".into()),
             expanded_folders: vec!["orders".into()],
+            active_environment: Some("dev".into()),
         };
         store.save_collection_state(id, &state).unwrap();
         assert_eq!(store.load_collection_state(id).unwrap(), state);

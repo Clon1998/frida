@@ -42,6 +42,9 @@ pub enum CoreError {
     /// convert a send error into a `CoreError` automatically (Java would need a manual wrap).
     #[error(transparent)]
     Send(#[from] crate::http::SendError),
+
+    #[error(transparent)]
+    Secret(#[from] frida_secrets::SecretError),
 }
 
 impl CoreError {

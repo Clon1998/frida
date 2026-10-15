@@ -1596,6 +1596,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "frida-core",
+ "frida-secrets",
  "serde",
  "serde_json",
  "specta",
@@ -1605,6 +1606,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-specta",
+ "tokio",
  "tokio-util",
  "tracing",
  "tracing-appender",

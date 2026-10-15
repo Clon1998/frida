@@ -5,7 +5,9 @@ use std::path::Path;
 use frida_secrets::{SecretKey, SecretStore};
 use sha2::{Digest, Sha256};
 
+use crate::error::Result;
 use crate::model::Environment;
+use crate::storage;
 
 /// The keychain scope of a workspace's global environments: a short hash of the workspace
 /// folder, so two workspaces with an environment of the same name don't share secrets.
@@ -43,13 +45,45 @@ pub fn fill_secret_values(
     errors
 }
 
+/// Loads the environment `name` from `dir` with its secret values filled in from `store`.
+/// Blocking, see [`fill_secret_values`]. Secrets that can't be read stay unset (logged).
+pub fn load_environment_with_secrets(
+    dir: &Path,
+    name: &str,
+    scope_id: &str,
+    store: &dyn SecretStore,
+) -> Result<Option<Environment>> {
+    let Some(mut env) = storage::find_environment(dir, name)? else {
+        return Ok(None);
+    };
+    for error in fill_secret_values(&mut env, scope_id, store) {
+        // Only the variable name and the store's error, never a value.
+        tracing::warn!(environment = %env.name, %error, "could not read secret");
+    }
+    Ok(Some(env))
+}
+
+/// Names of `env`'s secret variables that have a value in `store`. Blocking.
+pub fn set_secret_names(env: &Environment, scope_id: &str, store: &dyn SecretStore) -> Vec<String> {
+    env.variables
+        .iter()
+        .filter(|v| v.secret)
+        .filter(|v| {
+            store
+                .get(&SecretKey::new(scope_id, &env.name, &v.name))
+                .is_ok_and(|value| value.is_some())
+        })
+        .map(|v| v.name.clone())
+        .collect()
+}
+
 /// Moves the secrets of `env` when the environment is renamed, so they aren't orphaned.
 pub fn rename_env_secrets(
     env: &Environment,
     old_name: &str,
     scope_id: &str,
     store: &dyn SecretStore,
-) -> Result<(), frida_secrets::SecretError> {
+) -> Result<()> {
     for var in env.variables.iter().filter(|v| v.secret) {
         let old = SecretKey::new(scope_id, old_name, &var.name);
         if let Some(value) = store.get(&old)? {
@@ -65,7 +99,7 @@ pub fn delete_env_secrets(
     env: &Environment,
     scope_id: &str,
     store: &dyn SecretStore,
-) -> Result<(), frida_secrets::SecretError> {
+) -> Result<()> {
     for var in env.variables.iter().filter(|v| v.secret) {
         store.delete(&SecretKey::new(scope_id, &env.name, &var.name))?;
     }

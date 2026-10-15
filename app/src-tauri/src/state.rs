@@ -2,12 +2,15 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use frida_core::http::ResponseCache;
+use frida_core::http::{CookieJar, ResponseCache};
 use frida_core::local_state::LocalStore;
 use frida_core::storage;
 use frida_core::watch::FsWatcher;
+use frida_secrets::{EncryptedFileStore, KeychainStore, SecretStore};
+use serde::Deserialize;
+use specta::Type;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::{ApiError, ApiResult, ErrorCode};
@@ -25,6 +28,38 @@ pub struct AppState {
     pub in_flight: Mutex<HashMap<String, CancellationToken>>,
     pub responses: Mutex<ResponseCache>,
     pub watcher: Mutex<Option<FsWatcher>>,
+    pub secrets: SecretBackend,
+    /// Variables set by scripts (`bru.setVar`), per collection folder. In memory only.
+    pub runtime_vars: Mutex<HashMap<PathBuf, HashMap<String, String>>>,
+    /// One cookie jar per collection folder, in memory only.
+    pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,
+}
+
+/// Where secret values are kept on this machine (PLAN.md §6).
+pub enum SecretBackend {
+    /// The OS keychain (the normal case).
+    Keychain(Arc<KeychainStore>),
+    /// No OS keychain available: an encrypted file that must be unlocked with a password.
+    File(Arc<EncryptedFileStore>),
+}
+
+impl SecretBackend {
+    /// The store as a trait object. `Arc<dyn SecretStore>` lets commands use either backend
+    /// through the same interface and move it into `spawn_blocking` closures.
+    pub fn store(&self) -> Arc<dyn SecretStore> {
+        match self {
+            SecretBackend::Keychain(store) => Arc::clone(store) as Arc<dyn SecretStore>,
+            SecretBackend::File(store) => Arc::clone(store) as Arc<dyn SecretStore>,
+        }
+    }
+}
+
+/// Which environments a command is about: the workspace's global ones or a collection's.
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum EnvScope {
+    Global,
+    Collection { dir: String },
 }
 
 /// The currently open workspace and the folders of its collections.
@@ -36,13 +71,56 @@ pub struct OpenWorkspace {
 
 impl AppState {
     pub fn new(app_data_dir: PathBuf) -> Self {
+        let secrets = if frida_secrets::keychain_available() {
+            SecretBackend::Keychain(Arc::new(KeychainStore))
+        } else {
+            tracing::warn!("no OS keychain available, using the encrypted secret file");
+            SecretBackend::File(Arc::new(EncryptedFileStore::new(
+                app_data_dir.join("secrets.enc"),
+            )))
+        };
         Self {
             local: LocalStore::new(app_data_dir),
             workspace: Mutex::new(None),
             in_flight: Mutex::new(HashMap::new()),
             responses: Mutex::new(ResponseCache::default()),
             watcher: Mutex::new(None),
+            secrets,
+            runtime_vars: Mutex::new(HashMap::new()),
+            cookie_jars: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// The folder holding the environments of `scope`, and the keychain scope id of its secrets.
+    pub fn env_location(&self, scope: &EnvScope) -> ApiResult<(PathBuf, String)> {
+        match scope {
+            EnvScope::Global => {
+                let dir = self.workspace_dir()?;
+                let scope_id = frida_core::secrets::workspace_scope_id(&dir);
+                Ok((dir, scope_id))
+            }
+            EnvScope::Collection { dir } => {
+                let dir = self.collection_dir(dir)?;
+                let scope_id = storage::load_collection(&dir)?.id;
+                Ok((dir, scope_id))
+            }
+        }
+    }
+
+    /// The cookie jar of a collection, created on first use.
+    pub fn cookie_jar(&self, collection_dir: &Path) -> Arc<CookieJar> {
+        let mut jars = self.cookie_jars.lock().expect("cookie jars lock poisoned");
+        Arc::clone(jars.entry(collection_dir.to_path_buf()).or_default())
+    }
+
+    /// A copy of a collection's runtime variables.
+    pub fn runtime_vars(&self, collection_dir: &Path) -> HashMap<String, String> {
+        self.runtime_vars
+            .lock()
+            .expect("runtime vars lock poisoned")
+            .get(collection_dir)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// The open workspace's folder, or a `no_workspace` error.

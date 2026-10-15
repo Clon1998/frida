@@ -1,0 +1,300 @@
+//! Environments, their secrets, the active selection, runtime variables and cookies.
+//!
+//! Keychain access is blocking, so every command touching secrets is `async` and runs that
+//! part through [`blocking`] (a `spawn_blocking` wrapper).
+
+use std::path::Path;
+
+use frida_core::http::{self, CookieView};
+use frida_core::local_state::CollectionState;
+use frida_core::model::Environment;
+use frida_core::secrets;
+use frida_core::storage;
+use frida_secrets::SecretKey;
+use serde::Serialize;
+use specta::Type;
+use tauri::State;
+
+use crate::error::{ApiError, ApiResult, ErrorCode, blocking};
+use crate::state::{AppState, EnvScope, SecretBackend};
+
+/// An environment plus which of its secrets have a value (the values themselves stay hidden).
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentInfo {
+    pub environment: Environment,
+    pub set_secrets: Vec<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_environments(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+) -> ApiResult<Vec<EnvironmentInfo>> {
+    let (dir, scope_id) = state.env_location(&scope)?;
+    let store = state.secrets.store();
+    blocking(move || {
+        let infos = storage::list_environments(&dir)?
+            .into_iter()
+            .map(|environment| EnvironmentInfo {
+                set_secrets: secrets::set_secret_names(&environment, &scope_id, store.as_ref()),
+                environment,
+            })
+            .collect();
+        Ok(infos)
+    })
+    .await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_environment(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    name: String,
+) -> ApiResult<Environment> {
+    let (dir, _) = state.env_location(&scope)?;
+    Ok(storage::create_environment(&dir, &name)?)
+}
+
+/// Saves an environment that was loaded as `original_name`. Secret values in `environment`
+/// are ignored (they never go to disk); use [`set_secret`] for those. Renaming moves secrets.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_environment(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    original_name: String,
+    environment: Environment,
+) -> ApiResult<()> {
+    let (dir, scope_id) = state.env_location(&scope)?;
+    storage::save_environment(&dir, &original_name, &environment)?;
+    if environment.name != original_name {
+        let store = state.secrets.store();
+        blocking(move || {
+            Ok(secrets::rename_env_secrets(
+                &environment,
+                &original_name,
+                &scope_id,
+                store.as_ref(),
+            )?)
+        })
+        .await?;
+    }
+    Ok(())
+}
+
+/// Deletes an environment file and its secrets.
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_environment(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    name: String,
+) -> ApiResult<()> {
+    let (dir, scope_id) = state.env_location(&scope)?;
+    let env = storage::find_environment(&dir, &name)?.ok_or_else(|| {
+        ApiError::new(
+            ErrorCode::NotFound,
+            format!("environment {name:?} not found"),
+        )
+    })?;
+    storage::delete_environment(&dir, &name)?;
+    let store = state.secrets.store();
+    blocking(move || {
+        Ok(secrets::delete_env_secrets(
+            &env,
+            &scope_id,
+            store.as_ref(),
+        )?)
+    })
+    .await
+}
+
+/// Stores a secret value in the keychain (never in YAML).
+#[tauri::command]
+#[specta::specta]
+pub async fn set_secret(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    environment: String,
+    variable: String,
+    value: String,
+) -> ApiResult<()> {
+    let (_, scope_id) = state.env_location(&scope)?;
+    let store = state.secrets.store();
+    let key = SecretKey::new(scope_id, environment, variable);
+    blocking(move || Ok(store.set(&key, &value)?)).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_secret(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    environment: String,
+    variable: String,
+) -> ApiResult<()> {
+    let (_, scope_id) = state.env_location(&scope)?;
+    let store = state.secrets.store();
+    let key = SecretKey::new(scope_id, environment, variable);
+    blocking(move || Ok(store.delete(&key)?)).await
+}
+
+/// Returns a secret's value. Only called when the user clicks "reveal" (PLAN.md §3).
+#[tauri::command]
+#[specta::specta]
+pub async fn reveal_secret(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    environment: String,
+    variable: String,
+) -> ApiResult<Option<String>> {
+    let (_, scope_id) = state.env_location(&scope)?;
+    let store = state.secrets.store();
+    let key = SecretKey::new(scope_id, environment, variable);
+    tracing::info!(variable = %key.var, "secret revealed in the UI");
+    blocking(move || Ok(store.get(&key)?)).await
+}
+
+/// The selected global and collection environment.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveEnvironments {
+    pub global: Option<String>,
+    pub collection: Option<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_active_environments(
+    state: State<'_, AppState>,
+    dir: String,
+) -> ApiResult<ActiveEnvironments> {
+    let collection_dir = state.collection_dir(&dir)?;
+    active_environments(&state, &collection_dir)
+}
+
+/// Selects an environment (`None` = no environment).
+#[tauri::command]
+#[specta::specta]
+pub fn set_active_environment(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    name: Option<String>,
+) -> ApiResult<()> {
+    match scope {
+        EnvScope::Global => {
+            let ws = state.workspace_dir()?.to_string_lossy().to_string();
+            let mut settings = state.local.load_settings();
+            match name {
+                Some(name) => settings.active_global_environments.insert(ws, name),
+                None => settings.active_global_environments.remove(&ws),
+            };
+            Ok(state.local.save_settings(&settings)?)
+        }
+        EnvScope::Collection { dir } => {
+            let collection_dir = state.collection_dir(&dir)?;
+            let id = storage::load_collection(&collection_dir)?.id;
+            let collection_state = CollectionState {
+                active_environment: name,
+                ..state.local.load_collection_state(&id)?
+            };
+            Ok(state.local.save_collection_state(&id, &collection_state)?)
+        }
+    }
+}
+
+/// Looks up the active environment names for a collection (used here and when sending).
+pub fn active_environments(
+    state: &AppState,
+    collection_dir: &Path,
+) -> ApiResult<ActiveEnvironments> {
+    let ws = state.workspace_dir()?.to_string_lossy().to_string();
+    let global = state
+        .local
+        .load_settings()
+        .active_global_environments
+        .get(&ws)
+        .cloned();
+    let id = storage::load_collection(collection_dir)?.id;
+    let collection = state.local.load_collection_state(&id)?.active_environment;
+    Ok(ActiveEnvironments { global, collection })
+}
+
+/// How secrets are stored on this machine, for the env editor.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretBackendStatus {
+    /// `true`: the OS keychain. `false`: the encrypted file fallback.
+    pub keychain: bool,
+    /// For the file fallback: whether it is unlocked.
+    pub unlocked: bool,
+    /// For the file fallback: whether it was created already (unlocking checks the password).
+    pub file_exists: bool,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn secret_backend_status(state: State<'_, AppState>) -> SecretBackendStatus {
+    match &state.secrets {
+        SecretBackend::Keychain(_) => SecretBackendStatus {
+            keychain: true,
+            unlocked: true,
+            file_exists: false,
+        },
+        SecretBackend::File(file) => SecretBackendStatus {
+            keychain: false,
+            unlocked: file.is_unlocked(),
+            file_exists: file.exists(),
+        },
+    }
+}
+
+/// Unlocks (or, the first time, creates) the encrypted secret file.
+#[tauri::command]
+#[specta::specta]
+pub async fn unlock_secret_file(state: State<'_, AppState>, password: String) -> ApiResult<()> {
+    match &state.secrets {
+        SecretBackend::Keychain(_) => Ok(()),
+        SecretBackend::File(file) => {
+            let file = std::sync::Arc::clone(file);
+            // Argon2 key derivation is deliberately slow, so it runs off the async runtime too.
+            blocking(move || Ok(file.unlock(&password)?)).await
+        }
+    }
+}
+
+/// Clears the runtime variables (`bru.setVar`) of a collection.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_runtime_vars(state: State<'_, AppState>, dir: String) -> ApiResult<()> {
+    let collection_dir = state.collection_dir(&dir)?;
+    state
+        .runtime_vars
+        .lock()
+        .expect("runtime vars lock poisoned")
+        .remove(&collection_dir);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_cookies(state: State<'_, AppState>, dir: String) -> ApiResult<Vec<CookieView>> {
+    let collection_dir = state.collection_dir(&dir)?;
+    Ok(http::list_cookies(&state.cookie_jar(&collection_dir)))
+}
+
+/// Removes the cookies of `domain`, or all of the collection's cookies when `domain` is `None`.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_cookies(
+    state: State<'_, AppState>,
+    dir: String,
+    domain: Option<String>,
+) -> ApiResult<()> {
+    let collection_dir = state.collection_dir(&dir)?;
+    http::clear_cookies(&state.cookie_jar(&collection_dir), domain.as_deref());
+    Ok(())
+}

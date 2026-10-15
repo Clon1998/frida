@@ -2,6 +2,7 @@
 
 use frida_core::CoreError;
 use frida_core::http::SendError;
+use frida_secrets::SecretError;
 use serde::Serialize;
 use specta::Type;
 
@@ -32,6 +33,9 @@ pub enum ErrorCode {
     Tls,
     Http,
     NoWorkspace,
+    SecretLocked,
+    WrongPassword,
+    Secret,
 }
 
 impl ApiError {
@@ -65,6 +69,7 @@ impl From<CoreError> for ApiError {
                 .with_hint("It may have been moved or deleted outside Frida."),
             CoreError::InvalidInput(_) => ApiError::new(ErrorCode::InvalidInput, message),
             CoreError::Send(send) => send.into(),
+            CoreError::Secret(secret) => secret.into(),
         }
     }
 }
@@ -86,6 +91,36 @@ impl From<SendError> for ApiError {
             SendError::Other(_) => ApiError::new(ErrorCode::Http, message),
         }
     }
+}
+
+impl From<SecretError> for ApiError {
+    fn from(error: SecretError) -> Self {
+        let message = error.to_string();
+        match error {
+            SecretError::Locked => ApiError::new(ErrorCode::SecretLocked, message).with_hint(
+                "Unlock the secret file with your master password in the environment editor.",
+            ),
+            SecretError::WrongPassword => ApiError::new(ErrorCode::WrongPassword, message),
+            SecretError::KeychainUnavailable(_) => ApiError::new(ErrorCode::Secret, message)
+                .with_hint("Restart Frida; it will use an encrypted secret file instead."),
+            SecretError::Keychain(_) | SecretError::File { .. } => {
+                ApiError::new(ErrorCode::Secret, message)
+            }
+        }
+    }
+}
+
+/// Runs blocking work (keychain, file I/O) off the async runtime (CLAUDE.md) and flattens the
+/// join error. `spawn_blocking` moves the closure to a thread pool meant for blocking calls,
+/// like submitting a task to a separate `ExecutorService` in Java.
+pub async fn blocking<T, F>(work: F) -> ApiResult<T>
+where
+    F: FnOnce() -> ApiResult<T> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|e| ApiError::new(ErrorCode::Io, format!("background task failed: {e}")))?
 }
 
 /// Shorthand used by every command.

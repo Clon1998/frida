@@ -53,6 +53,31 @@ export const commands = {
 	moveItem: (dir: string, path: string, parent: string, index: number) => typedError<string, ApiError>(__TAURI_INVOKE("move_item", { dir, path, parent, index })),
 	/**  Shows a request file or folder in Finder / Explorer / the file manager. */
 	revealItem: (dir: string, path: string) => typedError<null, ApiError>(__TAURI_INVOKE("reveal_item", { dir, path })),
+	listEnvironments: (scope: EnvScope) => typedError<EnvironmentInfo_Serialize[], ApiError>(__TAURI_INVOKE("list_environments", { scope })),
+	createEnvironment: (scope: EnvScope, name: string) => typedError<Environment_Serialize, ApiError>(__TAURI_INVOKE("create_environment", { scope, name })),
+	/**
+	 *  Saves an environment that was loaded as `original_name`. Secret values in `environment`
+	 *  are ignored (they never go to disk); use [`set_secret`] for those. Renaming moves secrets.
+	 */
+	saveEnvironment: (scope: EnvScope, originalName: string, environment: Environment_Deserialize) => typedError<null, ApiError>(__TAURI_INVOKE("save_environment", { scope, originalName, environment })),
+	/**  Deletes an environment file and its secrets. */
+	deleteEnvironment: (scope: EnvScope, name: string) => typedError<null, ApiError>(__TAURI_INVOKE("delete_environment", { scope, name })),
+	/**  Stores a secret value in the keychain (never in YAML). */
+	setSecret: (scope: EnvScope, environment: string, variable: string, value: string) => typedError<null, ApiError>(__TAURI_INVOKE("set_secret", { scope, environment, variable, value })),
+	deleteSecret: (scope: EnvScope, environment: string, variable: string) => typedError<null, ApiError>(__TAURI_INVOKE("delete_secret", { scope, environment, variable })),
+	/**  Returns a secret's value. Only called when the user clicks "reveal" (PLAN.md §3). */
+	revealSecret: (scope: EnvScope, environment: string, variable: string) => typedError<string | null, ApiError>(__TAURI_INVOKE("reveal_secret", { scope, environment, variable })),
+	getActiveEnvironments: (dir: string) => typedError<ActiveEnvironments, ApiError>(__TAURI_INVOKE("get_active_environments", { dir })),
+	/**  Selects an environment (`None` = no environment). */
+	setActiveEnvironment: (scope: EnvScope, name: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_active_environment", { scope, name })),
+	secretBackendStatus: () => __TAURI_INVOKE<SecretBackendStatus>("secret_backend_status"),
+	/**  Unlocks (or, the first time, creates) the encrypted secret file. */
+	unlockSecretFile: (password: string) => typedError<null, ApiError>(__TAURI_INVOKE("unlock_secret_file", { password })),
+	/**  Clears the runtime variables (`bru.setVar`) of a collection. */
+	clearRuntimeVars: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("clear_runtime_vars", { dir })),
+	listCookies: (dir: string) => typedError<CookieView[], ApiError>(__TAURI_INVOKE("list_cookies", { dir })),
+	/**  Removes the cookies of `domain`, or all of the collection's cookies when `domain` is `None`. */
+	clearCookies: (dir: string, domain: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("clear_cookies", { dir, domain })),
 	/**
 	 *  Sends `request` (the editor's current state, saved or not) as if it lived at `path` in the
 	 *  collection `dir`. `request_id` is chosen by the UI and used by [`cancel_request`].
@@ -61,6 +86,11 @@ export const commands = {
 	 *  responsive while waiting for the server.
 	 */
 	sendRequest: (requestId: string, dir: string, path: string, request: Request) => typedError<ResponseView, ApiError>(__TAURI_INVOKE("send_request", { requestId, dir, path, request })),
+	/**
+	 *  Resolves the variables of `request` without sending it, for the inspector panel and the
+	 *  editor tooltips. Secret values are masked.
+	 */
+	inspectRequest: (dir: string, path: string, request: Request) => typedError<ResolveReport, ApiError>(__TAURI_INVOKE("inspect_request", { dir, path, request })),
 	/**  Cancels an in-flight request. Unknown ids (already finished) are ignored. */
 	cancelRequest: (requestId: string) => __TAURI_INVOKE<void>("cancel_request", { requestId }),
 	/**  Writes the full body of a recent response to `target` (chosen in a save dialog). */
@@ -77,6 +107,12 @@ export const events = {
 export type AboutInfo = {
 	productName: string,
 	coreVersion: string,
+};
+
+/**  The selected global and collection environment. */
+export type ActiveEnvironments = {
+	global: string | null,
+	collection: string | null,
 };
 
 /**
@@ -97,6 +133,8 @@ export type AppSettings = {
 	/**  Absolute workspace folders, most recent first. */
 	recentWorkspaces?: string[],
 	theme?: ThemePreference,
+	/**  The active global environment per workspace folder. */
+	activeGlobalEnvironments?: { [key in string]: string },
 };
 
 /**
@@ -168,6 +206,8 @@ export type CollectionState = {
 	activeTab?: string | null,
 	/**  Folders expanded in the sidebar tree. */
 	expandedFolders?: string[],
+	/**  The active collection environment. */
+	activeEnvironment?: string | null,
 };
 
 export type CollectionSummary = {
@@ -180,7 +220,71 @@ export type CollectionSummary = {
 	error: string | null,
 };
 
-export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace";
+/**  One cookie as the cookie viewer shows it. */
+export type CookieView = {
+	domain: string,
+	path: string,
+	name: string,
+	value: string,
+	/**  ISO timestamp, or `None` for session cookies. */
+	expires: string | null,
+	secure: boolean,
+	httpOnly: boolean,
+};
+
+/**  Which environments a command is about: the workspace's global ones or a collection's. */
+export type EnvScope = { kind: "global" } | { kind: "collection"; dir: string };
+
+export type EnvVariable = EnvVariable_Serialize | EnvVariable_Deserialize;
+
+export type EnvVariable_Deserialize = {
+	name: string,
+	/**  `None` for secrets, whose value is stored outside the file. */
+	value?: string | null,
+	secret?: boolean,
+	/**  Where a secret value comes from when it isn't in the keychain. */
+	source?: SecretSource_Deserialize | null,
+};
+
+export type EnvVariable_Serialize = {
+	name: string,
+	/**  `None` for secrets, whose value is stored outside the file. */
+	value?: string | null,
+	secret?: boolean,
+	/**  Where a secret value comes from when it isn't in the keychain. */
+	source?: SecretSource_Serialize | null,
+};
+
+export type Environment = Environment_Serialize | Environment_Deserialize;
+
+/**  An environment plus which of its secrets have a value (the values themselves stay hidden). */
+export type EnvironmentInfo = EnvironmentInfo_Serialize | EnvironmentInfo_Deserialize;
+
+/**  An environment plus which of its secrets have a value (the values themselves stay hidden). */
+export type EnvironmentInfo_Deserialize = {
+	environment: Environment_Deserialize,
+	setSecrets: string[],
+};
+
+/**  An environment plus which of its secrets have a value (the values themselves stay hidden). */
+export type EnvironmentInfo_Serialize = {
+	environment: Environment_Serialize,
+	setSecrets: string[],
+};
+
+export type Environment_Deserialize = {
+	version: number,
+	name: string,
+	variables?: EnvVariable_Deserialize[],
+};
+
+export type Environment_Serialize = {
+	version: number,
+	name: string,
+	variables: EnvVariable_Serialize[],
+};
+
+export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret";
 
 /**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
 export type Folder = {
@@ -275,6 +379,30 @@ export type Request = {
 	docs?: string,
 };
 
+/**  Everything the resolver found while resolving one request. */
+export type ResolveReport = {
+	/**  Each variable once, in order of first use. */
+	vars: ResolvedVar[],
+	/**  Problems such as cycles (`a → b → a`) or nesting deeper than [`MAX_DEPTH`]. */
+	errors: string[],
+};
+
+/**  One variable as the inspector shows it (PLAN.md §5.4). */
+export type ResolvedVar = {
+	name: string,
+	/**  The fully resolved value. `None` when unresolved, or when masked because it is secret. */
+	value: string | null,
+	/**  `None` when no layer defines the variable. */
+	source: VarSource | null,
+	resolved: boolean,
+	/**  The variable is secret, or its value contains a secret. */
+	isSecret: boolean,
+	/**  The secret's value was removed from this report (see [`ResolveReport::masked`]). */
+	masked: boolean,
+	shadowed: ShadowedVar[],
+	usedIn: UsageLocation[],
+};
+
 export type ResponseView = {
 	/**  Identifies the full body in the [`ResponseCache`]. */
 	id: string,
@@ -299,9 +427,33 @@ export type Scripts = {
 	post?: string,
 };
 
+/**  How secrets are stored on this machine, for the env editor. */
+export type SecretBackendStatus = {
+	/**  `true`: the OS keychain. `false`: the encrypted file fallback. */
+	keychain: boolean,
+	/**  For the file fallback: whether it is unlocked. */
+	unlocked: boolean,
+	/**  For the file fallback: whether it was created already (unlocking checks the password). */
+	fileExists: boolean,
+};
+
+export type SecretSource = SecretSource_Serialize | SecretSource_Deserialize;
+
+export type SecretSource_Deserialize = { type: "aws-secrets-manager"; secretId: string; jsonKey?: string | null; region?: string | null };
+
+export type SecretSource_Serialize = { type: "aws-secrets-manager"; secretId: string; jsonKey?: string | null; region?: string | null };
+
 /**  Request-level and folder-level settings. `None` means "inherit from the parent". */
 export type Settings = {
 	timeoutMs?: number | null,
+};
+
+/**  A lower-priority definition of a variable that lost to a higher one. */
+export type ShadowedVar = {
+	source: VarSource,
+	/**  `None` for secrets in a masked report, or a secret that has no value yet. */
+	value: string | null,
+	isSecret: boolean,
 };
 
 export type ThemePreference = "system" | "light" | "dark";
@@ -336,6 +488,25 @@ export type TreeNode = { kind: "folder"; path: string; name: string; seq: number
  *  whole tree, so one broken file (e.g. a git merge conflict) doesn't lock the user out.
  */
 { kind: "invalid"; path: string; error: string };
+
+/**  Where in the request a variable is used. */
+export type UsageLocation = { kind: "url" } | { kind: "pathParam"; name: string } | { kind: "header"; name: string } | { kind: "body" } | { kind: "auth" } | 
+/**  Inside another variable's value, e.g. `baseUrl = {{host}}/api`. */
+{ kind: "variable"; name: string };
+
+/**
+ *  Where a variable's value came from. Ordered from highest to lowest priority, plus the two
+ *  separate namespaces `process.env.*` and `$dynamic`.
+ */
+export type VarSource = 
+/**  Set by a script with `bru.setVar` (M5). Cleared on restart. */
+{ kind: "runtime" } | { kind: "request" } | 
+/**  `path` is the folder's collection-relative path. */
+{ kind: "folder"; path: string; name: string } | { kind: "collectionEnv"; name: string } | { kind: "collection" } | { kind: "globalEnv"; name: string } | 
+/**  `{{process.env.NAME}}` */
+{ kind: "processEnv" } | 
+/**  `{{$uuid}}` etc. */
+{ kind: "dynamic" };
 
 /**  A workspace as the UI shows it: its collections with names, or an error per collection. */
 export type WorkspaceOverview = {
