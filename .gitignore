@@ -1,0 +1,38 @@
+# --- Rust ---
+/target/
+# Pending insta snapshots (review with `cargo insta review`)
+*.snap.new
+*.pending-snap
+
+# --- Tauri ---
+# Generated at build time (JSON schemas for capabilities)
+app/src-tauri/gen/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.vite/
+*.local
+.env
+.env.*
+!.env.example
+
+# --- Logs ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Editors / IDEs ---
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
