@@ -24,16 +24,12 @@ export function Sidebar() {
   const createCollection = useWorkspace((s) => s.createCollection);
   const removeCollection = useWorkspace((s) => s.removeCollection);
   const closeWorkspace = useWorkspace((s) => s.closeWorkspace);
-  const [newCollectionDir, setNewCollectionDir] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!workspace) return null;
 
-  const pickNewCollectionFolder = async () => {
-    const dir = await open({ directory: true, title: "Choose an empty folder for the collection" });
-    if (typeof dir === "string") setNewCollectionDir(dir);
-  };
   const pickExistingCollection = async () => {
     const dir = await open({ directory: true, title: "Choose a collection folder" });
     if (typeof dir === "string") await addCollection(dir);
@@ -65,7 +61,7 @@ export function Sidebar() {
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void pickNewCollectionFolder()}>
+            <DropdownMenuItem onSelect={() => setCreating(true)}>
               <Plus /> New collection…
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void pickExistingCollection()}>
@@ -94,7 +90,7 @@ export function Sidebar() {
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
           <p className="text-sm text-muted-foreground">This workspace has no collections yet.</p>
-          <Button size="sm" onClick={() => void pickNewCollectionFolder()}>
+          <Button size="sm" onClick={() => setCreating(true)}>
             New collection…
           </Button>
           <Button size="sm" variant="outline" onClick={() => void pickExistingCollection()}>
@@ -104,13 +100,11 @@ export function Sidebar() {
       )}
 
       <NameDialog
-        open={newCollectionDir !== null}
+        open={creating}
         title="New collection"
         label="Collection name"
-        onOpenChange={(o) => !o && setNewCollectionDir(null)}
-        onConfirm={(name) => {
-          if (newCollectionDir) void createCollection(newCollectionDir, name);
-        }}
+        onOpenChange={setCreating}
+        onConfirm={(name) => void createCollection(name)}
       />
       {active && (
         <CollectionSettingsDialog

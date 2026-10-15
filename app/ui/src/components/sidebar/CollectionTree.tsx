@@ -19,6 +19,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
+import { FolderSettingsDialog } from "@/components/workspace/FolderSettingsDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { methodColor } from "@/lib/methods";
 import { type DropPosition, dropPosition, moveTarget } from "@/lib/tree";
@@ -32,6 +33,7 @@ type DialogState =
   | { kind: "new-request" | "new-folder"; parent: string }
   | { kind: "rename"; path: string; name: string }
   | { kind: "delete"; path: string; name: string; isFolder: boolean }
+  | { kind: "folder-settings"; path: string }
   | null;
 
 interface DropState {
@@ -77,6 +79,7 @@ export function CollectionTree({ dir }: { dir: string }) {
       setDialog({ kind: "rename", path: node.path, name: node.name }),
     remove: (path: string, name: string, isFolder: boolean) =>
       setDialog({ kind: "delete", path, name, isFolder }),
+    folderSettings: (path: string) => setDialog({ kind: "folder-settings", path }),
   };
 
   return (
@@ -141,6 +144,11 @@ export function CollectionTree({ dir }: { dir: string }) {
           if (dialog?.kind === "rename") void actions.renameItem(dir, dialog.path, name);
         }}
       />
+      <FolderSettingsDialog
+        dir={dir}
+        path={dialog?.kind === "folder-settings" ? dialog.path : null}
+        onClose={() => setDialog(null)}
+      />
       <ConfirmDialog
         open={dialog?.kind === "delete"}
         title={dialog?.kind === "delete" ? `Delete "${dialog.name}"?` : ""}
@@ -172,6 +180,7 @@ interface TreeRowProps {
     newFolder: (parent: string) => void;
     rename: (node: TreeNode & { name: string }) => void;
     remove: (path: string, name: string, isFolder: boolean) => void;
+    folderSettings: (path: string) => void;
   };
 }
 
@@ -257,6 +266,9 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => menu.newFolder(node.path)}>
                 New folder
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => menu.folderSettings(node.path)}>
+                Settings…
               </ContextMenuItem>
               <ContextMenuSeparator />
             </>

@@ -14,7 +14,8 @@ interface WorkspaceState {
   createWorkspace: (dir: string, name: string) => Promise<void>;
   closeWorkspace: () => Promise<void>;
   reloadWorkspace: () => Promise<void>;
-  createCollection: (dir: string, name: string) => Promise<void>;
+  /** Creates a collection named `name` in the workspace's `collections/` folder. */
+  createCollection: (name: string) => Promise<void>;
   addCollection: (dir: string) => Promise<void>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
@@ -73,9 +74,9 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       }
     },
 
-    createCollection: async (dir, name) => {
+    createCollection: async (name) => {
       try {
-        const overview = await unwrap(commands.createCollection(dir, name));
+        const [overview, dir] = await unwrap(commands.createCollection(name));
         set({ activeCollectionDir: dir });
         await applyOverview(overview);
       } catch (e) {

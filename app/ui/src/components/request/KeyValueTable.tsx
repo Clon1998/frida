@@ -1,11 +1,14 @@
 import { Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { KeyValue as RawKeyValue } from "@/bindings";
-import type { Complete } from "@/lib/model";
-
-type KeyValue = Complete<RawKeyValue>;
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { bulkToRows, rowsToBulk } from "@/lib/bulk";
+import type { Complete } from "@/lib/model";
+
+type KeyValue = Complete<RawKeyValue>;
 
 interface KeyValueTableProps {
   rows: KeyValue[];
@@ -16,7 +19,7 @@ interface KeyValueTableProps {
 
 /**
  * Editable `name | value` rows with an enabled checkbox. Typing into the empty last row adds a
- * new row, so there is no separate "Add" button.
+ * new row. "Bulk edit" switches to a text area with one `name: value` per line.
  */
 export function KeyValueTable({
   rows,
@@ -24,6 +27,10 @@ export function KeyValueTable({
   namePlaceholder = "Name",
   valuePlaceholder = "Value",
 }: KeyValueTableProps) {
+  // While bulk editing, the text is kept as typed (parsing on every key press would otherwise
+  // reformat lines under the cursor). `null` means table mode.
+  const [bulkText, setBulkText] = useState<string | null>(null);
+
   const update = (index: number, patch: Partial<KeyValue>) => {
     if (index === rows.length) {
       onChange([...rows, { name: "", value: "", enabled: true, ...patch }]);
@@ -38,41 +45,65 @@ export function KeyValueTable({
 
   return (
     <div className="flex flex-col gap-1">
-      {shown.map((row, index) => {
-        const isNew = index === rows.length;
-        return (
-          <div key={index} className="flex items-center gap-2">
-            <Checkbox
-              checked={row.enabled}
-              disabled={isNew}
-              onCheckedChange={(checked) => update(index, { enabled: checked === true })}
-              aria-label="Enabled"
-            />
-            <Input
-              className="h-8 font-mono text-xs"
-              placeholder={namePlaceholder}
-              value={row.name}
-              onChange={(e) => update(index, { name: e.target.value })}
-            />
-            <Input
-              className="h-8 font-mono text-xs"
-              placeholder={valuePlaceholder}
-              value={row.value}
-              onChange={(e) => update(index, { value: e.target.value })}
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0"
-              disabled={isNew}
-              onClick={() => remove(index)}
-              aria-label="Remove row"
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        );
-      })}
+      <div className="flex justify-end">
+        <Button
+          variant="link"
+          size="sm"
+          className="h-6 px-0 text-xs"
+          onClick={() => setBulkText(bulkText === null ? rowsToBulk(rows) : null)}
+        >
+          {bulkText === null ? "Bulk edit" : "Key/value edit"}
+        </Button>
+      </div>
+
+      {bulkText !== null ? (
+        <Textarea
+          className="min-h-40 font-mono text-xs"
+          spellCheck={false}
+          placeholder={"name: value\n//disabled: value"}
+          value={bulkText}
+          onChange={(e) => {
+            setBulkText(e.target.value);
+            onChange(bulkToRows(e.target.value));
+          }}
+        />
+      ) : (
+        shown.map((row, index) => {
+          const isNew = index === rows.length;
+          return (
+            <div key={index} className="flex items-center gap-2">
+              <Checkbox
+                checked={row.enabled}
+                disabled={isNew}
+                onCheckedChange={(checked) => update(index, { enabled: checked === true })}
+                aria-label="Enabled"
+              />
+              <Input
+                className="h-8 font-mono text-xs"
+                placeholder={namePlaceholder}
+                value={row.name}
+                onChange={(e) => update(index, { name: e.target.value })}
+              />
+              <Input
+                className="h-8 font-mono text-xs"
+                placeholder={valuePlaceholder}
+                value={row.value}
+                onChange={(e) => update(index, { value: e.target.value })}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0"
+                disabled={isNew}
+                onClick={() => remove(index)}
+                aria-label="Remove row"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

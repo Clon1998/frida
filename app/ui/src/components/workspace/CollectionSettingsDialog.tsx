@@ -2,6 +2,7 @@ import { open as openFile } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands } from "@/bindings";
+import { KeyValueTable } from "@/components/request/KeyValueTable";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -81,7 +82,7 @@ export function CollectionSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Collection settings</DialogTitle>
           <DialogDescription>
@@ -90,8 +91,16 @@ export function CollectionSettingsDialog({
         </DialogHeader>
 
         {collection && settings && (
-          <div className="flex flex-col gap-4 text-sm">
-            <label className="flex flex-col gap-1.5">
+          <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto text-sm">
+            <section className="flex flex-col gap-1.5">
+              <span>Headers sent with every request</span>
+              <KeyValueTable
+                rows={collection.headers}
+                namePlaceholder="Header"
+                onChange={(headers) => setCollection({ ...collection, headers })}
+              />
+            </section>
+            <label className="flex max-w-xs flex-col gap-1.5">
               Default timeout (ms)
               <Input
                 type="number"

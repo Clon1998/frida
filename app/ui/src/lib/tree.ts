@@ -63,3 +63,20 @@ export function moveTarget(
   if (index === -1) return null;
   return { parent, index: position === "after" ? index + 1 : index };
 }
+
+/** Display names of the folders containing `path`, outermost first. */
+export function folderTrail(tree: TreeNode[], path: string): string[] {
+  const trail: string[] = [];
+  let nodes = tree;
+  const parent = parentOf(path);
+  const parts = parent === "" ? [] : parent.split("/");
+  let current = "";
+  for (const part of parts) {
+    current = current ? `${current}/${part}` : part;
+    const folder = nodes.find((n) => n.kind === "folder" && n.path === current);
+    if (!folder || folder.kind !== "folder") break;
+    trail.push(folder.name);
+    nodes = folder.children;
+  }
+  return trail;
+}

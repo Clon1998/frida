@@ -607,6 +607,12 @@ Deviations from and clarifications of this plan, newest last.
 - **2026-10-15 (M1) Editors.** A small CodeMirror 6 wrapper of our own (`components/editor/CodeEditor.tsx`) instead of a
   React wrapper package, to keep control for `{{var}}` decorations in M2. Split panes use `react-resizable-panels`
   (via shadcn Resizable); toasts use `sonner`.
+- **2026-10-15 (M1 feedback) "New collection" asks only for a name** and creates `<workspace>/collections/<slug>`.
+  "Add existing collection" still picks any folder, e.g. a collection in another repo.
+- **2026-10-15 (M1 feedback) Additions not in the original plan:** Bruno-style bulk edit (`name: value` per line,
+  `//` = disabled) for query params, headers and form fields; a breadcrumb bar above the request editor (the
+  environment selectors from §14 go there in M2); folder settings (headers, timeout) and collection headers in the UI.
+  Folder/collection auth, vars and scripts get their UI in M2/M3/M5.
 
 ## 17. Testing strategy
 

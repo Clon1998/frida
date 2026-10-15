@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TreeNode } from "@/bindings";
-import { childrenOf, dropPosition, moveTarget, parentOf } from "./tree";
+import { childrenOf, dropPosition, folderTrail, moveTarget, parentOf } from "./tree";
 
 const request = (path: string): TreeNode => ({
   kind: "request",
@@ -57,5 +57,12 @@ describe("tree helpers", () => {
     expect(moveTarget(tree, "orders", "orders", "inside")).toBeNull();
     expect(moveTarget(tree, "orders", "orders/eu", "inside")).toBeNull();
     expect(moveTarget(tree, "orders", "orders/x.yaml", "after")).toBeNull();
+  });
+});
+
+describe("folderTrail", () => {
+  it("returns the folder names leading to a path", () => {
+    expect(folderTrail(tree, "orders/eu/y.yaml")).toEqual(["orders", "orders/eu"]);
+    expect(folderTrail(tree, "a.yaml")).toEqual([]);
   });
 });

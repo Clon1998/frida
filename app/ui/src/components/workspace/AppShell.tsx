@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
+import { RequestHeader } from "./RequestHeader";
 import { TabBar } from "./TabBar";
 
 export function AppShell() {
@@ -35,6 +36,7 @@ export function AppShell() {
         <ResizablePanel>
           <main className="flex h-full min-w-0 flex-col">
             {dir && <TabBar dir={dir} />}
+            {dir && <RequestHeader dir={dir} tab={tab} />}
             {dir && tab ? (
               <ResizablePanelGroup key={split} orientation={split} className="min-h-0 flex-1">
                 <ResizablePanel defaultSize="50" minSize={200}>
