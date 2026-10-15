@@ -35,13 +35,13 @@ const emptyRequest: RequestModel = {
 /** Renders the editor for a tab held in the real store, re-rendering on store changes. */
 function Harness() {
   const tab = useTabs((s) => s.byCollection[DIR]?.tabs[0]);
-  return tab ? <RequestEditor dir={DIR} tab={tab} /> : null;
+  return tab?.kind === "request" ? <RequestEditor dir={DIR} tab={tab} /> : null;
 }
 
 const url = () => screen.getByPlaceholderText(/api\.example\.com/) as HTMLInputElement;
 function draft() {
   const tab = useTabs.getState().byCollection[DIR]?.tabs[0];
-  if (!tab) throw new Error("no tab open");
+  if (tab?.kind !== "request") throw new Error("no request tab open");
   return tab.draft;
 }
 

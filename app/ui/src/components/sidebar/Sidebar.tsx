@@ -10,9 +10,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CollectionSettingsDialog } from "@/components/workspace/CollectionSettingsDialog";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
+import { useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { CollectionTree } from "./CollectionTree";
 
@@ -26,7 +26,7 @@ export function Sidebar() {
   const closeWorkspace = useWorkspace((s) => s.closeWorkspace);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openTab = useTabs((s) => s.openTab);
 
   if (!workspace) return null;
 
@@ -68,7 +68,7 @@ export function Sidebar() {
               <FolderPlus /> Add existing collection…
             </DropdownMenuItem>
             {active && (
-              <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+              <DropdownMenuItem onSelect={() => void openTab(active.dir, "")}>
                 <Settings /> Collection settings…
               </DropdownMenuItem>
             )}
@@ -83,6 +83,18 @@ export function Sidebar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {active && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            title="Collection settings"
+            aria-label="Collection settings"
+            onClick={() => void openTab(active.dir, "")}
+          >
+            <Settings />
+          </Button>
+        )}
       </div>
 
       {active ? (
@@ -106,13 +118,6 @@ export function Sidebar() {
         onOpenChange={setCreating}
         onConfirm={(name) => void createCollection(name)}
       />
-      {active && (
-        <CollectionSettingsDialog
-          dir={active.dir}
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-        />
-      )}
       <ConfirmDialog
         open={removing}
         title={`Remove “${active?.name}” from the workspace?`}

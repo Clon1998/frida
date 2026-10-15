@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RequestModel as Request } from "@/lib/model";
 import { queryParamsFromUrl, syncPathParams, urlWithQueryParams } from "@/lib/url";
-import { type Tab, useTabs } from "@/stores/tabs";
+import { type RequestTab, useTabs } from "@/stores/tabs";
+import { ConflictBanner } from "@/components/doc/ConflictBanner";
+import { AuthSection, ScriptsSection, TextSection, VarsSection } from "@/components/doc/sections";
 import { BodyEditor } from "./BodyEditor";
 import { KeyValueTable } from "./KeyValueTable";
 import { MethodSelect } from "./MethodSelect";
@@ -12,18 +14,18 @@ import { PathParamsTable } from "./PathParamsTable";
 
 interface RequestEditorProps {
   dir: string;
-  tab: Tab;
+  tab: RequestTab;
 }
 
 export function RequestEditor({ dir, tab }: RequestEditorProps) {
   const updateDraft = useTabs((s) => s.updateDraft);
   const send = useTabs((s) => s.send);
   const cancel = useTabs((s) => s.cancel);
-  const resolveConflict = useTabs((s) => s.resolveConflict);
   const request = tab.draft;
   const sending = tab.requestId !== null;
 
-  const update = (change: (r: Request) => Request) => updateDraft(dir, tab.path, change);
+  const update = (change: (r: Request) => Request) =>
+    updateDraft<RequestTab>(dir, tab.path, change);
 
   // The URL is the source of truth for enabled query params and the list of path params.
   const setUrl = (url: string) =>
@@ -38,25 +40,7 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {tab.conflict && (
-        <div className="flex items-center gap-2 border-b bg-amber-500/10 px-3 py-2 text-sm">
-          <span className="flex-1">This request changed on disk while you were editing it.</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => resolveConflict(dir, tab.path, "disk")}
-          >
-            Reload from disk
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => resolveConflict(dir, tab.path, "mine")}
-          >
-            Keep my version
-          </Button>
-        </div>
-      )}
+      <ConflictBanner dir={dir} tab={tab} />
 
       <div className="flex items-center gap-2 border-b p-2">
         <MethodSelect
@@ -94,6 +78,11 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
               <span className="text-muted-foreground">({request.headers.length})</span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="auth">Auth</TabsTrigger>
+          <TabsTrigger value="vars">Vars</TabsTrigger>
+          <TabsTrigger value="script">Script</TabsTrigger>
+          <TabsTrigger value="tests">Tests</TabsTrigger>
+          <TabsTrigger value="docs">Docs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -126,6 +115,37 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
             onChange={(headers) => update((r) => ({ ...r, headers }))}
             namePlaceholder="Header"
           />
+        </TabsContent>
+
+        <TabsContent value="auth" className="overflow-auto p-3">
+          <AuthSection
+            auth={request.auth}
+            canInherit
+            onChange={(auth) => update((r) => ({ ...r, auth }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="vars" className="overflow-auto p-3">
+          <VarsSection vars={request.vars} onChange={(vars) => update((r) => ({ ...r, vars }))} />
+        </TabsContent>
+
+        <TabsContent value="script" className="min-h-0 p-3">
+          <ScriptsSection
+            scripts={request.scripts}
+            onChange={(scripts) => update((r) => ({ ...r, scripts }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="tests" className="min-h-0 p-3">
+          <TextSection
+            value={request.tests}
+            note="Saved now; tests run once the scripting milestone is done."
+            onChange={(tests) => update((r) => ({ ...r, tests }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="docs" className="min-h-0 p-3">
+          <TextSection value={request.docs} onChange={(docs) => update((r) => ({ ...r, docs }))} />
         </TabsContent>
 
         <TabsContent value="settings" className="overflow-auto p-3">

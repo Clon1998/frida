@@ -1,6 +1,8 @@
 import { Columns2, Rows2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
+import { CollectionEditor } from "@/components/doc/CollectionEditor";
+import { FolderEditor } from "@/components/doc/FolderEditor";
 import { RequestEditor } from "@/components/request/RequestEditor";
 import { ResponseViewer } from "@/components/response/ResponseViewer";
 import { Sidebar } from "@/components/sidebar/Sidebar";
@@ -37,7 +39,7 @@ export function AppShell() {
           <main className="flex h-full min-w-0 flex-col">
             {dir && <TabBar dir={dir} />}
             {dir && <RequestHeader dir={dir} tab={tab} />}
-            {dir && tab ? (
+            {dir && tab?.kind === "request" && (
               <ResizablePanelGroup key={split} orientation={split} className="min-h-0 flex-1">
                 <ResizablePanel defaultSize="50" minSize={200}>
                   <RequestEditor dir={dir} tab={tab} />
@@ -47,7 +49,18 @@ export function AppShell() {
                   <ResponseViewer tab={tab} />
                 </ResizablePanel>
               </ResizablePanelGroup>
-            ) : (
+            )}
+            {dir && tab?.kind === "folder" && (
+              <div className="min-h-0 flex-1">
+                <FolderEditor dir={dir} tab={tab} />
+              </div>
+            )}
+            {dir && tab?.kind === "collection" && (
+              <div className="min-h-0 flex-1">
+                <CollectionEditor dir={dir} tab={tab} />
+              </div>
+            )}
+            {!tab && (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 Open a request from the sidebar, or right-click it to create one.
               </div>

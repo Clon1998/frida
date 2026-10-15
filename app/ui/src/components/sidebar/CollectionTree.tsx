@@ -8,9 +8,10 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { AlertTriangle, ChevronRight, Folder, FolderOpen } from "lucide-react";
+import { AlertTriangle, ChevronRight, Folder, FolderOpen, FolderPlus, Plus } from "lucide-react";
 import { useState } from "react";
 import type { TreeNode } from "@/bindings";
+import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -18,8 +19,13 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
-import { FolderSettingsDialog } from "@/components/workspace/FolderSettingsDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { methodColor } from "@/lib/methods";
 import { type DropPosition, dropPosition, moveTarget } from "@/lib/tree";
@@ -33,7 +39,6 @@ type DialogState =
   | { kind: "new-request" | "new-folder"; parent: string }
   | { kind: "rename"; path: string; name: string }
   | { kind: "delete"; path: string; name: string; isFolder: boolean }
-  | { kind: "folder-settings"; path: string }
   | null;
 
 interface DropState {
@@ -50,6 +55,7 @@ export function CollectionTree({ dir }: { dir: string }) {
   const active = useTabs((s) => s.byCollection[dir]?.active ?? null);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [drop, setDrop] = useState<DropState | null>(null);
+  const openTab = useTabs((s) => s.openTab);
 
   // Start dragging only after the pointer moved a few pixels, so clicks still open requests.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -79,14 +85,18 @@ export function CollectionTree({ dir }: { dir: string }) {
       setDialog({ kind: "rename", path: node.path, name: node.name }),
     remove: (path: string, name: string, isFolder: boolean) =>
       setDialog({ kind: "delete", path, name, isFolder }),
-    folderSettings: (path: string) => setDialog({ kind: "folder-settings", path }),
+    folderSettings: (path: string) => void openTab(dir, path),
   };
 
   return (
     <>
+      <div className="flex h-8 shrink-0 items-center justify-between px-3">
+        <span className="text-xs font-medium text-muted-foreground">Requests</span>
+        <AddMenu onRequest={() => menu.newRequest("")} onFolder={() => menu.newFolder("")} />
+      </div>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="min-h-0 flex-1 overflow-auto py-1 text-sm">
+          <div className="min-h-0 flex-1 overflow-auto pb-1 text-sm">
             <DndContext
               sensors={sensors}
               onDragMove={onDragMove}
@@ -94,9 +104,15 @@ export function CollectionTree({ dir }: { dir: string }) {
               onDragCancel={() => setDrop(null)}
             >
               {tree.length === 0 && (
-                <p className="px-3 py-2 text-xs text-muted-foreground">
-                  No requests yet. Right-click to add one.
-                </p>
+                <div className="flex flex-col items-center gap-2 px-3 py-6 text-center">
+                  <p className="text-xs text-muted-foreground">This collection is empty.</p>
+                  <Button size="sm" onClick={() => menu.newRequest("")}>
+                    <Plus /> New request
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => menu.newFolder("")}>
+                    <FolderPlus /> New folder
+                  </Button>
+                </div>
               )}
               {tree.map((node) => (
                 <TreeRow
@@ -144,11 +160,6 @@ export function CollectionTree({ dir }: { dir: string }) {
           if (dialog?.kind === "rename") void actions.renameItem(dir, dialog.path, name);
         }}
       />
-      <FolderSettingsDialog
-        dir={dir}
-        path={dialog?.kind === "folder-settings" ? dialog.path : null}
-        onClose={() => setDialog(null)}
-      />
       <ConfirmDialog
         open={dialog?.kind === "delete"}
         title={dialog?.kind === "delete" ? `Delete "${dialog.name}"?` : ""}
@@ -194,8 +205,13 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
   const droppable = useDroppable({ id: node.path, data: { isFolder } });
   const dropHere = drop?.over === node.path ? drop.position : null;
 
+  // Like Bruno: clicking a folder opens its settings tab and expands/collapses it. The chevron
+  // only expands/collapses.
   const onClick = () => {
-    if (node.kind === "folder") toggleExpanded(dir, node.path);
+    if (node.kind === "folder") {
+      toggleExpanded(dir, node.path);
+      void openTab(dir, node.path);
+    }
     if (node.kind === "request") void openTab(dir, node.path);
   };
 
@@ -213,7 +229,7 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
             onClick={onClick}
             style={{ paddingLeft: 8 + depth * 14 }}
             className={cn(
-              "flex h-7 cursor-default items-center gap-1.5 pr-2 select-none hover:bg-accent",
+              "group flex h-7 cursor-default items-center gap-1.5 pr-2 select-none hover:bg-accent",
               node.path === active && "bg-accent font-medium",
               draggable.isDragging && "opacity-40",
               dropHere === "before" && "shadow-[inset_0_2px_0_var(--ring)]",
@@ -223,15 +239,32 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
           >
             {node.kind === "folder" && (
               <>
-                <ChevronRight
-                  className={cn("size-3.5 shrink-0 transition-transform", isOpen && "rotate-90")}
-                />
+                <button
+                  type="button"
+                  aria-label={isOpen ? "Collapse folder" : "Expand folder"}
+                  className="flex size-4 shrink-0 items-center justify-center rounded hover:bg-muted"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpanded(dir, node.path);
+                  }}
+                >
+                  <ChevronRight
+                    className={cn("size-3.5 transition-transform", isOpen && "rotate-90")}
+                  />
+                </button>
                 {isOpen ? (
                   <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
                 ) : (
                   <Folder className="size-4 shrink-0 text-muted-foreground" />
                 )}
-                <span className="truncate">{node.name}</span>
+                <span className="flex-1 truncate">{node.name}</span>
+                <span className="opacity-0 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+                  <AddMenu
+                    onRequest={() => menu.newRequest(node.path)}
+                    onFolder={() => menu.newFolder(node.path)}
+                  />
+                </span>
               </>
             )}
             {node.kind === "request" && (
@@ -311,5 +344,34 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
           />
         ))}
     </>
+  );
+}
+
+/** A small "+" that offers a new request or folder. Clicks don't reach the row underneath. */
+function AddMenu({ onRequest, onFolder }: { onRequest: () => void; onFolder: () => void }) {
+  return (
+    // Non-modal, so the name dialog it opens gets focus cleanly when the menu closes.
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-5"
+          aria-label="Add request or folder"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onSelect={onRequest}>
+          <Plus /> New request
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onFolder}>
+          <FolderPlus /> New folder
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

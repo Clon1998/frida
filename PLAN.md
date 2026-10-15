@@ -611,8 +611,13 @@ Deviations from and clarifications of this plan, newest last.
   "Add existing collection" still picks any folder, e.g. a collection in another repo.
 - **2026-10-15 (M1 feedback) Additions not in the original plan:** Bruno-style bulk edit (`name: value` per line,
   `//` = disabled) for query params, headers and form fields; a breadcrumb bar above the request editor (the
-  environment selectors from §14 go there in M2); folder settings (headers, timeout) and collection headers in the UI.
-  Folder/collection auth, vars and scripts get their UI in M2/M3/M5.
+  environment selectors from §14 go there in M2).
+- **2026-10-15 (M1 feedback) Folder and collection settings open as tabs, like Bruno.** Clicking a folder opens its tab
+  (and expands it); the gear next to the collection name opens the collection tab. Both have Headers, Auth, Vars,
+  Script, Tests, Docs and Settings sub-tabs, and requests got the missing §14 sub-tabs. Everything is saved to YAML
+  now; vars are applied from M2, auth from M3, scripts and tests from M5, and each tab says so. The tab kind is
+  derived from the path (`""` collection, `*.yaml` request, otherwise folder), so persisted tab state stays a list of
+  paths. Hover "+" buttons on folders and the tree root, and an empty-state with New request / New folder.
 
 ## 17. Testing strategy
 

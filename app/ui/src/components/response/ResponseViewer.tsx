@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showError, unwrap } from "@/lib/api";
 import { bodyKind, formatBytes, formatDuration, prettyJson } from "@/lib/format";
-import type { Tab } from "@/stores/tabs";
+import type { RequestTab } from "@/stores/tabs";
 import { cn } from "cn";
 
 function statusColor(status: number) {
@@ -19,7 +19,7 @@ function statusColor(status: number) {
   return "bg-rose-600 text-white";
 }
 
-export function ResponseViewer({ tab }: { tab: Tab }) {
+export function ResponseViewer({ tab }: { tab: RequestTab }) {
   if (tab.requestId) {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">

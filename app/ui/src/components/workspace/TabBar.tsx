@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Folder, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { methodColor } from "@/lib/methods";
 import { isDirty, type Tab, useTabs } from "@/stores/tabs";
@@ -38,11 +38,7 @@ export function TabBar({ dir }: { dir: string }) {
               tab.path === active ? "bg-background" : "text-muted-foreground hover:bg-accent",
             )}
           >
-            <span
-              className={cn("font-mono text-[10px] font-semibold", methodColor(tab.draft.method))}
-            >
-              {tab.draft.method}
-            </span>
+            <TabIcon tab={tab} />
             <span className="truncate">{tab.draft.name}</span>
             <button
               type="button"
@@ -79,4 +75,20 @@ export function TabBar({ dir }: { dir: string }) {
       />
     </>
   );
+}
+
+/** Method for requests, a folder icon for folders, a gear for the collection settings. */
+function TabIcon({ tab }: { tab: Tab }) {
+  switch (tab.kind) {
+    case "request":
+      return (
+        <span className={cn("font-mono text-[10px] font-semibold", methodColor(tab.draft.method))}>
+          {tab.draft.method}
+        </span>
+      );
+    case "folder":
+      return <Folder className="size-3.5 shrink-0" />;
+    case "collection":
+      return <Settings className="size-3.5 shrink-0" />;
+  }
 }
