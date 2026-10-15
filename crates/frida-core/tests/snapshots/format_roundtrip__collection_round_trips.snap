@@ -1,0 +1,50 @@
+---
+source: crates/frida-core/tests/format_roundtrip.rs
+assertion_line: 51
+expression: yaml
+---
+version: 1
+id: 7f1c2e4a-0b5e-4a8e-9f1a-2c3d4e5f6a7b
+name: Orders API
+vars:
+- name: apiVersion
+  value: v2
+  enabled: true
+headers:
+- name: Accept
+  value: application/json
+  enabled: true
+auth:
+  mode: custom
+  schemes:
+  - type: oauth2
+    grant: client_credentials
+    tokenUrl: "{{tokenUrl}}"
+    authUrl: ""
+    redirectUri: http://127.0.0.1:{port}/callback
+    clientId: "{{clientId}}"
+    clientSecret: "{{clientSecret}}"
+    scope: orders/read
+    usePkce: true
+    username: ""
+    password: ""
+    clientAuth: basic_header
+    tokenPlacement:
+      in: header
+      name: Authorization
+      prefix: Bearer
+    preset: null
+  - type: apikey
+    in: header
+    name: x-api-key
+    value: "{{apiKey}}"
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: 30000
+  tls:
+    verify: true
+    caCertPaths: []
+docs: ""

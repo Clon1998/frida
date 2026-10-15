@@ -1,0 +1,10 @@
+---
+source: crates/frida-core/tests/format_roundtrip.rs
+assertion_line: 39
+expression: yaml
+---
+version: 1
+name: EIP
+collections:
+- path: ./collections/orders-api
+- path: ../other-repo/flight-events

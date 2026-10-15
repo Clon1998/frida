@@ -1,0 +1,8 @@
+version: 1
+name: Orders
+seq: 1
+vars: []
+headers: []
+auth: { mode: inherit }
+scripts: { pre: "", post: "" }
+tests: ""

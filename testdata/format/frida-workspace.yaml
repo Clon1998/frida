@@ -1,0 +1,5 @@
+version: 1
+name: EIP
+collections:                   # relative or absolute paths to collection folders
+  - path: ./collections/orders-api
+  - path: ../other-repo/flight-events

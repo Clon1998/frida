@@ -5,5 +5,9 @@
 //! so it stays testable and reusable for the future CLI.
 
 mod about;
+pub mod error;
+pub mod model;
+pub mod yaml;
 
 pub use about::{AboutInfo, about};
+pub use error::{CoreError, Result};

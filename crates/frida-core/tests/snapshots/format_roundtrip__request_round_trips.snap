@@ -1,0 +1,47 @@
+---
+source: crates/frida-core/tests/format_roundtrip.rs
+assertion_line: 68
+expression: yaml
+---
+version: 1
+name: Get order
+seq: 2
+method: GET
+url: "{{baseUrl}}/orders/:orderId"
+params:
+  query:
+  - name: expand
+    value: items
+    enabled: true
+  path:
+  - name: orderId
+    value: "{{lastOrderId}}"
+headers:
+- name: X-Correlation-Id
+  value: "{{$uuid}}"
+  enabled: true
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars:
+- name: limit
+  value: "10"
+  enabled: true
+scripts:
+  pre: |
+    bru.setVar("ts", Date.now());
+  post: |
+    bru.setVar("lastOrderId", res.body.id);
+tests: |
+  test("status is 200", () => expect(res.status).to.equal(200));
+settings:
+  timeoutMs: null
+docs: |
+  Markdown docs for this request.

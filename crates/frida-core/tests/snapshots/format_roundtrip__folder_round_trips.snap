@@ -1,0 +1,19 @@
+---
+source: crates/frida-core/tests/format_roundtrip.rs
+assertion_line: 58
+expression: yaml
+---
+version: 1
+name: Orders
+seq: 1
+vars: []
+headers: []
+auth:
+  mode: inherit
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

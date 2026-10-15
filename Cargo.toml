@@ -38,6 +38,7 @@ directories = "6.0.0"
 serde-saphyr = "2.0.0"
 uuid = { version = "1.28.0", features = ["v4", "serde"] }
 tempfile = "3.27.0"
+insta = "1.49.0"
 
 # Rust <-> TypeScript type generation. The Tauri 2 compatible line of tauri-specta is still a
 # release candidate, and it requires an *exact* specta version, so both are pinned with `=`.

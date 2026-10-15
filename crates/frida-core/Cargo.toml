@@ -11,12 +11,13 @@ serde = { workspace = true }
 specta = { workspace = true }
 serde-saphyr = { workspace = true }
 thiserror = { workspace = true }
+tempfile = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-tempfile = { workspace = true }
+insta = { workspace = true }
 
 [lints]
 workspace = true

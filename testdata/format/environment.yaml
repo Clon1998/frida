@@ -1,0 +1,16 @@
+version: 1
+name: dev
+variables:
+  - name: baseUrl
+    value: https://orders.dev.example.com
+  - name: clientId
+    value: abc123
+  - name: clientSecret
+    secret: true               # value stored in the OS keychain, NEVER in this file
+  - name: apiKey
+    secret: true
+    source:
+      type: aws-secrets-manager
+      secretId: eip/dev/orders-api
+      jsonKey: apiKey          # optional: pick a key from a JSON secret string
+      region: eu-central-1     # optional: falls back to profile region

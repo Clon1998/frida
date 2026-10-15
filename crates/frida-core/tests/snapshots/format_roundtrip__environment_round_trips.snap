@@ -1,0 +1,21 @@
+---
+source: crates/frida-core/tests/format_roundtrip.rs
+assertion_line: 77
+expression: yaml
+---
+version: 1
+name: dev
+variables:
+- name: baseUrl
+  value: https://orders.dev.example.com
+- name: clientId
+  value: abc123
+- name: clientSecret
+  secret: true
+- name: apiKey
+  secret: true
+  source:
+    type: aws-secrets-manager
+    secretId: eip/dev/orders-api
+    jsonKey: apiKey
+    region: eu-central-1
