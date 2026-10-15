@@ -1,9 +1,11 @@
 //! HTTP execution (PLAN.md §7): prepare a request, send it, and present the response.
 
+mod execute;
 mod prepare;
 mod send;
 mod view;
 
+pub use execute::execute;
 pub use prepare::{
     DEFAULT_TIMEOUT, PreparedBody, PreparedPart, PreparedRequest, RequestContext, prepare,
 };

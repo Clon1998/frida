@@ -6,8 +6,8 @@ mod workspace;
 
 pub use collection::{
     TreeNode, create_collection, create_folder, create_request, delete_item, duplicate_request,
-    load_collection, move_item, read_folder, read_request, rename_item, reorder, save_collection,
-    save_folder, save_request, scan_tree,
+    load_collection, load_folder_chain, move_item, read_folder, read_request, rename_item, reorder,
+    save_collection, save_folder, save_request, scan_tree,
 };
 pub use paths::{COLLECTION_FILE, FOLDER_FILE, WORKSPACE_FILE, slugify};
 pub use workspace::{

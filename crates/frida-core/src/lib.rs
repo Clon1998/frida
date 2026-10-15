@@ -7,6 +7,7 @@
 mod about;
 pub mod error;
 pub mod http;
+pub mod local_state;
 pub mod model;
 pub mod storage;
 pub mod yaml;

@@ -162,6 +162,22 @@ pub fn save_request(root: &Path, rel: &str, request: &Request) -> Result<()> {
     write_yaml(&path, &request)
 }
 
+/// The folders a request (or folder) at `rel` inherits from, outermost first.
+/// `orders/eu/get.yaml` → `[orders, orders/eu]`.
+pub fn load_folder_chain(root: &Path, rel: &str) -> Result<Vec<Folder>> {
+    let mut chain = Vec::new();
+    let mut current = String::new();
+    let parent = rel_parent(rel);
+    if parent.is_empty() {
+        return Ok(chain);
+    }
+    for part in parent.split('/') {
+        current = rel_join(&current, part);
+        chain.push(read_folder(root, &current)?);
+    }
+    Ok(chain)
+}
+
 pub fn read_folder(root: &Path, rel: &str) -> Result<Folder> {
     read_yaml(&existing(root, rel)?.join(FOLDER_FILE))
 }

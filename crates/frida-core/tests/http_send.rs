@@ -320,3 +320,41 @@ async fn tls_custom_ca_is_trusted_with_verification_on() {
     .unwrap();
     assert_eq!(response.status, 200);
 }
+
+#[tokio::test]
+async fn execute_applies_collection_and_folder_headers_and_timeouts() {
+    use frida_core::storage;
+
+    let addr = server().await;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let mut collection = storage::create_collection(root, "Orders").unwrap();
+    collection.headers = vec![
+        KeyValue::new("X-Level", "collection"),
+        KeyValue::new("X-Col", "1"),
+    ];
+    storage::save_collection(root, &collection).unwrap();
+
+    let folder_rel = storage::create_folder(root, "", "Orders").unwrap();
+    let mut folder = storage::read_folder(root, &folder_rel).unwrap();
+    folder.headers = vec![KeyValue::new("X-Level", "folder")];
+    folder.settings.timeout_ms = Some(150);
+    storage::save_folder(root, &folder_rel, &folder).unwrap();
+
+    let req = request("GET", format!("http://{addr}/echo"));
+    let rel = storage::create_request(root, &folder_rel, &req).unwrap();
+
+    let response = http::execute(root, &rel, &req, CancellationToken::new())
+        .await
+        .unwrap();
+    let reply: Value = serde_json::from_slice(&response.body).unwrap();
+    assert_eq!(reply["headers"]["x-level"], "folder");
+    assert_eq!(reply["headers"]["x-col"], "1");
+
+    // The folder's 150 ms timeout applies to requests inside it.
+    let slow = request("GET", format!("http://{addr}/slow?ms=1000"));
+    let err = http::execute(root, &rel, &slow, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("timed out"), "{err}");
+}

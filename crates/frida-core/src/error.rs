@@ -37,6 +37,11 @@ pub enum CoreError {
 
     #[error("{0}")]
     InvalidInput(String),
+
+    /// `#[from]` generates `impl From<SendError> for CoreError`, which lets the `?` operator
+    /// convert a send error into a `CoreError` automatically (Java would need a manual wrap).
+    #[error(transparent)]
+    Send(#[from] crate::http::SendError),
 }
 
 impl CoreError {
