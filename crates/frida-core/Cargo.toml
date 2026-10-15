@@ -3,6 +3,7 @@ name = "frida-core"
 description = "Frida domain model, storage, variable resolution, HTTP execution, importers and codegen."
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 publish = false
 
 [dependencies]

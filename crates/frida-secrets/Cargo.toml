@@ -3,6 +3,7 @@ name = "frida-secrets"
 description = "Secret providers for Frida: OS keychain and AWS Secrets Manager."
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 publish = false
 
 [dependencies]
