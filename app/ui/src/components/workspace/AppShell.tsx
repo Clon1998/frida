@@ -1,3 +1,4 @@
+import { ask } from "@tauri-apps/plugin-dialog";
 import { Columns2, Rows2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
@@ -10,7 +11,7 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useEnvs } from "@/stores/envs";
-import { useTabs } from "@/stores/tabs";
+import { isDirty, tabTitle, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { RequestHeader } from "./RequestHeader";
 import { TabBar } from "./TabBar";
@@ -182,7 +183,16 @@ function useShortcuts() {
         void tabs.save(dir, active);
       } else if (e.key === "w") {
         e.preventDefault();
-        tabs.closeTab(dir, active);
+        const tab = tabs.byCollection[dir]?.tabs.find((t) => t.path === active);
+        if (tab && isDirty(tab)) {
+          void ask(`"${tabTitle(tab)}" has unsaved changes that will be lost.`, {
+            title: "Close without saving?",
+            kind: "warning",
+            okLabel: "Close",
+          }).then((close) => close && tabs.closeTab(dir, active));
+        } else {
+          tabs.closeTab(dir, active);
+        }
       }
     };
     window.addEventListener("keydown", onKeyDown);

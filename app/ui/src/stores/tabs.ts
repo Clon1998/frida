@@ -58,6 +58,10 @@ interface TabsState {
   /** Opens (or focuses) the tab for `path`. The kind follows from the path, see {@link kindOf}. */
   openTab: (dir: string, path: string) => Promise<void>;
   closeTab: (dir: string, path: string) => void;
+  /** Closes several tabs at once (close others / to the right / saved / all). */
+  closeTabs: (dir: string, paths: string[]) => void;
+  /** Throws away unsaved edits of a tab. */
+  revert: (dir: string, path: string) => void;
   setActive: (dir: string, path: string) => void;
   /** Edits a tab's draft. `T` says which kind of tab the caller expects. */
   updateDraft: <T extends DocumentTab>(
@@ -220,6 +224,27 @@ export const useTabs = create<TabsState>((set, get) => {
         }
         return { ...c, tabs, active };
       }),
+
+    closeTabs: (dir, paths) =>
+      setCollection(dir, (c) => {
+        const closing = new Set(paths);
+        const tabs = c.tabs.filter((t) => !closing.has(t.path));
+        // Keep the active tab if it survives; otherwise pick the nearest remaining one.
+        let active = c.active;
+        if (active !== null && closing.has(active)) {
+          const index = c.tabs.findIndex((t) => t.path === active);
+          const after = c.tabs.slice(index).find((t) => !closing.has(t.path));
+          const before = c.tabs
+            .slice(0, index)
+            .reverse()
+            .find((t) => !closing.has(t.path));
+          active = (after ?? before)?.path ?? null;
+        }
+        return { ...c, tabs, active };
+      }),
+
+    revert: (dir, path) =>
+      updateTab(dir, path, (t) => ({ ...t, draft: t.original, conflict: null }) as DocumentTab),
 
     setActive: (dir, path) => setCollection(dir, (c) => ({ ...c, active: path })),
 

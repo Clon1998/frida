@@ -56,3 +56,28 @@ describe("tabs store", () => {
     expect(isDirty(tab())).toBe(false);
   });
 });
+
+describe("closing several tabs", () => {
+  beforeEach(() => {
+    const tab = (path: string) => ({ kind: "environments" as const, path }) as never;
+    useTabs.setState({
+      byCollection: {
+        "/col": { tabs: ["a", "b", "c", "d"].map(tab), active: "c", expanded: [] },
+      },
+    });
+  });
+  const state = () => useTabs.getState().byCollection["/col"];
+
+  it("keeps the active tab when it survives", () => {
+    useTabs.getState().closeTabs("/col", ["a", "d"]);
+    expect(state()?.tabs.map((t) => t.path)).toEqual(["b", "c"]);
+    expect(state()?.active).toBe("c");
+  });
+
+  it("moves to the nearest remaining tab when the active one closes", () => {
+    useTabs.getState().closeTabs("/col", ["c", "d"]);
+    expect(state()?.active).toBe("b");
+    useTabs.getState().closeTabs("/col", ["a", "b"]);
+    expect(state()?.active).toBeNull();
+  });
+});
