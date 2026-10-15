@@ -1,0 +1,26 @@
+version: 1
+name: Get with variables
+seq: 1
+method: GET
+url: "{{baseUrl}}/{{resource}}/:id?trace={{$uuid}}"
+params:
+  query:
+  - name: trace
+    value: "{{$uuid}}"
+    enabled: true
+  path:
+  - name: id
+    value: "{{orderId}}"
+headers:
+- name: Authorization
+  value: Bearer {{token}}
+  enabled: true
+vars:
+- name: orderId
+  value: "42"
+  enabled: true
+docs: |
+  Select the "local" collection environment and the "shared" global environment.
+  `baseUrl` comes from "local" (it overrides "shared"), `team` from "shared",
+  `resource` from the folder and `orderId` from the request. Set the secret `token`
+  in the environment editor, then open the variables inspector ({} button).

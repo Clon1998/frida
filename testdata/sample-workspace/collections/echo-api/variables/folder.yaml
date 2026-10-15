@@ -1,0 +1,13 @@
+version: 1
+name: Variables
+seq: 3
+vars:
+- name: resource
+  value: orders
+  enabled: true
+headers:
+- name: X-Team
+  value: "{{team}}"
+  enabled: true
+auth:
+  mode: inherit

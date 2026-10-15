@@ -1,0 +1,7 @@
+version: 1
+name: shared
+variables:
+- name: team
+  value: platform
+- name: baseUrl
+  value: http://localhost:9999

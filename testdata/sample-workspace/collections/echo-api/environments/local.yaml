@@ -1,0 +1,7 @@
+version: 1
+name: local
+variables:
+- name: baseUrl
+  value: http://localhost:8787
+- name: token
+  secret: true

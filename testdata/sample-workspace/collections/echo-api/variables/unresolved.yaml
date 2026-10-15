@@ -1,0 +1,10 @@
+version: 1
+name: Unresolved variable
+seq: 2
+method: GET
+url: "{{baseUrl}}/echo?missing={{doesNotExist}}"
+params:
+  query:
+  - name: missing
+    value: "{{doesNotExist}}"
+    enabled: true
