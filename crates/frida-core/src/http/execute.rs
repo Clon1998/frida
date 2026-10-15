@@ -11,8 +11,9 @@ use tokio_util::sync::CancellationToken;
 use super::cookies::CookieJar;
 use super::prepare::{RequestContext, prepare};
 use super::send::{HttpResponse, build_client, send};
-use crate::auth::{OAuth2Manager, apply_auth};
+use crate::auth::{OAuth2Manager, TokenInfo, apply_auth};
 use crate::error::Result;
+use crate::model::AuthScheme;
 use crate::model::{Environment, Request};
 use crate::storage;
 use crate::vars::{ResolveReport, ResolvedContext, ScopeInput, resolve_context};
@@ -74,6 +75,29 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
         response,
         report: resolved.report,
     })
+}
+
+/// Fetches new tokens for every OAuth2 scheme that applies to the request ("Get new token"),
+/// ignoring the cache. Returns all cached tokens afterwards, for the token viewer.
+pub async fn fetch_tokens(
+    input: ExecuteInput<'_>,
+    cancel: CancellationToken,
+) -> Result<Vec<TokenInfo>> {
+    let resolved = load_and_resolve(&input)?;
+    let ctx = RequestContext {
+        collection_dir: input.collection_dir,
+        collection: &resolved.collection,
+        folders: &resolved.folders,
+    };
+    // Only for the TLS settings and timeout; nothing is sent to the request's URL.
+    let prepared = prepare(ctx, &resolved.request)?;
+    let client = build_client(&prepared, None).await?;
+    for scheme in &resolved.auth {
+        if let AuthScheme::OAuth2(config) = scheme {
+            input.oauth.fetch_new(config, &client, &cancel).await?;
+        }
+    }
+    Ok(input.oauth.list())
 }
 
 fn load_and_resolve(input: &ExecuteInput<'_>) -> Result<ResolvedContext> {

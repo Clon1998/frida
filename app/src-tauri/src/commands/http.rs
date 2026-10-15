@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use frida_core::auth::TokenInfo;
 use frida_core::http::{self, ExecuteInput, ResponseView};
 use frida_core::model::{Environment, Request};
 use frida_core::secrets;
@@ -84,6 +85,7 @@ pub async fn send_request(
         global_env: global_env.as_ref(),
         runtime: &runtime,
         cookies: Some(state.cookie_jar(&root)),
+        oauth: &state.oauth,
     };
     let result = http::execute(input, cancel).await;
     state
@@ -129,8 +131,78 @@ pub async fn inspect_request(
         global_env: global_env.as_ref(),
         runtime: &runtime,
         cookies: None,
+        oauth: &state.oauth,
     })?;
     Ok(report.masked())
+}
+
+/// Fetches new OAuth2 tokens for the item at `path` ("Get new token"). `path` may be a request,
+/// a folder or `""` (the collection); `request` is the editor's state for request tabs. For the
+/// authorization code flow this opens the browser; cancel it with `request_id`.
+#[tauri::command]
+#[specta::specta]
+pub async fn fetch_oauth2_tokens(
+    state: State<'_, AppState>,
+    request_id: String,
+    dir: String,
+    path: String,
+    request: Option<Request>,
+) -> ApiResult<Vec<TokenInfo>> {
+    let root = state.collection_dir(&dir)?;
+    let (global_env, collection_env) = load_active_envs(&state, &root).await?;
+    let runtime = state.runtime_vars(&root);
+    // Folders and the collection: a stand-in request inside them that inherits their auth.
+    let (request, request_rel) = match request {
+        Some(request) => (request, path),
+        None => {
+            let rel = if path.is_empty() {
+                "_.yaml".to_string()
+            } else {
+                format!("{path}/_.yaml")
+            };
+            (Request::new("token"), rel)
+        }
+    };
+    let cancel = CancellationToken::new();
+    state
+        .in_flight
+        .lock()
+        .expect("in-flight lock poisoned")
+        .insert(request_id.clone(), cancel.clone());
+    let result = http::fetch_tokens(
+        ExecuteInput {
+            collection_dir: &root,
+            request_rel: &request_rel,
+            request: &request,
+            collection_env: collection_env.as_ref(),
+            global_env: global_env.as_ref(),
+            runtime: &runtime,
+            cookies: None,
+            oauth: &state.oauth,
+        },
+        cancel,
+    )
+    .await;
+    state
+        .in_flight
+        .lock()
+        .expect("in-flight lock poisoned")
+        .remove(&request_id);
+    Ok(result?)
+}
+
+/// All cached OAuth2 tokens, for the token viewer. Shown only when the user opens the viewer.
+#[tauri::command]
+#[specta::specta]
+pub fn list_oauth2_tokens(state: State<'_, AppState>) -> Vec<TokenInfo> {
+    state.oauth.list()
+}
+
+/// Forgets one cached token, or all of them when `token` is `None`.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_oauth2_tokens(state: State<'_, AppState>, token: Option<TokenInfo>) {
+    state.oauth.clear(token.as_ref());
 }
 
 /// Cancels an in-flight request. Unknown ids (already finished) are ignored.

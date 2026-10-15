@@ -1,6 +1,7 @@
 //! The error type every command returns to the UI: `{ code, message, hint? }` (CLAUDE.md).
 
 use frida_core::CoreError;
+use frida_core::auth::OAuth2Error;
 use frida_core::http::SendError;
 use frida_secrets::SecretError;
 use serde::Serialize;
@@ -36,6 +37,7 @@ pub enum ErrorCode {
     SecretLocked,
     WrongPassword,
     Secret,
+    Auth,
 }
 
 impl ApiError {
@@ -70,6 +72,15 @@ impl From<CoreError> for ApiError {
             CoreError::InvalidInput(_) => ApiError::new(ErrorCode::InvalidInput, message),
             CoreError::Send(send) => send.into(),
             CoreError::Secret(secret) => secret.into(),
+            CoreError::Auth(auth) => match auth {
+                OAuth2Error::Cancelled => ApiError::new(ErrorCode::Cancelled, message),
+                OAuth2Error::Rejected { .. } => ApiError::new(ErrorCode::Auth, message).with_hint(
+                    "Check the client id and secret, the scope and the token URL in the Auth tab.",
+                ),
+                OAuth2Error::Browser(_) => ApiError::new(ErrorCode::Auth, message)
+                    .with_hint("Check the authorization URL and the redirect URI."),
+                _ => ApiError::new(ErrorCode::Auth, message),
+            },
         }
     }
 }

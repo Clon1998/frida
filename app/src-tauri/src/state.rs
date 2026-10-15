@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use frida_core::auth::OAuth2Manager;
 use frida_core::http::{CookieJar, ResponseCache};
 use frida_core::local_state::LocalStore;
 use frida_core::storage;
@@ -33,6 +34,8 @@ pub struct AppState {
     pub runtime_vars: Mutex<HashMap<PathBuf, HashMap<String, String>>>,
     /// One cookie jar per collection folder, in memory only.
     pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,
+    /// OAuth2 tokens, in memory, shared by all collections (tokens are keyed by provider).
+    pub oauth: OAuth2Manager,
 }
 
 /// Where secret values are kept on this machine (PLAN.md §6).
@@ -97,6 +100,10 @@ impl AppState {
             secrets,
             runtime_vars: Mutex::new(HashMap::new()),
             cookie_jars: Mutex::new(HashMap::new()),
+            // The authorization code flow opens the system browser for the user to sign in.
+            oauth: OAuth2Manager::new(Arc::new(|url: &str| {
+                tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+            })),
         }
     }
 

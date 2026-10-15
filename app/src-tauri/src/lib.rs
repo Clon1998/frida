@@ -81,6 +81,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
             env::clear_cookies,
             http::send_request,
             http::inspect_request,
+            http::fetch_oauth2_tokens,
+            http::list_oauth2_tokens,
+            http::clear_oauth2_tokens,
             http::cancel_request,
             http::save_response_body,
         ])

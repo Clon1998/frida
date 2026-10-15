@@ -91,6 +91,47 @@ export const commands = {
 	 *  editor tooltips. Secret values are masked.
 	 */
 	inspectRequest: (dir: string, path: string, request: Request) => typedError<ResolveReport, ApiError>(__TAURI_INVOKE("inspect_request", { dir, path, request })),
+	/**
+	 *  Fetches new OAuth2 tokens for the item at `path` ("Get new token"). `path` may be a request,
+	 *  a folder or `""` (the collection); `request` is the editor's state for request tabs. For the
+	 *  authorization code flow this opens the browser; cancel it with `request_id`.
+	 */
+	fetchOauth2Tokens: (requestId: string, dir: string, path: string, request: {
+	version: number,
+	name: string,
+	/**  Sort order inside its folder. Lower comes first. */
+	seq?: number,
+	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
+	method: string,
+	url?: string,
+	params?: Params,
+	headers?: KeyValue[],
+	body?: Body,
+	auth?: Auth,
+	vars?: KeyValue[],
+	scripts?: Scripts,
+	tests?: string,
+	settings?: Settings,
+	docs?: string,
+} | null) => typedError<TokenInfo[], ApiError>(__TAURI_INVOKE("fetch_oauth2_tokens", { requestId, dir, path, request })),
+	/**  All cached OAuth2 tokens, for the token viewer. Shown only when the user opens the viewer. */
+	listOauth2Tokens: () => __TAURI_INVOKE<TokenInfo[]>("list_oauth2_tokens"),
+	/**  Forgets one cached token, or all of them when `token` is `None`. */
+	clearOauth2Tokens: (token: {
+	tokenUrl: string,
+	clientId: string,
+	scope: string,
+	grant: string,
+	username: string,
+	accessToken: string,
+	tokenType: string,
+	hasRefreshToken: boolean,
+	/**  ISO timestamp, or `None` if the provider didn't say. */
+	expiresAt: string | null,
+	expired: boolean,
+	/**  Pretty-printed JWT claims, when the access token is a JWT. */
+	claims: string | null,
+} | null) => __TAURI_INVOKE<void>("clear_oauth2_tokens", { token }),
 	/**  Cancels an in-flight request. Unknown ids (already finished) are ignored. */
 	cancelRequest: (requestId: string) => __TAURI_INVOKE<void>("cancel_request", { requestId }),
 	/**  Writes the full body of a recent response to `target` (chosen in a save dialog). */
@@ -284,7 +325,7 @@ export type Environment_Serialize = {
 	variables: EnvVariable_Serialize[],
 };
 
-export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret";
+export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth";
 
 /**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
 export type Folder = {
@@ -467,6 +508,23 @@ export type TlsSettings = {
 	 *  folder, or absolute.
 	 */
 	caCertPaths?: string[],
+};
+
+/**  A cached token as the token viewer shows it. */
+export type TokenInfo = {
+	tokenUrl: string,
+	clientId: string,
+	scope: string,
+	grant: string,
+	username: string,
+	accessToken: string,
+	tokenType: string,
+	hasRefreshToken: boolean,
+	/**  ISO timestamp, or `None` if the provider didn't say. */
+	expiresAt: string | null,
+	expired: boolean,
+	/**  Pretty-printed JWT claims, when the access token is a JWT. */
+	claims: string | null,
 };
 
 /**  Where the OAuth2 access token is put on the outgoing request. */
