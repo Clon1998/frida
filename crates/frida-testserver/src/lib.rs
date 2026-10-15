@@ -8,8 +8,11 @@
 //! - `/cookies/set?k=v` sets each query pair as a cookie (`Set-Cookie`)
 //! - anything else     echoes the request back as JSON: method, path, query, headers, body
 //!
+//! - `/oauth/*`        a mock OAuth2 provider, see the `oauth` module
+//!
 //! [`spawn_tls`] serves the same routes over HTTPS with a throwaway CA.
 
+mod oauth;
 mod tls;
 
 pub use tls::{TlsServer, spawn_tls};
@@ -44,6 +47,7 @@ pub fn router() -> Router {
         )
         .route("/status/{code}", any(status))
         .route("/cookies/set", get(set_cookies))
+        .merge(oauth::router())
         .fallback(echo)
 }
 

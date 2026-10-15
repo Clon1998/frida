@@ -30,6 +30,7 @@ fn inspect_x(runtime: &HashMap<String, String>) -> ResolvedVar {
         global_env: Some(&global_env),
         runtime,
         cookies: None,
+        oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
     })
     .unwrap();
     report.vars.into_iter().find(|v| v.name == "x").unwrap()

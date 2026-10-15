@@ -5,6 +5,7 @@
 //! so it stays testable and reusable for the future CLI.
 
 mod about;
+pub mod auth;
 pub mod error;
 pub mod http;
 pub mod local_state;

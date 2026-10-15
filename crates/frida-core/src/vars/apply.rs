@@ -3,7 +3,8 @@
 use super::resolver::Resolver;
 use super::scope::{ScopeInput, VarScope};
 use super::{ResolveReport, UsageLocation};
-use crate::model::{Collection, Folder, KeyValue, Request};
+use crate::auth::effective_auth;
+use crate::model::{AuthScheme, Collection, Folder, KeyValue, Request};
 
 /// A request and its inherited data with all variables resolved, plus the report.
 #[derive(Debug, Clone)]
@@ -12,6 +13,8 @@ pub struct ResolvedContext {
     pub collection: Collection,
     /// Same order as the input: outermost first.
     pub folders: Vec<Folder>,
+    /// The auth schemes that apply (after inheritance), with variables resolved.
+    pub auth: Vec<AuthScheme>,
     pub report: ResolveReport,
 }
 
@@ -32,11 +35,16 @@ pub fn resolve_context(input: &ScopeInput<'_>) -> ResolvedContext {
         })
         .collect();
     let request = resolve_request(&mut resolver, input.request);
+    let auth = effective_auth(input.request, input.folders, input.collection)
+        .iter()
+        .map(|scheme| resolve_auth(&mut resolver, scheme))
+        .collect();
 
     ResolvedContext {
         request,
         collection,
         folders,
+        auth,
         report: resolver.finish(),
     }
 }
@@ -75,6 +83,39 @@ pub fn resolve_request(resolver: &mut Resolver<'_>, request: &Request) -> Reques
         field.value = resolver.resolve(&field.value, UsageLocation::Body);
     }
     out
+}
+
+/// A copy of an auth scheme with variables resolved in every text field.
+fn resolve_auth(resolver: &mut Resolver<'_>, scheme: &AuthScheme) -> AuthScheme {
+    let mut r = |text: &str| resolver.resolve(text, UsageLocation::Auth);
+    match scheme {
+        AuthScheme::Basic { username, password } => AuthScheme::Basic {
+            username: r(username),
+            password: r(password),
+        },
+        AuthScheme::Bearer { token } => AuthScheme::Bearer { token: r(token) },
+        AuthScheme::ApiKey {
+            location,
+            name,
+            value,
+        } => AuthScheme::ApiKey {
+            location: *location,
+            name: r(name),
+            value: r(value),
+        },
+        AuthScheme::OAuth2(config) => {
+            let mut c = (**config).clone();
+            c.token_url = r(&c.token_url);
+            c.auth_url = r(&c.auth_url);
+            c.redirect_uri = r(&c.redirect_uri);
+            c.client_id = r(&c.client_id);
+            c.client_secret = r(&c.client_secret);
+            c.scope = r(&c.scope);
+            c.username = r(&c.username);
+            c.password = r(&c.password);
+            AuthScheme::OAuth2(Box::new(c))
+        }
+    }
 }
 
 /// Enabled headers with resolved names and values. Disabled rows are kept unchanged.

@@ -129,7 +129,7 @@ async fn send_inner(
 /// A new client per send keeps this simple: TLS settings can differ per collection. Cookies
 /// still persist across sends because the jar is shared. (Connection reuse could be added by
 /// caching clients per collection later.)
-async fn build_client(
+pub(crate) async fn build_client(
     prepared: &PreparedRequest,
     cookies: Option<Arc<CookieJar>>,
 ) -> Result<reqwest::Client, SendError> {

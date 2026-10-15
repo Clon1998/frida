@@ -69,6 +69,7 @@ async fn every_sample_request_succeeds_against_the_test_server() {
             global_env: Some(&shared_env),
             runtime: &runtime,
             cookies: None,
+            oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
         };
         let response = http::execute(input, CancellationToken::new())
             .await
@@ -112,6 +113,7 @@ async fn variables_sample_resolves_every_layer() {
             global_env: Some(&shared_env),
             runtime: &runtime,
             cookies: None,
+            oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
         },
         CancellationToken::new(),
     )

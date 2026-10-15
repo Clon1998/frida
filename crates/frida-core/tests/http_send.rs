@@ -346,6 +346,7 @@ async fn execute_applies_collection_and_folder_headers_and_timeouts() {
     let rel = storage::create_request(root, &folder_rel, &req).unwrap();
 
     let runtime = std::collections::HashMap::new();
+    let oauth = frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(())));
     let input = |request| http::ExecuteInput {
         collection_dir: root,
         request_rel: &rel,
@@ -354,6 +355,7 @@ async fn execute_applies_collection_and_folder_headers_and_timeouts() {
         global_env: None,
         runtime: &runtime,
         cookies: None,
+        oauth: &oauth,
     };
     let response = http::execute(input(&req), CancellationToken::new())
         .await

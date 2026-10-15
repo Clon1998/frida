@@ -10,7 +10,8 @@ use tokio_util::sync::CancellationToken;
 
 use super::cookies::CookieJar;
 use super::prepare::{RequestContext, prepare};
-use super::send::{HttpResponse, send};
+use super::send::{HttpResponse, build_client, send};
+use crate::auth::{OAuth2Manager, apply_auth};
 use crate::error::Result;
 use crate::model::{Environment, Request};
 use crate::storage;
@@ -28,6 +29,8 @@ pub struct ExecuteInput<'a> {
     pub global_env: Option<&'a Environment>,
     pub runtime: &'a HashMap<String, String>,
     pub cookies: Option<Arc<CookieJar>>,
+    /// Holds OAuth2 tokens across sends.
+    pub oauth: &'a OAuth2Manager,
 }
 
 /// A response plus the variable report of the request that produced it.
@@ -51,7 +54,19 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
         collection: &resolved.collection,
         folders: &resolved.folders,
     };
-    let prepared = prepare(ctx, &resolved.request)?;
+    let mut prepared = prepare(ctx, &resolved.request)?;
+    if !resolved.auth.is_empty() {
+        // The token endpoint is reached with the collection's TLS settings, without cookies.
+        let token_client = build_client(&prepared, None).await?;
+        apply_auth(
+            &mut prepared,
+            &resolved.auth,
+            input.oauth,
+            &token_client,
+            &cancel,
+        )
+        .await?;
+    }
     // The URL may contain secrets, so it is only logged at debug level (CLAUDE.md).
     tracing::debug!(method = %prepared.method, "sending request");
     let response = send(&prepared, input.cookies.clone(), cancel).await?;

@@ -45,6 +45,9 @@ pub enum CoreError {
 
     #[error(transparent)]
     Secret(#[from] frida_secrets::SecretError),
+
+    #[error(transparent)]
+    Auth(#[from] crate::auth::OAuth2Error),
 }
 
 impl CoreError {
