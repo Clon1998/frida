@@ -1,0 +1,3 @@
+# `app/` is a small pnpm workspace: this folder holds the Tauri CLI, `ui/` holds the React frontend.
+packages:
+  - ui
