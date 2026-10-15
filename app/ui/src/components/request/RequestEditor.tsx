@@ -10,7 +10,9 @@ import type { RequestModel as Request } from "@/lib/model";
 import { queryParamsFromUrl, syncPathParams, urlWithQueryParams } from "@/lib/url";
 import { type RequestTab, useTabs } from "@/stores/tabs";
 import { ConflictBanner } from "@/components/doc/ConflictBanner";
-import { AuthSection, ScriptsSection, TextSection, VarsSection } from "@/components/doc/sections";
+import { AuthEditor } from "@/components/doc/AuthEditor";
+import { ScriptsSection, TextSection, VarsSection } from "@/components/doc/sections";
+import type { Auth } from "@/bindings";
 import { BodyEditor } from "./BodyEditor";
 import { KeyValueTable } from "./KeyValueTable";
 import { MethodSelect } from "./MethodSelect";
@@ -147,10 +149,12 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
           </TabsContent>
 
           <TabsContent value="auth" className="overflow-auto p-3">
-            <AuthSection
-              auth={request.auth}
+            <AuthEditor
+              auth={request.auth as Auth}
               canInherit
-              onChange={(auth) => update((r) => ({ ...r, auth }))}
+              context={{ dir, path: tab.path, request }}
+              // `as`: the editor works with the generated type; see AuthEditor for why.
+              onChange={(auth) => update((r) => ({ ...r, auth: auth as Request["auth"] }))}
             />
           </TabsContent>
 

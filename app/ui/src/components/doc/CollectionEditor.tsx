@@ -12,7 +12,9 @@ import { commands } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
 import { ConflictBanner } from "./ConflictBanner";
 import { CookiesSection } from "./CookiesSection";
-import { AuthSection, ScriptsSection, TextSection, VarsSection } from "./sections";
+import type { Auth } from "@/bindings";
+import { AuthEditor } from "./AuthEditor";
+import { ScriptsSection, TextSection, VarsSection } from "./sections";
 
 /** Collection settings, opened as a tab. Saved in `collection.yaml`, shared through git. */
 export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab }) {
@@ -60,10 +62,11 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
           />
         </TabsContent>
         <TabsContent value="auth" className="overflow-auto p-3">
-          <AuthSection
-            auth={collection.auth}
+          <AuthEditor
+            auth={collection.auth as Auth}
             canInherit={false}
-            onChange={(auth) => update((c) => ({ ...c, auth }))}
+            context={{ dir, path: "", request: null }}
+            onChange={(auth) => update((c) => ({ ...c, auth: auth as CollectionModel["auth"] }))}
           />
         </TabsContent>
         <TabsContent value="vars" className="overflow-auto p-3">

@@ -4,7 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { FolderModel } from "@/lib/model";
 import { type FolderTab, useTabs } from "@/stores/tabs";
 import { ConflictBanner } from "./ConflictBanner";
-import { AuthSection, ScriptsSection, TextSection, VarsSection } from "./sections";
+import type { Auth } from "@/bindings";
+import { AuthEditor } from "./AuthEditor";
+import { ScriptsSection, TextSection, VarsSection } from "./sections";
 
 /** Folder settings, opened as a tab: inherited by every request in the folder. */
 export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
@@ -37,10 +39,11 @@ export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
           />
         </TabsContent>
         <TabsContent value="auth" className="overflow-auto p-3">
-          <AuthSection
-            auth={folder.auth}
+          <AuthEditor
+            auth={folder.auth as Auth}
             canInherit
-            onChange={(auth) => update((f) => ({ ...f, auth }))}
+            context={{ dir, path: tab.path, request: null }}
+            onChange={(auth) => update((f) => ({ ...f, auth: auth as FolderModel["auth"] }))}
           />
         </TabsContent>
         <TabsContent value="vars" className="overflow-auto p-3">
