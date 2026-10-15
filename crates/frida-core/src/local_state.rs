@@ -13,7 +13,7 @@ use crate::error::{CoreError, Result};
 pub const MAX_RECENT_WORKSPACES: usize = 10;
 
 /// `settings.json`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
     /// Absolute workspace folders, most recent first.
@@ -21,6 +21,19 @@ pub struct AppSettings {
     pub theme: ThemePreference,
     /// The active global environment per workspace folder.
     pub active_global_environments: std::collections::BTreeMap<String, String>,
+    /// How many history entries are kept (PLAN.md §13).
+    pub history_size: u32,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            recent_workspaces: Vec::new(),
+            theme: ThemePreference::default(),
+            active_global_environments: Default::default(),
+            history_size: crate::history::DEFAULT_RETENTION as u32,
+        }
+    }
 }
 
 impl AppSettings {

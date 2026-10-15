@@ -8,5 +8,6 @@
 pub mod app;
 pub mod collection;
 pub mod env;
+pub mod history;
 pub mod http;
 pub mod workspace;

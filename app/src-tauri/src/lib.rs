@@ -34,7 +34,7 @@ pub struct FsChanged {
 /// It's a separate function so both [`run`] and the `export_bindings` test can use it.
 /// The `tauri::Wry` type parameter is the concrete webview runtime Tauri uses on desktop.
 fn specta_builder() -> Builder<tauri::Wry> {
-    use commands::{app, collection, env, http, workspace};
+    use commands::{app, collection, env, history, http, workspace};
 
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -79,6 +79,11 @@ fn specta_builder() -> Builder<tauri::Wry> {
             env::clear_runtime_vars,
             env::list_cookies,
             env::clear_cookies,
+            history::list_history,
+            history::get_history_entry,
+            history::clear_history,
+            history::export_curl,
+            history::import_curl,
             http::send_request,
             http::inspect_request,
             http::fetch_oauth2_tokens,

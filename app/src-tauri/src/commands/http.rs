@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use frida_core::auth::TokenInfo;
+use frida_core::history::NewEntry;
 use frida_core::http::{self, ExecuteInput, ResponseView};
 use frida_core::model::{Environment, Request};
 use frida_core::secrets;
@@ -17,7 +18,7 @@ use crate::state::AppState;
 
 /// The active global and collection environment of a collection, with secret values filled in
 /// from the keychain. Keychain access is blocking, so it runs off the async runtime.
-async fn load_active_envs(
+pub(crate) async fn load_active_envs(
     state: &AppState,
     collection_dir: &Path,
 ) -> ApiResult<(Option<Environment>, Option<Environment>)> {
@@ -94,6 +95,7 @@ pub async fn send_request(
         .expect("in-flight lock poisoned")
         .remove(&request_id);
 
+    record_history(&state, &root, &path, &request, &result);
     let response = result?.response;
     let id = uuid::Uuid::new_v4().to_string();
     let view = ResponseView::new(id.clone(), &response);
@@ -108,6 +110,59 @@ pub async fn send_request(
         "response received"
     );
     Ok(view)
+}
+
+/// Writes a history entry in the background, so the response isn't delayed. Cancelled requests
+/// aren't recorded. Secret values are masked inside `HistoryStore::add`.
+fn record_history(
+    state: &AppState,
+    root: &Path,
+    path: &str,
+    request: &Request,
+    result: &Result<http::Executed, frida_core::CoreError>,
+) {
+    let Some(history) = state.history.clone() else {
+        return;
+    };
+    let collection_id = storage::load_collection(root)
+        .map(|c| c.id)
+        .unwrap_or_default();
+    let (entry, sensitive) = match result {
+        Ok(executed) => (
+            NewEntry::from_send(
+                &collection_id,
+                path,
+                &request.name,
+                &executed.sent,
+                Ok(&executed.response),
+            ),
+            executed.sensitive.clone(),
+        ),
+        Err(frida_core::CoreError::Send(http::SendError::Cancelled)) => return,
+        // The request never got as far as being sent: record it as typed (with
+        // `{{placeholders}}`, so no secret values) together with the error.
+        Err(err) => (
+            NewEntry {
+                collection_id,
+                request_path: path.to_string(),
+                request_name: request.name.clone(),
+                method: request.method.clone(),
+                url: request.url.clone(),
+                request_headers: Vec::new(),
+                request_body: None,
+                response: None,
+                error: Some(err.to_string()),
+            },
+            Vec::new(),
+        ),
+    };
+    let retention = state.local.load_settings().history_size as usize;
+    // Fire and forget: SQLite is blocking I/O, so it runs on the blocking thread pool.
+    tokio::task::spawn_blocking(move || {
+        if let Err(err) = history.add(&entry, &sensitive, retention) {
+            tracing::warn!(%err, "could not write history");
+        }
+    });
 }
 
 /// Resolves the variables of `request` without sending it, for the inspector panel and the

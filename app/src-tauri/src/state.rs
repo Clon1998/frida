@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use frida_core::auth::OAuth2Manager;
+use frida_core::history::HistoryStore;
 use frida_core::http::{CookieJar, ResponseCache};
 use frida_core::local_state::LocalStore;
 use frida_core::storage;
@@ -36,6 +37,9 @@ pub struct AppState {
     pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,
     /// OAuth2 tokens, in memory, shared by all collections (tokens are keyed by provider).
     pub oauth: OAuth2Manager,
+    /// Request history. `Arc` so it can be moved into `spawn_blocking` closures. `None` if the
+    /// database couldn't be opened (history is then simply off; sending still works).
+    pub history: Option<Arc<HistoryStore>>,
 }
 
 /// Where secret values are kept on this machine (PLAN.md §6).
@@ -91,7 +95,15 @@ impl AppState {
                 app_data_dir.join("secrets.enc"),
             )))
         };
+        let history = match HistoryStore::open(&app_data_dir.join("history.sqlite")) {
+            Ok(store) => Some(Arc::new(store)),
+            Err(err) => {
+                tracing::warn!(%err, "history disabled");
+                None
+            }
+        };
         Self {
+            history,
             local: LocalStore::new(app_data_dir),
             workspace: Mutex::new(None),
             in_flight: Mutex::new(HashMap::new()),

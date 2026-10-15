@@ -78,6 +78,18 @@ export const commands = {
 	listCookies: (dir: string) => typedError<CookieView[], ApiError>(__TAURI_INVOKE("list_cookies", { dir })),
 	/**  Removes the cookies of `domain`, or all of the collection's cookies when `domain` is `None`. */
 	clearCookies: (dir: string, domain: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("clear_cookies", { dir, domain })),
+	/**  History of the collection `dir` (or of all collections when `None`), newest first. */
+	listHistory: (dir: string | null, search: string) => typedError<HistorySummary[], ApiError>(__TAURI_INVOKE("list_history", { dir, search })),
+	/**
+	 *  One entry with its request and response. The response body is also put in the response
+	 *  cache, so "Save to file" works for it like for a live response.
+	 */
+	getHistoryEntry: (id: number) => typedError<HistoryEntry, ApiError>(__TAURI_INVOKE("get_history_entry", { id })),
+	clearHistory: () => typedError<null, ApiError>(__TAURI_INVOKE("clear_history")),
+	/**  "Copy as curl" for the editor's current request at `path` in collection `dir`. */
+	exportCurl: (dir: string, path: string, request: Request, options: CurlOptions) => typedError<string, ApiError>(__TAURI_INVOKE("export_curl", { dir, path, request, options })),
+	/**  Parses a curl command into a request (not saved yet). */
+	importCurl: (command: string) => typedError<CurlImport, ApiError>(__TAURI_INVOKE("import_curl", { command })),
 	/**
 	 *  Sends `request` (the editor's current state, saved or not) as if it lived at `path` in the
 	 *  collection `dir`. `request_id` is chosen by the UI and used by [`cancel_request`].
@@ -176,6 +188,8 @@ export type AppSettings = {
 	theme?: ThemePreference,
 	/**  The active global environment per workspace folder. */
 	activeGlobalEnvironments?: { [key in string]: string },
+	/**  How many history entries are kept (PLAN.md §13). */
+	historySize?: number,
 };
 
 /**
@@ -273,6 +287,23 @@ export type CookieView = {
 	httpOnly: boolean,
 };
 
+/**  The imported request plus anything that couldn't be carried over. */
+export type CurlImport = {
+	request: Request,
+	warnings: string[],
+};
+
+export type CurlOptions = {
+	shell: Shell,
+	/**  Replace `{{variables}}` with their values (default) or keep the placeholders. */
+	resolveVariables: boolean,
+	/**
+	 *  Off by default: secret values are replaced by `***`. Turning it on requires an explicit
+	 *  confirmation in the UI (PLAN.md §6).
+	 */
+	includeSecrets: boolean,
+};
+
 /**  Which environments a command is about: the workspace's global ones or a collection's. */
 export type EnvScope = { kind: "global" } | { kind: "collection"; dir: string };
 
@@ -360,6 +391,31 @@ export type Folder = {
 export type FsChanged = {
 	/**  Absolute paths of the changed files and folders. */
 	paths: string[],
+};
+
+/**  A full entry, opened read-only. */
+export type HistoryEntry = {
+	summary: HistorySummary,
+	requestHeaders: KeyValue[],
+	/**  The body as text, if it was text. */
+	requestBody: string | null,
+	requestBodyTruncated: boolean,
+	/**  The response in the same shape as a live one. Its `id` is `history-<id>`. */
+	response: ResponseView | null,
+};
+
+/**  A row in the history list. */
+export type HistorySummary = {
+	id: number,
+	timestamp: string,
+	collectionId: string,
+	requestPath: string,
+	requestName: string,
+	method: string,
+	url: string,
+	status: number | null,
+	timeMs: number | null,
+	error: string | null,
 };
 
 /**  A `name: value` row that can be switched off, used for headers, query params, vars and form fields. */
@@ -508,6 +564,15 @@ export type ShadowedVar = {
 	value: string | null,
 	isSecret: boolean,
 };
+
+export type Shell = 
+/**  bash, zsh, sh: single quotes, `\` line continuation. */
+"bash" | 
+/**
+ *  PowerShell: single quotes, `` ` `` line continuation, and `curl.exe` (in Windows
+ *  PowerShell, `curl` is an alias for `Invoke-WebRequest`).
+ */
+"powershell";
 
 export type ThemePreference = "system" | "light" | "dark";
 
