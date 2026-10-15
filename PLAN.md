@@ -593,6 +593,11 @@ Deviations from and clarifications of this plan, newest last.
   Writes are atomic (temp file + rename).
 - **2026-10-15 (M1) CI**: lint & test on every push/PR (skipping docs-only changes); the 4-OS build matrix only on PRs
   and manual dispatch.
+- **2026-10-15 (M1) `crates/frida-testserver`** (not in §3): a dev-only axum echo server with an HTTPS mode using a
+  throwaway CA. Used by the HTTP integration tests and for manual testing (`cargo run -p frida-testserver`, port 8787).
+- **2026-10-15 (M1) HTTP details.** The URL is the source of truth for the query string when sending (`params.query`
+  mirrors it for the UI). A URL without a scheme gets `http://`. A new reqwest client is built per send in M1; connection
+  reuse and cookie jars come with M2. reqwest's default system-proxy detection is left on (no proxy UI, per non-goals).
 
 ## 17. Testing strategy
 
