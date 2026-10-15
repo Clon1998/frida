@@ -9,9 +9,10 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 use super::cookies::CookieJar;
-use super::prepare::{RequestContext, prepare};
+use super::prepare::{PreparedRequest, RequestContext, prepare};
 use super::send::{HttpResponse, build_client, send};
-use crate::auth::{OAuth2Manager, TokenInfo, apply_auth};
+use crate::auth::{OAuth2Manager, TokenInfo, apply_auth, effective_auth};
+use crate::codegen::{CurlOptions, curl_request, render_curl};
 use crate::error::Result;
 use crate::model::AuthScheme;
 use crate::model::{Environment, Request};
@@ -34,10 +35,14 @@ pub struct ExecuteInput<'a> {
     pub oauth: &'a OAuth2Manager,
 }
 
-/// A response plus the variable report of the request that produced it.
+/// A response plus what produced it.
 pub struct Executed {
     pub response: HttpResponse,
     pub report: ResolveReport,
+    /// The request exactly as sent (variables resolved, auth applied), for history.
+    pub sent: PreparedRequest,
+    /// Every secret value in the sent request (resolved secrets and auth values), to mask.
+    pub sensitive: Vec<String>,
 }
 
 /// Resolves variables in the request without sending it, for the inspector.
@@ -56,10 +61,11 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
         folders: &resolved.folders,
     };
     let mut prepared = prepare(ctx, &resolved.request)?;
+    let mut sensitive = resolved.report.secret_values.clone();
     if !resolved.auth.is_empty() {
         // The token endpoint is reached with the collection's TLS settings, without cookies.
         let token_client = build_client(&prepared, None).await?;
-        apply_auth(
+        let auth_values = apply_auth(
             &mut prepared,
             &resolved.auth,
             input.oauth,
@@ -67,6 +73,7 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
             &cancel,
         )
         .await?;
+        sensitive.extend(auth_values);
     }
     // The URL may contain secrets, so it is only logged at debug level (CLAUDE.md).
     tracing::debug!(method = %prepared.method, "sending request");
@@ -74,6 +81,8 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
     Ok(Executed {
         response,
         report: resolved.report,
+        sent: prepared,
+        sensitive,
     })
 }
 
@@ -98,6 +107,44 @@ pub async fn fetch_tokens(
         }
     }
     Ok(input.oauth.list())
+}
+
+/// "Copy as curl" (PLAN.md §11.3) for the request, with variables resolved or kept as
+/// `{{placeholders}}`. Secrets are masked as `***` unless `options.include_secrets`.
+pub fn export_curl(input: &ExecuteInput<'_>, options: CurlOptions) -> Result<String> {
+    if options.resolve_variables {
+        let resolved = load_and_resolve(input)?;
+        let ctx = RequestContext {
+            collection_dir: input.collection_dir,
+            collection: &resolved.collection,
+            folders: &resolved.folders,
+        };
+        let (curl, auth_values) = curl_request(ctx, &resolved.request, &resolved.auth, input.oauth);
+        let mut masked = resolved.report.secret_values;
+        masked.extend(auth_values);
+        if options.include_secrets {
+            masked.clear();
+        }
+        Ok(render_curl(&curl, options.shell, &masked))
+    } else {
+        let collection = storage::load_collection(input.collection_dir)?;
+        let folders = storage::load_folder_chain(input.collection_dir, input.request_rel)?;
+        let folder_docs: Vec<_> = folders.iter().map(|(_, f)| f.clone()).collect();
+        let ctx = RequestContext {
+            collection_dir: input.collection_dir,
+            collection: &collection,
+            folders: &folder_docs,
+        };
+        let auth = effective_auth(input.request, &folders, &collection);
+        let (curl, literal_values) = curl_request(ctx, input.request, &auth, input.oauth);
+        // Placeholders hide secrets already; mask literal values typed into auth fields.
+        let masked = if options.include_secrets {
+            Vec::new()
+        } else {
+            literal_values
+        };
+        Ok(render_curl(&curl, options.shell, &masked))
+    }
 }
 
 fn load_and_resolve(input: &ExecuteInput<'_>) -> Result<ResolvedContext> {

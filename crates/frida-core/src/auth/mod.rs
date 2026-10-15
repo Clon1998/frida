@@ -44,32 +44,43 @@ pub fn effective_auth(
 /// replaces a header of the same name set elsewhere (e.g. an old `Authorization` header).
 /// OAuth2 tokens come from `oauth` (cached, refreshed or fetched); `client` is used for the
 /// token endpoint so the collection's TLS settings apply there too.
+///
+/// Returns the sensitive values it added (tokens, keys, credentials) for masking.
 pub async fn apply_auth(
     prepared: &mut PreparedRequest,
     schemes: &[AuthScheme],
     oauth: &OAuth2Manager,
     client: &reqwest::Client,
     cancel: &CancellationToken,
-) -> Result<(), OAuth2Error> {
+) -> Result<Vec<String>, OAuth2Error> {
+    // Values that must be masked in history and logs.
+    let mut sensitive = Vec::new();
     for scheme in schemes {
         match scheme {
             AuthScheme::Basic { username, password } => {
                 let encoded = STANDARD.encode(format!("{username}:{password}"));
+                sensitive.push(encoded.clone());
+                sensitive.push(password.clone());
                 set_header(prepared, "Authorization", format!("Basic {encoded}"));
             }
             AuthScheme::Bearer { token } => {
+                sensitive.push(token.clone());
                 set_header(prepared, "Authorization", format!("Bearer {token}"));
             }
             AuthScheme::ApiKey {
                 location,
                 name,
                 value,
-            } => match location {
-                ApiKeyLocation::Header => set_header(prepared, name, value.clone()),
-                ApiKeyLocation::Query => add_query(prepared, name, value),
-            },
+            } => {
+                sensitive.push(value.clone());
+                match location {
+                    ApiKeyLocation::Header => set_header(prepared, name, value.clone()),
+                    ApiKeyLocation::Query => add_query(prepared, name, value),
+                }
+            }
             AuthScheme::OAuth2(config) => {
                 let token = oauth.token(config, client, cancel).await?;
+                sensitive.push(token.access_token.clone());
                 let placement = &config.token_placement;
                 match placement.location {
                     ApiKeyLocation::Header => {
@@ -87,7 +98,8 @@ pub async fn apply_auth(
             }
         }
     }
-    Ok(())
+    sensitive.retain(|s| !s.is_empty());
+    Ok(sensitive)
 }
 
 fn set_header(prepared: &mut PreparedRequest, name: &str, value: String) {

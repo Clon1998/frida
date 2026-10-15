@@ -8,6 +8,7 @@ mod about;
 pub mod auth;
 pub mod codegen;
 pub mod error;
+pub mod history;
 pub mod http;
 pub mod import;
 pub mod local_state;
