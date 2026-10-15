@@ -1,9 +1,13 @@
 name: CI
 
+# Lint & test run on every push/PR (except docs-only changes). The slow 4-OS build matrix
+# runs only on pull requests or when started by hand ("Run workflow" in the Actions tab).
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:
 
 concurrency:
@@ -64,6 +68,7 @@ jobs:
   build:
     name: Build (${{ matrix.name }})
     needs: check
+    if: github.event_name != 'push'
     strategy:
       fail-fast: false
       matrix:
