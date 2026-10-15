@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { ChevronsUpDown, FolderPlus, LogOut, Plus, Settings } from "lucide-react";
+import { ChevronsUpDown, FolderPlus, Plus, Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { HistoryPanel } from "@/components/history/HistoryPanel";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollectionTree } from "./CollectionTree";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export function Sidebar() {
   const workspace = useWorkspace((s) => s.workspace);
@@ -25,7 +26,6 @@ export function Sidebar() {
   const addCollection = useWorkspace((s) => s.addCollection);
   const createCollection = useWorkspace((s) => s.createCollection);
   const removeCollection = useWorkspace((s) => s.removeCollection);
-  const closeWorkspace = useWorkspace((s) => s.closeWorkspace);
   const [creating, setCreating] = useState(false);
   const [view, setView] = useState<"tree" | "history">("tree");
   const [removing, setRemoving] = useState(false);
@@ -40,6 +40,9 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full flex-col border-r bg-muted/30">
+      <div className="border-b px-2 pt-2">
+        <WorkspaceSwitcher />
+      </div>
       <div className="flex items-center gap-1 border-b p-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -80,10 +83,6 @@ export function Sidebar() {
                 Remove “{active.name}” from workspace
               </DropdownMenuItem>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void closeWorkspace()}>
-              <LogOut /> Close workspace
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         {active && (
