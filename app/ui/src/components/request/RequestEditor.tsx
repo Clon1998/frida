@@ -7,7 +7,6 @@ import { useDialogs } from "@/stores/dialogs";
 import { useUi } from "@/stores/ui";
 import { useEffect } from "react";
 import { CodeEditor } from "@/components/editor/CodeEditor";
-import { InspectorPanel } from "@/components/inspector/InspectorPanel";
 import { useInspection } from "@/components/inspector/useInspection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,15 +34,12 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
   const cancel = useTabs((s) => s.cancel);
   const request = tab.draft;
   const sending = tab.requestId !== null;
-  const inspectorOpen = useUi((s) => s.inspectorOpen);
-  const setInspectorOpen = useUi((s) => s.setInspectorOpen);
   const { report, variables } = useInspection(dir, tab.path, request);
-  const unresolved = report?.vars.filter((v) => !v.resolved).length ?? 0;
-  // The inspector button lives in the header bar; tell it how many variables are unresolved.
+  // The inspector drawer and its button live in the app shell; share the report with them.
   useEffect(() => {
-    useUi.getState().setUnresolved(unresolved);
-    return () => useUi.getState().setUnresolved(0);
-  }, [unresolved]);
+    useUi.getState().setReport(report);
+    return () => useUi.getState().setReport(null);
+  }, [report]);
   const openCurlExport = useDialogs((s) => s.openCurlExport);
 
   /** Pasting a curl command into the URL bar turns this request into it (PLAN.md §11.3). */
@@ -237,11 +233,6 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
             </label>
           </TabsContent>
         </Tabs>
-        {inspectorOpen && (
-          <div className="w-80 shrink-0">
-            <InspectorPanel dir={dir} report={report} onClose={() => setInspectorOpen(false)} />
-          </div>
-        )}
       </div>
     </div>
   );

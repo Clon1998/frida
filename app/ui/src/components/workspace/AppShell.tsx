@@ -8,6 +8,8 @@ import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { HistoryView } from "@/components/history/HistoryView";
+import { InspectorPanel } from "@/components/inspector/InspectorPanel";
+import { useUi } from "@/stores/ui";
 import { RequestEditor } from "@/components/request/RequestEditor";
 import { ResponseViewer } from "@/components/response/ResponseViewer";
 import { Sidebar } from "@/components/sidebar/Sidebar";
@@ -28,6 +30,10 @@ export function AppShell() {
     return c?.tabs.find((t) => t.path === c.active) ?? null;
   });
   const [split, setSplit] = useState<"horizontal" | "vertical">("horizontal");
+  const inspectorOpen = useUi((s) => s.inspectorOpen);
+  const setInspectorOpen = useUi((s) => s.setInspectorOpen);
+  const report = useUi((s) => s.report);
+  const showInspector = inspectorOpen && dir !== null && tab?.kind === "request";
 
   useRestoreTabs();
   useLoadEnvs();
@@ -38,11 +44,11 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col">
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-        <ResizablePanel defaultSize="22" minSize={180} maxSize="45">
+        <ResizablePanel id="sidebar" defaultSize="22" minSize={180} maxSize="45">
           <Sidebar />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel>
+        <ResizablePanel id="main">
           <main className="flex h-full min-w-0 flex-col">
             {dir && <TabBar dir={dir} />}
             {dir && <RequestHeader dir={dir} tab={tab} />}
@@ -84,6 +90,15 @@ export function AppShell() {
             )}
           </main>
         </ResizablePanel>
+        {showInspector && (
+          // The variables drawer: full height on the right of the window (PLAN.md §14).
+          <>
+            <ResizableHandle />
+            <ResizablePanel id="inspector" defaultSize="22" minSize={240} maxSize="45">
+              <InspectorPanel dir={dir} report={report} onClose={() => setInspectorOpen(false)} />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
 
       <CurlExportDialog />
