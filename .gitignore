@@ -36,3 +36,6 @@ pnpm-debug.log*
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# --- Claude Code (personal settings; the shared .claude/settings.json is committed) ---
+.claude/settings.local.json
