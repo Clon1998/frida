@@ -1,0 +1,11 @@
+[package]
+name = "frida-script"
+description = "Sandboxed QuickJS runtime for Frida pre/post request scripts and tests."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true

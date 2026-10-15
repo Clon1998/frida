@@ -1,0 +1,16 @@
+[package]
+name = "frida-core"
+description = "Frida domain model, storage, variable resolution, HTTP execution, importers and codegen."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+specta = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
