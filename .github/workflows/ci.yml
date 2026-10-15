@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Lint & test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install UI dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace
+      - name: Generated TS bindings are up to date
+        run: git diff --exit-code -- app/ui/src/bindings.ts
+
+      - name: UI typecheck
+        working-directory: app/ui
+        run: pnpm typecheck
+      - name: UI lint
+        working-directory: app/ui
+        run: pnpm lint
+      - name: UI test
+        working-directory: app/ui
+        run: pnpm test
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: linux-x64
+            # Oldest supported Ubuntu, so the AppImage/.deb run on as many distros as possible.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Tauri system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install UI dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app bundles
+        working-directory: app
+        run: pnpm tauri build --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frida-http-${{ matrix.name }}
+          path: target/${{ matrix.target }}/release/bundle/
+          if-no-files-found: error
