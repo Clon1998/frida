@@ -1,4 +1,8 @@
-import { Loader2, Send, X } from "lucide-react";
+import { Braces, Loader2, Send, X } from "lucide-react";
+import { useState } from "react";
+import { CodeEditor } from "@/components/editor/CodeEditor";
+import { InspectorPanel } from "@/components/inspector/InspectorPanel";
+import { useInspection } from "@/components/inspector/useInspection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +27,9 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
   const cancel = useTabs((s) => s.cancel);
   const request = tab.draft;
   const sending = tab.requestId !== null;
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const { report, variables } = useInspection(dir, tab.path, request);
+  const unresolved = report?.vars.filter((v) => !v.resolved).length ?? 0;
 
   const update = (change: (r: Request) => Request) =>
     updateDraft<RequestTab>(dir, tab.path, change);
@@ -47,13 +54,30 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
           value={request.method}
           onChange={(method) => update((r) => ({ ...r, method }))}
         />
-        <Input
-          className="h-9 font-mono text-sm"
+        <CodeEditor
+          singleLine
+          className="h-9 min-w-0 flex-1 overflow-hidden rounded-md border px-1 py-1.5 [&_.cm-content]:py-0"
           placeholder="https://api.example.com/orders/:orderId"
           value={request.url}
-          onChange={(e) => setUrl(e.target.value)}
-          spellCheck={false}
+          variables={variables}
+          onChange={setUrl}
+          onEnter={() => void send(dir, tab.path)}
         />
+        <Button
+          variant={inspectorOpen ? "secondary" : "ghost"}
+          size="icon"
+          className="relative size-9 shrink-0"
+          title="Variables inspector"
+          aria-label="Variables inspector"
+          onClick={() => setInspectorOpen((o) => !o)}
+        >
+          <Braces />
+          {unresolved > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] text-white">
+              {unresolved}
+            </span>
+          )}
+        </Button>
         {sending ? (
           <Button variant="outline" onClick={() => void cancel(dir, tab.path)}>
             <Loader2 className="animate-spin" />
@@ -68,103 +92,117 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
         )}
       </div>
 
-      <Tabs defaultValue="params" className="min-h-0 flex-1 gap-0">
-        <TabsList className="mx-2 mt-2">
-          <TabsTrigger value="params">Params</TabsTrigger>
-          <TabsTrigger value="body">Body</TabsTrigger>
-          <TabsTrigger value="headers">
-            Headers
-            {request.headers.length > 0 && (
-              <span className="text-muted-foreground">({request.headers.length})</span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="auth">Auth</TabsTrigger>
-          <TabsTrigger value="vars">Vars</TabsTrigger>
-          <TabsTrigger value="script">Script</TabsTrigger>
-          <TabsTrigger value="tests">Tests</TabsTrigger>
-          <TabsTrigger value="docs">Docs</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+      <div className="flex min-h-0 flex-1">
+        <Tabs defaultValue="params" className="min-h-0 min-w-0 flex-1 gap-0">
+          <TabsList className="mx-2 mt-2">
+            <TabsTrigger value="params">Params</TabsTrigger>
+            <TabsTrigger value="body">Body</TabsTrigger>
+            <TabsTrigger value="headers">
+              Headers
+              {request.headers.length > 0 && (
+                <span className="text-muted-foreground">({request.headers.length})</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="auth">Auth</TabsTrigger>
+            <TabsTrigger value="vars">Vars</TabsTrigger>
+            <TabsTrigger value="script">Script</TabsTrigger>
+            <TabsTrigger value="tests">Tests</TabsTrigger>
+            <TabsTrigger value="docs">Docs</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="params" className="overflow-auto p-3">
-          <h3 className="mb-2 text-xs font-medium text-muted-foreground">Query</h3>
-          <KeyValueTable
-            rows={request.params.query}
-            onChange={(query) =>
-              update((r) => ({
-                ...r,
-                url: urlWithQueryParams(r.url, query),
-                params: { ...r.params, query },
-              }))
-            }
-          />
-          <h3 className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Path</h3>
-          <PathParamsTable
-            params={request.params.path}
-            onChange={(path) => update((r) => ({ ...r, params: { ...r.params, path } }))}
-          />
-        </TabsContent>
-
-        <TabsContent value="body" className="min-h-0 p-3">
-          <BodyEditor body={request.body} onChange={(body) => update((r) => ({ ...r, body }))} />
-        </TabsContent>
-
-        <TabsContent value="headers" className="overflow-auto p-3">
-          <KeyValueTable
-            rows={request.headers}
-            onChange={(headers) => update((r) => ({ ...r, headers }))}
-            namePlaceholder="Header"
-          />
-        </TabsContent>
-
-        <TabsContent value="auth" className="overflow-auto p-3">
-          <AuthSection
-            auth={request.auth}
-            canInherit
-            onChange={(auth) => update((r) => ({ ...r, auth }))}
-          />
-        </TabsContent>
-
-        <TabsContent value="vars" className="overflow-auto p-3">
-          <VarsSection vars={request.vars} onChange={(vars) => update((r) => ({ ...r, vars }))} />
-        </TabsContent>
-
-        <TabsContent value="script" className="min-h-0 p-3">
-          <ScriptsSection
-            scripts={request.scripts}
-            onChange={(scripts) => update((r) => ({ ...r, scripts }))}
-          />
-        </TabsContent>
-
-        <TabsContent value="tests" className="min-h-0 p-3">
-          <TextSection
-            value={request.tests}
-            note="Saved now; tests run once the scripting milestone is done."
-            onChange={(tests) => update((r) => ({ ...r, tests }))}
-          />
-        </TabsContent>
-
-        <TabsContent value="docs" className="min-h-0 p-3">
-          <TextSection value={request.docs} onChange={(docs) => update((r) => ({ ...r, docs }))} />
-        </TabsContent>
-
-        <TabsContent value="settings" className="overflow-auto p-3">
-          <label className="flex max-w-sm flex-col gap-1 text-sm">
-            Timeout (ms)
-            <Input
-              type="number"
-              min={1}
-              className="h-8"
-              placeholder="Inherit from folder / collection (default 30000)"
-              value={request.settings.timeoutMs ?? ""}
-              onChange={(e) => {
-                const value = e.target.value === "" ? null : Math.max(1, Number(e.target.value));
-                update((r) => ({ ...r, settings: { ...r.settings, timeoutMs: value } }));
-              }}
+          <TabsContent value="params" className="overflow-auto p-3">
+            <h3 className="mb-2 text-xs font-medium text-muted-foreground">Query</h3>
+            <KeyValueTable
+              rows={request.params.query}
+              onChange={(query) =>
+                update((r) => ({
+                  ...r,
+                  url: urlWithQueryParams(r.url, query),
+                  params: { ...r.params, query },
+                }))
+              }
             />
-          </label>
-        </TabsContent>
-      </Tabs>
+            <h3 className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Path</h3>
+            <PathParamsTable
+              params={request.params.path}
+              onChange={(path) => update((r) => ({ ...r, params: { ...r.params, path } }))}
+            />
+          </TabsContent>
+
+          <TabsContent value="body" className="min-h-0 p-3">
+            <BodyEditor
+              body={request.body}
+              variables={variables}
+              onChange={(body) => update((r) => ({ ...r, body }))}
+            />
+          </TabsContent>
+
+          <TabsContent value="headers" className="overflow-auto p-3">
+            <KeyValueTable
+              rows={request.headers}
+              onChange={(headers) => update((r) => ({ ...r, headers }))}
+              namePlaceholder="Header"
+            />
+          </TabsContent>
+
+          <TabsContent value="auth" className="overflow-auto p-3">
+            <AuthSection
+              auth={request.auth}
+              canInherit
+              onChange={(auth) => update((r) => ({ ...r, auth }))}
+            />
+          </TabsContent>
+
+          <TabsContent value="vars" className="overflow-auto p-3">
+            <VarsSection vars={request.vars} onChange={(vars) => update((r) => ({ ...r, vars }))} />
+          </TabsContent>
+
+          <TabsContent value="script" className="min-h-0 p-3">
+            <ScriptsSection
+              scripts={request.scripts}
+              onChange={(scripts) => update((r) => ({ ...r, scripts }))}
+            />
+          </TabsContent>
+
+          <TabsContent value="tests" className="min-h-0 p-3">
+            <TextSection
+              value={request.tests}
+              note="Saved now; tests run once the scripting milestone is done."
+              onChange={(tests) => update((r) => ({ ...r, tests }))}
+            />
+          </TabsContent>
+
+          <TabsContent value="docs" className="min-h-0 p-3">
+            <TextSection
+              value={request.docs}
+              onChange={(docs) => update((r) => ({ ...r, docs }))}
+            />
+          </TabsContent>
+
+          <TabsContent value="settings" className="overflow-auto p-3">
+            <label className="flex max-w-sm flex-col gap-1 text-sm">
+              Timeout (ms)
+              <Input
+                type="number"
+                min={1}
+                className="h-8"
+                placeholder="Inherit from folder / collection (default 30000)"
+                value={request.settings.timeoutMs ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value === "" ? null : Math.max(1, Number(e.target.value));
+                  update((r) => ({ ...r, settings: { ...r.settings, timeoutMs: value } }));
+                }}
+              />
+            </label>
+          </TabsContent>
+        </Tabs>
+        {inspectorOpen && (
+          <div className="w-80 shrink-0">
+            <InspectorPanel dir={dir} report={report} onClose={() => setInspectorOpen(false)} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

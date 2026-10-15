@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CollectionModel } from "@/lib/model";
 import { type CollectionTab, useTabs } from "@/stores/tabs";
+import { toast } from "sonner";
+import { commands } from "@/bindings";
+import { showError, unwrap } from "@/lib/api";
 import { ConflictBanner } from "./ConflictBanner";
+import { CookiesSection } from "./CookiesSection";
 import { AuthSection, ScriptsSection, TextSection, VarsSection } from "./sections";
 
 /** Collection settings, opened as a tab. Saved in `collection.yaml`, shared through git. */
@@ -43,6 +47,7 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
           <TabsTrigger value="tests">Tests</TabsTrigger>
           <TabsTrigger value="docs">Docs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="cookies">Cookies</TabsTrigger>
         </TabsList>
         <TabsContent value="headers" className="overflow-auto p-3">
           <p className="mb-2 text-xs text-muted-foreground">
@@ -66,6 +71,23 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
             vars={collection.vars}
             onChange={(vars) => update((c) => ({ ...c, vars }))}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            title="Variables set by scripts (bru.setVar) during this session"
+            onClick={() =>
+              void unwrap(commands.clearRuntimeVars(dir)).then(
+                () => toast.success("Runtime variables cleared"),
+                showError,
+              )
+            }
+          >
+            Clear runtime variables
+          </Button>
+        </TabsContent>
+        <TabsContent value="cookies" className="overflow-auto p-3">
+          <CookiesSection dir={dir} />
         </TabsContent>
         <TabsContent value="script" className="min-h-0 p-3">
           <ScriptsSection

@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
 import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
+import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { RequestEditor } from "@/components/request/RequestEditor";
 import { ResponseViewer } from "@/components/response/ResponseViewer";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { useEnvs } from "@/stores/envs";
 import { useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { RequestHeader } from "./RequestHeader";
@@ -24,6 +26,7 @@ export function AppShell() {
   const [split, setSplit] = useState<"horizontal" | "vertical">("horizontal");
 
   useRestoreTabs();
+  useLoadEnvs();
   usePersistTabs();
   useFileWatcher();
   useShortcuts();
@@ -60,6 +63,11 @@ export function AppShell() {
                 <CollectionEditor dir={dir} tab={tab} />
               </div>
             )}
+            {dir && tab?.kind === "environments" && (
+              <div className="min-h-0 flex-1">
+                <EnvironmentsEditor dir={dir} />
+              </div>
+            )}
             {!tab && (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 Open a request from the sidebar, or right-click it to create one.
@@ -84,6 +92,15 @@ export function AppShell() {
       </footer>
     </div>
   );
+}
+
+/** Loads the environments (and the active selection) when the active collection changes. */
+function useLoadEnvs() {
+  const dir = useActiveCollection()?.dir;
+  const load = useEnvs((s) => s.load);
+  useEffect(() => {
+    if (dir) void load(dir);
+  }, [dir, load]);
 }
 
 /** Restores the saved tabs the first time a collection becomes active. */
@@ -129,6 +146,11 @@ function useFileWatcher() {
       const { workspace, reloadTree, reloadWorkspace } = useWorkspace.getState();
       if (!workspace) return;
       if (payload.paths.some((p) => p.endsWith("frida-workspace.yaml"))) void reloadWorkspace();
+      // Environment files changed (git pull, editor): reload the lists and selection.
+      const envDir = useEnvs.getState().dir;
+      if (envDir && payload.paths.some((p) => p.includes("/environments/"))) {
+        void useEnvs.getState().load(envDir);
+      }
       for (const collection of workspace.collections) {
         if (payload.paths.some((p) => p.startsWith(collection.dir))) {
           void reloadTree(collection.dir);

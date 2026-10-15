@@ -27,9 +27,22 @@ export interface RequestTab extends DocTab<"request", RequestModel> {
 export type FolderTab = DocTab<"folder", FolderModel>;
 export type CollectionTab = DocTab<"collection", CollectionModel>;
 
-/** A tab shows a request, a folder's settings or the collection's settings (like Bruno). */
-export type Tab = RequestTab | FolderTab | CollectionTab;
+/** Path of the environment editor tab (not a file, so it can't clash with a real path). */
+export const ENVIRONMENTS_TAB = "@environments";
+
+/** The environment editor. It edits several files and tracks its own changes. */
+export interface EnvironmentsTab {
+  kind: "environments";
+  path: typeof ENVIRONMENTS_TAB;
+}
+
+/** A tab backed by one file, with a saved and an edited version. */
+export type DocumentTab = RequestTab | FolderTab | CollectionTab;
+
+/** A tab shows a request, a folder's or the collection's settings, or the environments. */
+export type Tab = DocumentTab | EnvironmentsTab;
 export type TabKind = Tab["kind"];
+type DocKind = DocumentTab["kind"];
 
 interface CollectionTabs {
   tabs: Tab[];
@@ -47,7 +60,7 @@ interface TabsState {
   closeTab: (dir: string, path: string) => void;
   setActive: (dir: string, path: string) => void;
   /** Edits a tab's draft. `T` says which kind of tab the caller expects. */
-  updateDraft: <T extends Tab>(
+  updateDraft: <T extends DocumentTab>(
     dir: string,
     path: string,
     update: (draft: T["draft"]) => T["draft"],
@@ -75,18 +88,25 @@ const EMPTY: CollectionTabs = { tabs: [], active: null, expanded: [] };
  * folder. Deriving it from the path keeps the persisted tab list a plain list of paths.
  */
 export function kindOf(path: string): TabKind {
+  if (path === ENVIRONMENTS_TAB) return "environments";
   if (path === "") return "collection";
   return path.endsWith(".yaml") ? "request" : "folder";
 }
 
-export const isDirty = (tab: Tab) => !same(tab.draft, tab.original);
+export const isDirty = (tab: Tab) => tab.kind !== "environments" && !same(tab.draft, tab.original);
+
+export const isDocument = (tab: Tab): tab is DocumentTab => tab.kind !== "environments";
+
+/** The name shown on the tab and in the header. */
+export const tabTitle = (tab: Tab) =>
+  tab.kind === "environments" ? "Environments" : tab.draft.name;
 
 function same(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Reads the document a tab shows from disk. */
-async function readDoc(dir: string, kind: TabKind, path: string): Promise<Tab["draft"]> {
+async function readDoc(dir: string, kind: DocKind, path: string): Promise<DocumentTab["draft"]> {
   switch (kind) {
     case "request":
       return fromRust(await unwrap(commands.readRequest(dir, path)));
@@ -97,7 +117,7 @@ async function readDoc(dir: string, kind: TabKind, path: string): Promise<Tab["d
   }
 }
 
-async function writeDoc(dir: string, tab: Tab) {
+async function writeDoc(dir: string, tab: DocumentTab) {
   switch (tab.kind) {
     case "request":
       return unwrap(commands.saveRequest(dir, tab.path, tab.draft));
@@ -108,7 +128,7 @@ async function writeDoc(dir: string, tab: Tab) {
   }
 }
 
-function newTab(kind: TabKind, path: string, doc: Tab["draft"]): Tab {
+function newTab(kind: DocKind, path: string, doc: DocumentTab["draft"]): Tab {
   // The casts are safe: `doc` was read for exactly this `kind` by `readDoc`.
   switch (kind) {
     case "request": {
@@ -152,18 +172,26 @@ export const useTabs = create<TabsState>((set, get) => {
       byCollection: { ...s.byCollection, [dir]: update(s.byCollection[dir] ?? EMPTY) },
     }));
 
-  const updateTab = (dir: string, path: string, update: (tab: Tab) => Tab) =>
+  /** Updates the document tab at `path` (the environments tab has no document). */
+  const updateTab = (dir: string, path: string, update: (tab: DocumentTab) => DocumentTab) =>
     setCollection(dir, (c) => ({
       ...c,
-      tabs: c.tabs.map((t) => (t.path === path ? update(t) : t)),
+      tabs: c.tabs.map((t) => (t.path === path && isDocument(t) ? update(t) : t)),
     }));
 
   const updateRequestTab = (dir: string, path: string, update: (tab: RequestTab) => RequestTab) =>
     updateTab(dir, path, (t) => (t.kind === "request" ? update(t) : t));
 
   /** Puts a freshly read document into a tab as both original and draft. */
-  const withDoc = (tab: Tab, doc: Tab["draft"]): Tab =>
-    ({ ...tab, original: doc, draft: doc, conflict: null }) as Tab;
+  const withDoc = (tab: DocumentTab, doc: DocumentTab["draft"]): DocumentTab =>
+    ({ ...tab, original: doc, draft: doc, conflict: null }) as DocumentTab;
+
+  /** Creates the tab for `path`, reading its document from disk if it has one. */
+  const loadTab = async (dir: string, path: string): Promise<Tab> => {
+    const kind = kindOf(path);
+    if (kind === "environments") return { kind, path: ENVIRONMENTS_TAB };
+    return newTab(kind, path, await readDoc(dir, kind, path));
+  };
 
   return {
     byCollection: {},
@@ -174,8 +202,7 @@ export const useTabs = create<TabsState>((set, get) => {
         return;
       }
       try {
-        const kind = kindOf(path);
-        const tab = newTab(kind, path, await readDoc(dir, kind, path));
+        const tab = await loadTab(dir, path);
         setCollection(dir, (c) => ({ ...c, tabs: [...c.tabs, tab], active: path }));
       } catch (e) {
         showError(e);
@@ -198,11 +225,11 @@ export const useTabs = create<TabsState>((set, get) => {
 
     updateDraft: (dir, path, update) =>
       // `as never`: the caller chose `T` to match the tab at `path`; TS can't check that link.
-      updateTab(dir, path, (t) => ({ ...t, draft: update(t.draft as never) }) as Tab),
+      updateTab(dir, path, (t) => ({ ...t, draft: update(t.draft as never) }) as DocumentTab),
 
     save: async (dir, path) => {
       const tab = findTab(dir, path);
-      if (!tab) return;
+      if (!tab || !isDocument(tab)) return;
       try {
         await writeDoc(dir, tab);
         // Read back what was written (e.g. the method is normalized to upper case).
@@ -246,8 +273,7 @@ export const useTabs = create<TabsState>((set, get) => {
         for (const path of state.openTabs) {
           // Files may have been deleted since; skip those quietly.
           try {
-            const kind = kindOf(path);
-            tabs.push(newTab(kind, path, await readDoc(dir, kind, path)));
+            tabs.push(await loadTab(dir, path));
           } catch {
             // skip
           }
@@ -265,7 +291,7 @@ export const useTabs = create<TabsState>((set, get) => {
       setCollection(dir, (c) => {
         const rename = (p: string) => (isUnder(p, from) ? to + p.slice(from.length) : p);
         return {
-          tabs: c.tabs.map((t) => ({ ...t, path: rename(t.path) })),
+          tabs: c.tabs.map((t) => (isDocument(t) ? { ...t, path: rename(t.path) } : t)),
           active: c.active !== null ? rename(c.active) : null,
           expanded: c.expanded.map(rename),
         };
@@ -280,8 +306,8 @@ export const useTabs = create<TabsState>((set, get) => {
     },
 
     syncFromDisk: async (dir) => {
-      for (const tab of tabsOf(dir).tabs) {
-        let disk: Tab["draft"];
+      for (const tab of tabsOf(dir).tabs.filter(isDocument)) {
+        let disk: DocumentTab["draft"];
         try {
           disk = await readDoc(dir, tab.kind, tab.path);
         } catch {
@@ -289,7 +315,7 @@ export const useTabs = create<TabsState>((set, get) => {
         }
         if (same(disk, tab.original)) continue; // our own save, or no real change
         updateTab(dir, tab.path, (t) =>
-          isDirty(t) ? ({ ...t, conflict: disk } as Tab) : withDoc(t, disk),
+          isDirty(t) ? ({ ...t, conflict: disk } as DocumentTab) : withDoc(t, disk),
         );
       }
     },
@@ -300,7 +326,7 @@ export const useTabs = create<TabsState>((set, get) => {
         return keep === "disk"
           ? withDoc(t, t.conflict)
           : // Keep my edits; the disk version becomes the new baseline, so saving overwrites it.
-            ({ ...t, original: t.conflict, conflict: null } as Tab);
+            ({ ...t, original: t.conflict, conflict: null } as DocumentTab);
       }),
 
     toggleExpanded: (dir, folder, expanded) =>

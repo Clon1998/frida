@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { type Tab, useTabs } from "@/stores/tabs";
+import { type DocumentTab, useTabs } from "@/stores/tabs";
 
 /** Shown when the tab's file changed on disk while it had unsaved edits. */
-export function ConflictBanner({ dir, tab }: { dir: string; tab: Tab }) {
+export function ConflictBanner({ dir, tab }: { dir: string; tab: DocumentTab }) {
   const resolveConflict = useTabs((s) => s.resolveConflict);
   if (!tab.conflict) return null;
   return (

@@ -1,9 +1,10 @@
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
-import { basicSetup } from "codemirror";
+import { Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
+import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
+import { basicSetup, minimalSetup } from "codemirror";
 import { useEffect, useRef } from "react";
+import { setVariables, type VariableMap, variablesExtension } from "./variables";
 
 export type CodeLanguage = "json" | "xml" | "text";
 
@@ -13,6 +14,12 @@ interface CodeEditorProps {
   language?: CodeLanguage;
   readOnly?: boolean;
   className?: string;
+  /** Variables of the current request, for `{{var}}` highlighting and tooltips. */
+  variables?: VariableMap;
+  /** One line only (e.g. the URL bar): newlines are removed, Enter calls `onEnter`. */
+  singleLine?: boolean;
+  onEnter?: () => void;
+  placeholder?: string;
 }
 
 const languageExtension = (language: CodeLanguage): Extension =>
@@ -40,6 +47,19 @@ const theme = EditorView.theme({
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
     backgroundColor: "color-mix(in oklch, var(--ring) 35%, transparent)",
   },
+  ".cm-tooltip": {
+    backgroundColor: "var(--popover)",
+    color: "var(--popover-foreground)",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+  },
+});
+
+/** Keeps a single-line editor on one line: pasted newlines become spaces. */
+const singleLineFilter = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged || tr.newDoc.lines === 1) return tr;
+  const text = tr.newDoc.toString().replace(/\r?\n/g, " ");
+  return [tr, { changes: { from: 0, to: tr.newDoc.length, insert: text }, sequential: true }];
 });
 
 /**
@@ -52,28 +72,42 @@ export function CodeEditor({
   language = "text",
   readOnly = false,
   className,
+  variables,
+  singleLine = false,
+  onEnter,
+  placeholder,
 }: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const onEnterRef = useRef(onEnter);
   const languageSlot = useRef(new Compartment());
   const readOnlySlot = useRef(new Compartment());
 
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
+    onEnterRef.current = onEnter;
+  }, [onChange, onEnter]);
 
   // Create the editor once.
   useEffect(() => {
     if (!host.current) return;
+    const lineMode: Extension = singleLine
+      ? [
+          minimalSetup,
+          singleLineFilter,
+          Prec.highest(keymap.of([{ key: "Enter", run: () => (onEnterRef.current?.(), true) }])),
+        ]
+      : [basicSetup, EditorView.lineWrapping];
     const editor = new EditorView({
       parent: host.current,
       state: EditorState.create({
         doc: value,
         extensions: [
-          basicSetup,
+          lineMode,
           theme,
-          EditorView.lineWrapping,
+          variablesExtension(),
+          placeholder ? placeholderExtension(placeholder) : [],
           languageSlot.current.of(languageExtension(language)),
           readOnlySlot.current.of([
             EditorState.readOnly.of(readOnly),
@@ -113,6 +147,10 @@ export function CodeEditor({
       ]),
     });
   }, [readOnly]);
+
+  useEffect(() => {
+    if (variables) view.current?.dispatch({ effects: setVariables.of(variables) });
+  }, [variables]);
 
   return <div ref={host} className={className} />;
 }

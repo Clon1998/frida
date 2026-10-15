@@ -1,7 +1,7 @@
-import { Folder, Settings, X } from "lucide-react";
+import { Folder, Layers, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { methodColor } from "@/lib/methods";
-import { isDirty, type Tab, useTabs } from "@/stores/tabs";
+import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { cn } from "cn";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -39,7 +39,7 @@ export function TabBar({ dir }: { dir: string }) {
             )}
           >
             <TabIcon tab={tab} />
-            <span className="truncate">{tab.draft.name}</span>
+            <span className="truncate">{tabTitle(tab)}</span>
             <button
               type="button"
               aria-label="Close tab"
@@ -90,5 +90,7 @@ function TabIcon({ tab }: { tab: Tab }) {
       return <Folder className="size-3.5 shrink-0" />;
     case "collection":
       return <Settings className="size-3.5 shrink-0" />;
+    case "environments":
+      return <Layers className="size-3.5 shrink-0" />;
   }
 }

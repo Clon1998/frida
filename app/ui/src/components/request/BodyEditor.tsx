@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Body as RawBody, BodyMode } from "@/bindings";
 import { CodeEditor } from "@/components/editor/CodeEditor";
+import type { VariableMap } from "@/components/editor/variables";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,9 +30,11 @@ const MODES: { value: BodyMode; label: string }[] = [
 interface BodyEditorProps {
   body: Body;
   onChange: (body: Body) => void;
+  /** For `{{var}}` highlighting in the text editors. */
+  variables?: VariableMap;
 }
 
-export function BodyEditor({ body, onChange }: BodyEditorProps) {
+export function BodyEditor({ body, onChange, variables }: BodyEditorProps) {
   const patch = (p: Partial<Body>) => onChange({ ...body, ...p });
 
   const pickBinary = async () => {
@@ -62,6 +65,7 @@ export function BodyEditor({ body, onChange }: BodyEditorProps) {
           <CodeEditor
             className="h-full overflow-hidden rounded-md border"
             language="json"
+            variables={variables}
             value={body.json}
             onChange={(json) => patch({ json })}
           />
@@ -70,6 +74,7 @@ export function BodyEditor({ body, onChange }: BodyEditorProps) {
           <CodeEditor
             className="h-full overflow-hidden rounded-md border"
             language="xml"
+            variables={variables}
             value={body.xml}
             onChange={(xml) => patch({ xml })}
           />
@@ -78,6 +83,7 @@ export function BodyEditor({ body, onChange }: BodyEditorProps) {
           <CodeEditor
             className="h-full overflow-hidden rounded-md border"
             value={body.text}
+            variables={variables}
             onChange={(text) => patch({ text })}
           />
         )}
