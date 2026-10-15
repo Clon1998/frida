@@ -473,11 +473,11 @@ the UI typechecked and linted, PLAN.md checkboxes updated, and a short summary i
 ### M0: Scaffold & CI
 - [x] Cargo workspace with the crates from §3 (empty but compiling). Tauri 2 app with React/TS/Vite/Tailwind/shadcn.
 - [x] tauri-specta wiring: one example command with generated TS bindings.
-- [ ] GitHub Actions: fmt, clippy, cargo test, UI typecheck and lint and tests, plus a Tauri build matrix (macOS arm64 + x64, Windows x64, Linux x64) uploading artifacts.
-  *(Workflow written in `.github/workflows/ci.yml`; tick once it has run green on GitHub.)*
+- [x] GitHub Actions: fmt, clippy, cargo test, UI typecheck and lint and tests, plus a Tauri build matrix (macOS arm64 + x64, Windows x64, Linux x64) uploading artifacts.
 - [x] `tracing` logging to a rotating file in the app data dir.
 
 **Acceptance:** `pnpm tauri dev` opens a window on all 3 OSes, and CI produces downloadable builds.
+*Status 2026-10-15: done. CI is green on all 4 targets with artifacts. The window was verified on macOS; Windows and Linux are covered by CI builds only, which is accepted for now.*
 
 ### M1: Storage, tree, requests, sending
 - [ ] Domain model + YAML (de)serialization for workspace, collection, folder, request, env (§4), with round-trip tests.
