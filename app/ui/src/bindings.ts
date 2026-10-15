@@ -19,8 +19,11 @@ export const commands = {
 	/**  Reloads the open workspace, e.g. after `frida-workspace.yaml` changed on disk. */
 	reloadWorkspace: () => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("reload_workspace")),
 	closeWorkspace: () => __TAURI_INVOKE<void>("close_workspace"),
-	/**  Creates a new collection in `dir` and adds it to the open workspace. */
-	createCollection: (dir: string, name: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("create_collection", { dir, name })),
+	/**
+	 *  Creates a new collection at `<workspace>/collections/<name>` and adds it to the workspace.
+	 *  Returns the updated overview and the new collection's folder.
+	 */
+	createCollection: (name: string) => typedError<[WorkspaceOverview, string], ApiError>(__TAURI_INVOKE("create_collection", { name })),
 	/**  Adds an existing collection folder to the open workspace. */
 	addCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("add_collection", { dir })),
 	/**  Removes a collection from the workspace list. Its files are not deleted. */
@@ -32,6 +35,8 @@ export const commands = {
 	readRequest: (dir: string, path: string) => typedError<Request, ApiError>(__TAURI_INVOKE("read_request", { dir, path })),
 	saveRequest: (dir: string, path: string, request: Request) => typedError<null, ApiError>(__TAURI_INVOKE("save_request", { dir, path, request })),
 	readFolder: (dir: string, path: string) => typedError<Folder, ApiError>(__TAURI_INVOKE("read_folder", { dir, path })),
+	/**  Saves a folder's settings (`folder.yaml`). Renaming is a separate operation. */
+	saveFolder: (dir: string, path: string, folder: Folder) => typedError<null, ApiError>(__TAURI_INVOKE("save_folder", { dir, path, folder })),
 	/**
 	 *  Creates an empty GET request named `name` in folder `parent` (`""` = root).
 	 *  Returns the new request's path.

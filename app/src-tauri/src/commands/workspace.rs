@@ -63,17 +63,20 @@ pub fn close_workspace(state: State<'_, AppState>) {
     }
 }
 
-/// Creates a new collection in `dir` and adds it to the open workspace.
+/// Creates a new collection at `<workspace>/collections/<name>` and adds it to the workspace.
+/// Returns the updated overview and the new collection's folder.
 #[tauri::command]
 #[specta::specta]
 pub fn create_collection(
     state: State<'_, AppState>,
-    dir: String,
     name: String,
-) -> ApiResult<WorkspaceOverview> {
+) -> ApiResult<(WorkspaceOverview, String)> {
     let ws = state.workspace_dir()?;
-    storage::create_collection_in_workspace(&ws, Path::new(&dir), &name)?;
-    state.refresh_workspace(&ws)
+    let dir = storage::create_named_collection(&ws, &name)?;
+    let overview = state.refresh_workspace(&ws)?;
+    // The overview lists canonical folders, so return the same form for the UI to select it.
+    let dir = dir.canonicalize().unwrap_or(dir);
+    Ok((overview, dir.to_string_lossy().to_string()))
 }
 
 /// Adds an existing collection folder to the open workspace.

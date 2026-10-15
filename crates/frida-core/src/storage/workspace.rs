@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::collection::{create_collection, load_collection};
-use super::paths::{COLLECTION_FILE, ENVIRONMENTS_DIR, WORKSPACE_FILE};
+use super::paths::{COLLECTION_FILE, ENVIRONMENTS_DIR, EntryKind, WORKSPACE_FILE, unique_name};
 use crate::error::{CoreError, Result};
 use crate::model::{Collection, CollectionRef, Workspace};
 use crate::yaml::{read_yaml, write_yaml};
@@ -118,6 +118,19 @@ pub fn create_collection_in_workspace(
     let collection = create_collection(collection_dir, name)?;
     register(workspace_dir, collection_dir)?;
     Ok(collection)
+}
+
+/// Folder inside the workspace where collections created by name are put.
+pub const COLLECTIONS_DIR: &str = "collections";
+
+/// Creates a new collection at `<workspace>/collections/<slug>` (with a unique slug) and adds it
+/// to the workspace. Returns the new collection's folder.
+pub fn create_named_collection(workspace_dir: &Path, name: &str) -> Result<PathBuf> {
+    let parent = workspace_dir.join(COLLECTIONS_DIR);
+    std::fs::create_dir_all(&parent).map_err(|e| CoreError::io(&parent, e))?;
+    let dir = parent.join(unique_name(&parent, name, EntryKind::Folder, None));
+    create_collection_in_workspace(workspace_dir, &dir, name)?;
+    Ok(dir)
 }
 
 /// Removes a collection from the workspace list. The files on disk are left untouched.

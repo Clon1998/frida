@@ -56,6 +56,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             collection::read_request,
             collection::save_request,
             collection::read_folder,
+            collection::save_folder,
             collection::create_request,
             collection::create_request_from,
             collection::create_folder,

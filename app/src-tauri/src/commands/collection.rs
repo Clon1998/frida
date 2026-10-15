@@ -65,6 +65,22 @@ pub fn read_folder(state: State<'_, AppState>, dir: String, path: String) -> Api
     Ok(storage::read_folder(&state.collection_dir(&dir)?, &path)?)
 }
 
+/// Saves a folder's settings (`folder.yaml`). Renaming is a separate operation.
+#[tauri::command]
+#[specta::specta]
+pub fn save_folder(
+    state: State<'_, AppState>,
+    dir: String,
+    path: String,
+    folder: Folder,
+) -> ApiResult<()> {
+    Ok(storage::save_folder(
+        &state.collection_dir(&dir)?,
+        &path,
+        &folder,
+    )?)
+}
+
 /// Creates an empty GET request named `name` in folder `parent` (`""` = root).
 /// Returns the new request's path.
 #[tauri::command]

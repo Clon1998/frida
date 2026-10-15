@@ -320,3 +320,25 @@ fn overview_reports_broken_collections_without_failing() {
     assert!(overview.collections[1].id.is_none());
     assert!(overview.collections[1].error.is_some());
 }
+
+#[test]
+fn named_collections_go_into_the_collections_folder() {
+    let ws = tempfile::tempdir().unwrap();
+    storage::create_workspace(ws.path(), "EIP").unwrap();
+
+    let first = storage::create_named_collection(ws.path(), "Orders API").unwrap();
+    let second = storage::create_named_collection(ws.path(), "Orders API").unwrap();
+    assert_eq!(first, ws.path().join("collections/orders-api"));
+    assert_eq!(second, ws.path().join("collections/orders-api-2"));
+
+    let workspace = storage::open_workspace(ws.path()).unwrap();
+    let paths: Vec<&str> = workspace
+        .collections
+        .iter()
+        .map(|c| c.path.as_str())
+        .collect();
+    assert_eq!(
+        paths,
+        ["./collections/orders-api", "./collections/orders-api-2"]
+    );
+}
