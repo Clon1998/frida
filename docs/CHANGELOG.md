@@ -1,5 +1,29 @@
 # Changelog
 
+## M4: curl export/import + history (2026-10-15)
+
+### What was built
+- **curl export** (`crates/frida-core/src/codegen/curl.rs`, `http::export_curl`): bash or PowerShell, multi-line,
+  variables resolved or kept as `{{placeholders}}`, auth included, secrets masked as `***` unless explicitly included.
+- **curl import** (`crates/frida-core/src/import/curl.rs`): the flags of §11.3 plus continuation lines from bash,
+  PowerShell and cmd, a Content-Type based body mode heuristic, and warnings for anything unsupported. A corpus in
+  `testdata/curl` is snapshot-tested; exports round-trip through import.
+- **History** (`crates/frida-core/src/history.rs`): SQLite (rusqlite, bundled), the request as sent and the response,
+  bodies capped at 1 MB, newest 500 kept, searchable; secrets and auth values masked before writing.
+- **UI**: "Copy as curl" (tree, tab menu, request toolbar), "New request from curl" with a live preview, pasting curl
+  into the URL bar, a History sidebar tab, read-only history tabs with "Restore as new request".
+
+### Rust things worth understanding in this milestone
+1. **Owning vs borrowing results** (`http/execute.rs` `Executed`). `execute` now returns the prepared request it
+   sent. The struct *owns* it (moved in, no copy), so the caller can hand it to the history writer on another thread.
+2. **Fire-and-forget blocking work** (`app/src-tauri/src/commands/http.rs` `record_history`). `spawn_blocking`
+   without `.await` runs the SQLite write in the background; everything the closure needs is moved into it
+   (`Arc` clone of the store, owned entry), which is why it compiles without lifetimes.
+3. **`rusqlite` and `Mutex<Connection>`** (`history.rs`). A SQLite connection may not be used from two threads at
+   once, so it sits behind a mutex; `query_row(...).optional()` turns "no row" into `Ok(None)` instead of an error.
+4. **Small pure helpers over clever code** (`import/curl.rs`). The importer is a plain `while let` loop over tokens
+   with a `match` on flags: easy to read and to extend, with every unknown flag turned into a warning.
+
 ## M3: Auth (2026-10-15)
 
 ### What was built

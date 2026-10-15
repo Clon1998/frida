@@ -514,10 +514,12 @@ in the UI; further UI polish is deferred.*
 *Status 2026-10-15: done (automated): `crates/frida-core/tests/auth.rs` against the mock provider in `frida-testserver`.*
 
 ### M4: curl export/import + history
-- [ ] curl export with the options from §11.3, and curl import (paste + dialog).
-- [ ] History (§13).
+- [x] curl export with the options from §11.3, and curl import (paste + dialog).
+- [x] History (§13).
 
 **Acceptance:** a snapshot corpus of curl examples passes, and history entries contain no secret values.
+*Status 2026-10-15: done (automated): `tests/curl.rs` (corpus `testdata/curl`, export → import round trip) and
+`tests/history.rs` (end-to-end send with secrets; nothing in history or curl).*
 
 ### M5: Scripting & tests
 - [ ] rquickjs sandbox with limits, the API from §10 and `docs/scripting.md`.
@@ -648,6 +650,11 @@ Deviations from and clarifications of this plan, newest last.
 - **2026-10-15 Environment colors (on-disk format, additive).** Environments have an optional `color` (a named UI
   color such as `red`), stored in the environment file so a team shares "prod is red". Old files stay valid; the
   field is omitted when unset. Requested by Patrick.
+- **2026-10-15 (M4) curl and history details.** Import drops a Content-Type that equals the body mode's default (Frida
+  adds it itself), maps `-u` to Basic auth, `-G -d` to query params and `--max-time` to the timeout; `-k` and cookie
+  files only produce warnings. Export puts method and URL on the first line and uses `curl.exe` for PowerShell. History
+  is per collection in the sidebar, masks resolved secrets *and* auth values (tokens, keys, Basic credentials), records
+  failed sends (with the typed request) but not cancelled ones, and keeps 500 entries (`historySize` in settings).
 
 ## 17. Testing strategy
 
