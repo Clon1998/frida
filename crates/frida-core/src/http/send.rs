@@ -1,9 +1,11 @@
 //! Sending a [`PreparedRequest`] with reqwest (PLAN.md §7, step 7).
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tokio_util::sync::CancellationToken;
 
+use super::cookies::CookieJar;
 use super::prepare::{PreparedBody, PreparedPart, PreparedRequest};
 
 /// Redirects are followed up to this many hops (PLAN.md §7).
@@ -48,7 +50,8 @@ pub enum SendError {
     Other(String),
 }
 
-/// Sends the request and reads the full response body.
+/// Sends the request and reads the full response body. With a cookie jar, cookies are sent
+/// and the response's `Set-Cookie` headers are stored in it.
 ///
 /// `cancel` lets the UI abort an in-flight request. `tokio::select!` waits for whichever
 /// finishes first, the request or the cancellation, and drops the other one. Dropping a
@@ -56,16 +59,20 @@ pub enum SendError {
 /// the connection is closed as soon as the user clicks "Cancel".
 pub async fn send(
     prepared: &PreparedRequest,
+    cookies: Option<Arc<CookieJar>>,
     cancel: CancellationToken,
 ) -> Result<HttpResponse, SendError> {
     tokio::select! {
-        result = send_inner(prepared) => result,
+        result = send_inner(prepared, cookies) => result,
         () = cancel.cancelled() => Err(SendError::Cancelled),
     }
 }
 
-async fn send_inner(prepared: &PreparedRequest) -> Result<HttpResponse, SendError> {
-    let client = build_client(prepared).await?;
+async fn send_inner(
+    prepared: &PreparedRequest,
+    cookies: Option<Arc<CookieJar>>,
+) -> Result<HttpResponse, SendError> {
+    let client = build_client(prepared, cookies).await?;
 
     let url = reqwest::Url::parse(&prepared.url).map_err(|e| SendError::InvalidUrl {
         url: prepared.url.clone(),
@@ -119,9 +126,13 @@ async fn send_inner(prepared: &PreparedRequest) -> Result<HttpResponse, SendErro
     })
 }
 
-/// A new client per send keeps M1 simple: TLS settings can differ per collection. Connection
-/// reuse and per-collection cookie jars come with M2.
-async fn build_client(prepared: &PreparedRequest) -> Result<reqwest::Client, SendError> {
+/// A new client per send keeps this simple: TLS settings can differ per collection. Cookies
+/// still persist across sends because the jar is shared. (Connection reuse could be added by
+/// caching clients per collection later.)
+async fn build_client(
+    prepared: &PreparedRequest,
+    cookies: Option<Arc<CookieJar>>,
+) -> Result<reqwest::Client, SendError> {
     let mut certs = Vec::new();
     for path in &prepared.ca_cert_paths {
         let pem = tokio::fs::read(path).await.map_err(|e| SendError::File {
@@ -137,7 +148,11 @@ async fn build_client(prepared: &PreparedRequest) -> Result<reqwest::Client, Sen
         certs.append(&mut bundle);
     }
 
-    reqwest::Client::builder()
+    let mut builder = reqwest::Client::builder();
+    if let Some(jar) = cookies {
+        builder = builder.cookie_provider(jar);
+    }
+    builder
         .timeout(prepared.timeout)
         .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS))
         // Custom CAs are trusted *in addition to* the OS roots (PLAN.md §7).

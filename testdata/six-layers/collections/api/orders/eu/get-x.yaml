@@ -1,0 +1,9 @@
+version: 1
+name: Get x
+seq: 1
+method: GET
+url: "http://localhost/{{x}}"
+vars:
+- name: x
+  value: request
+  enabled: true

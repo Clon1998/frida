@@ -1,0 +1,7 @@
+version: 1
+id: 0d6c2a4e-8f1b-4c3d-9e5a-7b8c9d0e1f2a
+name: API
+vars:
+- name: x
+  value: collection
+  enabled: true

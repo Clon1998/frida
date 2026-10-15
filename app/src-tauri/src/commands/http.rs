@@ -33,14 +33,24 @@ pub async fn send_request(
         .insert(request_id.clone(), cancel.clone());
 
     // The lock above is released at the end of its statement, *before* this await.
-    let result = http::execute(&root, &path, &request, cancel).await;
+    let runtime = std::collections::HashMap::new();
+    let input = http::ExecuteInput {
+        collection_dir: &root,
+        request_rel: &path,
+        request: &request,
+        collection_env: None,
+        global_env: None,
+        runtime: &runtime,
+        cookies: None,
+    };
+    let result = http::execute(input, cancel).await;
     state
         .in_flight
         .lock()
         .expect("in-flight lock poisoned")
         .remove(&request_id);
 
-    let response = result?;
+    let response = result?.response;
     let id = uuid::Uuid::new_v4().to_string();
     let view = ResponseView::new(id.clone(), &response);
     state

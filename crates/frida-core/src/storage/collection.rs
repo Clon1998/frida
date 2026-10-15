@@ -162,9 +162,9 @@ pub fn save_request(root: &Path, rel: &str, request: &Request) -> Result<()> {
     write_yaml(&path, &request)
 }
 
-/// The folders a request (or folder) at `rel` inherits from, outermost first.
-/// `orders/eu/get.yaml` → `[orders, orders/eu]`.
-pub fn load_folder_chain(root: &Path, rel: &str) -> Result<Vec<Folder>> {
+/// The folders a request (or folder) at `rel` inherits from, outermost first, with their paths.
+/// `orders/eu/get.yaml` → `[("orders", ..), ("orders/eu", ..)]`.
+pub fn load_folder_chain(root: &Path, rel: &str) -> Result<Vec<(String, Folder)>> {
     let mut chain = Vec::new();
     let mut current = String::new();
     let parent = rel_parent(rel);
@@ -173,7 +173,7 @@ pub fn load_folder_chain(root: &Path, rel: &str) -> Result<Vec<Folder>> {
     }
     for part in parent.split('/') {
         current = rel_join(&current, part);
-        chain.push(read_folder(root, &current)?);
+        chain.push((current.clone(), read_folder(root, &current)?));
     }
     Ok(chain)
 }

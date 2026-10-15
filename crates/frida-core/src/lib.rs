@@ -9,7 +9,9 @@ pub mod error;
 pub mod http;
 pub mod local_state;
 pub mod model;
+pub mod secrets;
 pub mod storage;
+pub mod vars;
 pub mod watch;
 pub mod yaml;
 

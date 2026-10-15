@@ -51,9 +51,20 @@ async fn every_sample_request_succeeds_against_the_test_server() {
             .url
             .replace("localhost:8787", &format!("127.0.0.1:{}", addr.port()));
 
-        let response = http::execute(&collection, path, &request, CancellationToken::new())
+        let runtime = std::collections::HashMap::new();
+        let input = http::ExecuteInput {
+            collection_dir: &collection,
+            request_rel: path,
+            request: &request,
+            collection_env: None,
+            global_env: None,
+            runtime: &runtime,
+            cookies: None,
+        };
+        let response = http::execute(input, CancellationToken::new())
             .await
-            .unwrap_or_else(|e| panic!("{path} failed: {e}"));
+            .unwrap_or_else(|e| panic!("{path} failed: {e}"))
+            .response;
         assert_eq!(response.status, 200, "{path}");
     }
 }

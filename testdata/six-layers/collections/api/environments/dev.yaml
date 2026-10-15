@@ -1,0 +1,5 @@
+version: 1
+name: dev
+variables:
+- name: x
+  value: collection env

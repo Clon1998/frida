@@ -31,7 +31,7 @@ async fn send_in(dir: &Path, request: &Request) -> Result<HttpResponse, SendErro
         folders: &[],
     };
     let prepared = http::prepare(ctx, request).unwrap();
-    http::send(&prepared, CancellationToken::new()).await
+    http::send(&prepared, None, CancellationToken::new()).await
 }
 
 async fn send(request: &Request) -> Result<HttpResponse, SendError> {
@@ -224,7 +224,7 @@ async fn can_be_cancelled() {
     });
 
     let started = std::time::Instant::now();
-    let err = http::send(&prepared, cancel).await.unwrap_err();
+    let err = http::send(&prepared, None, cancel).await.unwrap_err();
     assert!(matches!(err, SendError::Cancelled), "{err}");
     assert!(started.elapsed() < Duration::from_secs(2));
 }
@@ -268,6 +268,7 @@ async fn send_with_tls(
     };
     http::send(
         &http::prepare(ctx, request).unwrap(),
+        None,
         CancellationToken::new(),
     )
     .await
@@ -344,17 +345,71 @@ async fn execute_applies_collection_and_folder_headers_and_timeouts() {
     let req = request("GET", format!("http://{addr}/echo"));
     let rel = storage::create_request(root, &folder_rel, &req).unwrap();
 
-    let response = http::execute(root, &rel, &req, CancellationToken::new())
+    let runtime = std::collections::HashMap::new();
+    let input = |request| http::ExecuteInput {
+        collection_dir: root,
+        request_rel: &rel,
+        request,
+        collection_env: None,
+        global_env: None,
+        runtime: &runtime,
+        cookies: None,
+    };
+    let response = http::execute(input(&req), CancellationToken::new())
         .await
-        .unwrap();
+        .unwrap()
+        .response;
     let reply: Value = serde_json::from_slice(&response.body).unwrap();
     assert_eq!(reply["headers"]["x-level"], "folder");
     assert_eq!(reply["headers"]["x-col"], "1");
 
     // The folder's 150 ms timeout applies to requests inside it.
     let slow = request("GET", format!("http://{addr}/slow?ms=1000"));
-    let err = http::execute(root, &rel, &slow, CancellationToken::new())
+    let err = http::execute(input(&slow), CancellationToken::new())
         .await
-        .unwrap_err();
+        .err()
+        .expect("should time out");
     assert!(err.to_string().contains("timed out"), "{err}");
+}
+
+#[tokio::test]
+async fn cookies_persist_in_the_jar_across_sends() {
+    use std::sync::Arc;
+
+    let addr = server().await;
+    let jar = Arc::new(http::CookieJar::default());
+    let collection = Collection::new("Test");
+    let ctx = RequestContext {
+        collection_dir: Path::new("."),
+        collection: &collection,
+        folders: &[],
+    };
+    let send_with_jar = |url: String| {
+        let prepared = http::prepare(ctx, &request("GET", url)).unwrap();
+        let jar = Arc::clone(&jar);
+        async move {
+            http::send(&prepared, Some(jar), CancellationToken::new())
+                .await
+                .unwrap()
+        }
+    };
+
+    send_with_jar(format!(
+        "http://localhost:{}/cookies/set?session=abc",
+        addr.port()
+    ))
+    .await;
+    let response = send_with_jar(format!("http://localhost:{}/echo", addr.port())).await;
+    let reply: Value = serde_json::from_slice(&response.body).unwrap();
+    assert_eq!(reply["headers"]["cookie"], "session=abc");
+
+    let cookies = http::list_cookies(&jar);
+    assert_eq!(cookies.len(), 1);
+    assert_eq!(
+        (cookies[0].domain.as_str(), cookies[0].name.as_str()),
+        ("localhost", "session")
+    );
+
+    http::clear_cookies(&jar, Some("localhost"));
+    assert!(http::list_cookies(&jar).is_empty());
 }

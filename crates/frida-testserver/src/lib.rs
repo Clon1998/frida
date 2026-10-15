@@ -5,6 +5,7 @@
 //! - `/redirect`       302 to `/echo`
 //! - `/image.png`      a 1x1 PNG
 //! - `/status/{code}`  responds with that status code
+//! - `/cookies/set?k=v` sets each query pair as a cookie (`Set-Cookie`)
 //! - anything else     echoes the request back as JSON: method, path, query, headers, body
 //!
 //! [`spawn_tls`] serves the same routes over HTTPS with a throwaway CA.
@@ -42,6 +43,7 @@ pub fn router() -> Router {
             get(|| async { ([(header::CONTENT_TYPE, "image/png")], PIXEL_PNG) }),
         )
         .route("/status/{code}", any(status))
+        .route("/cookies/set", get(set_cookies))
         .fallback(echo)
 }
 
@@ -99,4 +101,15 @@ async fn slow(
 async fn status(Path(code): Path<u16>) -> Response {
     let status = StatusCode::from_u16(code).unwrap_or(StatusCode::BAD_REQUEST);
     (status, format!("status {code}")).into_response()
+}
+
+async fn set_cookies(Query(pairs): Query<std::collections::BTreeMap<String, String>>) -> Response {
+    let mut response = "cookies set".into_response();
+    for (name, value) in pairs {
+        let cookie = format!("{name}={value}; Path=/");
+        if let Ok(header) = header::HeaderValue::from_str(&cookie) {
+            response.headers_mut().append(header::SET_COOKIE, header);
+        }
+    }
+    response
 }
