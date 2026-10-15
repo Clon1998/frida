@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { ChevronsUpDown, FolderPlus, LogOut, Plus } from "lucide-react";
+import { ChevronsUpDown, FolderPlus, LogOut, Plus, Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CollectionSettingsDialog } from "@/components/workspace/CollectionSettingsDialog";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
@@ -25,6 +26,7 @@ export function Sidebar() {
   const closeWorkspace = useWorkspace((s) => s.closeWorkspace);
   const [newCollectionDir, setNewCollectionDir] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!workspace) return null;
 
@@ -70,6 +72,11 @@ export function Sidebar() {
               <FolderPlus /> Add existing collection…
             </DropdownMenuItem>
             {active && (
+              <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                <Settings /> Collection settings…
+              </DropdownMenuItem>
+            )}
+            {active && (
               <DropdownMenuItem onSelect={() => setRemoving(true)}>
                 Remove “{active.name}” from workspace
               </DropdownMenuItem>
@@ -105,6 +112,13 @@ export function Sidebar() {
           if (newCollectionDir) void createCollection(newCollectionDir, name);
         }}
       />
+      {active && (
+        <CollectionSettingsDialog
+          dir={active.dir}
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+        />
+      )}
       <ConfirmDialog
         open={removing}
         title={`Remove “${active?.name}” from the workspace?`}

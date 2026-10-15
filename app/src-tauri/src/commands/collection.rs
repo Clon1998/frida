@@ -1,12 +1,36 @@
 //! Tree and file operations inside a collection. `dir` is always a collection folder of the
 //! open workspace (checked by `AppState::collection_dir`), and `path` is relative to it.
 
-use frida_core::model::{Folder, Request};
+use frida_core::model::{Collection, Folder, Request};
 use frida_core::storage::{self, TreeNode};
 use tauri::State;
 
 use crate::error::{ApiError, ApiResult, ErrorCode};
 use crate::state::AppState;
+
+/// The collection's own settings file (`collection.yaml`).
+#[tauri::command]
+#[specta::specta]
+pub fn read_collection(state: State<'_, AppState>, dir: String) -> ApiResult<Collection> {
+    Ok(storage::load_collection(&state.collection_dir(&dir)?)?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_collection(
+    state: State<'_, AppState>,
+    dir: String,
+    collection: Collection,
+) -> ApiResult<()> {
+    let root = state.collection_dir(&dir)?;
+    // The id keys local state and secrets, so it must never change through the UI.
+    let current = storage::load_collection(&root)?;
+    let collection = Collection {
+        id: current.id,
+        ..collection
+    };
+    Ok(storage::save_collection(&root, &collection)?)
+}
 
 #[tauri::command]
 #[specta::specta]

@@ -25,6 +25,9 @@ export const commands = {
 	addCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("add_collection", { dir })),
 	/**  Removes a collection from the workspace list. Its files are not deleted. */
 	removeCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("remove_collection", { dir })),
+	/**  The collection's own settings file (`collection.yaml`). */
+	readCollection: (dir: string) => typedError<Collection, ApiError>(__TAURI_INVOKE("read_collection", { dir })),
+	saveCollection: (dir: string, collection: Collection) => typedError<null, ApiError>(__TAURI_INVOKE("save_collection", { dir, collection })),
 	getTree: (dir: string) => typedError<TreeNode[], ApiError>(__TAURI_INVOKE("get_tree", { dir })),
 	readRequest: (dir: string, path: string) => typedError<Request, ApiError>(__TAURI_INVOKE("read_request", { dir, path })),
 	saveRequest: (dir: string, path: string, request: Request) => typedError<null, ApiError>(__TAURI_INVOKE("save_request", { dir, path, request })),
@@ -131,6 +134,27 @@ export type Body = {
 };
 
 export type BodyMode = "none" | "json" | "xml" | "text" | "form-urlencoded" | "multipart" | "binary";
+
+/**  The root of a collection: the folder that contains `collection.yaml`. */
+export type Collection = {
+	version: number,
+	/**  Stable UUID. Keys local state (tabs, AWS profile mapping, secrets), so it must never change. */
+	id: string,
+	name: string,
+	vars?: KeyValue[],
+	headers?: KeyValue[],
+	auth?: Auth,
+	scripts?: Scripts,
+	tests?: string,
+	settings?: CollectionSettings,
+	docs?: string,
+};
+
+/**  Collection-level settings: the root of the settings inheritance chain. */
+export type CollectionSettings = {
+	timeoutMs?: number | null,
+	tls?: TlsSettings,
+};
 
 /**  `state/{collectionId}.json`: what the user had open in a collection. */
 export type CollectionState = {
@@ -276,6 +300,17 @@ export type Settings = {
 };
 
 export type ThemePreference = "system" | "light" | "dark";
+
+/**  TLS options, set on the collection. */
+export type TlsSettings = {
+	/**  `false` accepts invalid or self-signed certificates. */
+	verify?: boolean,
+	/**
+	 *  Extra PEM files trusted *in addition to* the system roots. Relative to the collection
+	 *  folder, or absolute.
+	 */
+	caCertPaths?: string[],
+};
 
 /**  Where the OAuth2 access token is put on the outgoing request. */
 export type TokenPlacement = {
