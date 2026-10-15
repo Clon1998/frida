@@ -43,10 +43,11 @@ export function ResponseViewer({ tab }: { tab: RequestTab }) {
       </div>
     );
   }
-  return <Response response={tab.response} />;
+  return <ResponsePanel response={tab.response} />;
 }
 
-function Response({ response }: { response: ResponseView }) {
+/** A response: status chips, body (pretty/raw/preview), headers, copy and save. */
+export function ResponsePanel({ response }: { response: ResponseView }) {
   const [pretty, setPretty] = useState(true);
   const kind = bodyKind(response.contentType, response.bodyText);
   const text = response.bodyText ?? "";

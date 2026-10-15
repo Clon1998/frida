@@ -1,4 +1,4 @@
-import { Folder, Layers, Settings, X } from "lucide-react";
+import { Folder, History, Layers, Settings, X } from "lucide-react";
 import { useState } from "react";
 import {
   ContextMenu,
@@ -179,5 +179,7 @@ function TabIcon({ tab }: { tab: Tab }) {
       return <Settings className="size-3.5 shrink-0" />;
     case "environments":
       return <Layers className="size-3.5 shrink-0" />;
+    case "history":
+      return <History className="size-3.5 shrink-0" />;
   }
 }

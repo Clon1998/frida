@@ -37,11 +37,21 @@ export interface EnvironmentsTab {
   path: typeof ENVIRONMENTS_TAB;
 }
 
+/** A history entry, opened read-only (PLAN.md §13). Path: `@history/<id>`. */
+export interface HistoryTab {
+  kind: "history";
+  path: string;
+  /** e.g. "GET Get order", shown on the tab. */
+  title: string;
+}
+
+export const HISTORY_TAB_PREFIX = "@history/";
+
 /** A tab backed by one file, with a saved and an edited version. */
 export type DocumentTab = RequestTab | FolderTab | CollectionTab;
 
 /** A tab shows a request, a folder's or the collection's settings, or the environments. */
-export type Tab = DocumentTab | EnvironmentsTab;
+export type Tab = DocumentTab | EnvironmentsTab | HistoryTab;
 export type TabKind = Tab["kind"];
 type DocKind = DocumentTab["kind"];
 
@@ -99,17 +109,27 @@ const EMPTY: CollectionTabs = { tabs: [], active: null, expanded: [] };
  */
 export function kindOf(path: string): TabKind {
   if (path === ENVIRONMENTS_TAB) return "environments";
+  if (path.startsWith(HISTORY_TAB_PREFIX)) return "history";
   if (path === "") return "collection";
   return path.endsWith(".yaml") ? "request" : "folder";
 }
 
-export const isDirty = (tab: Tab) => tab.kind !== "environments" && !same(tab.draft, tab.original);
+export const isDocument = (tab: Tab): tab is DocumentTab =>
+  tab.kind !== "environments" && tab.kind !== "history";
 
-export const isDocument = (tab: Tab): tab is DocumentTab => tab.kind !== "environments";
+export const isDirty = (tab: Tab) => isDocument(tab) && !same(tab.draft, tab.original);
 
 /** The name shown on the tab and in the header. */
-export const tabTitle = (tab: Tab) =>
-  tab.kind === "environments" ? "Environments" : tab.draft.name;
+export const tabTitle = (tab: Tab) => {
+  switch (tab.kind) {
+    case "environments":
+      return "Environments";
+    case "history":
+      return tab.title;
+    default:
+      return tab.draft.name;
+  }
+};
 
 function same(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -200,6 +220,11 @@ export const useTabs = create<TabsState>((set, get) => {
   const loadTab = async (dir: string, path: string): Promise<Tab> => {
     const kind = kindOf(path);
     if (kind === "environments") return { kind, path: ENVIRONMENTS_TAB };
+    if (kind === "history") {
+      const id = Number(path.slice(HISTORY_TAB_PREFIX.length));
+      const entry = await unwrap(commands.getHistoryEntry(id));
+      return { kind, path, title: `${entry.summary.method} ${entry.summary.requestName}` };
+    }
     return newTab(kind, path, await readDoc(dir, kind, path));
   };
 

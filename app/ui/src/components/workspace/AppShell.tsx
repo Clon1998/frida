@@ -7,6 +7,7 @@ import { CurlImportDialog } from "@/components/curl/CurlImportDialog";
 import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
+import { HistoryView } from "@/components/history/HistoryView";
 import { RequestEditor } from "@/components/request/RequestEditor";
 import { ResponseViewer } from "@/components/response/ResponseViewer";
 import { Sidebar } from "@/components/sidebar/Sidebar";
@@ -69,6 +70,11 @@ export function AppShell() {
             {dir && tab?.kind === "environments" && (
               <div className="min-h-0 flex-1">
                 <EnvironmentsEditor dir={dir} />
+              </div>
+            )}
+            {dir && tab?.kind === "history" && (
+              <div className="min-h-0 flex-1">
+                <HistoryView key={tab.path} dir={dir} path={tab.path} />
               </div>
             )}
             {!tab && (

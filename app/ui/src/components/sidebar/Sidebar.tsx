@@ -14,6 +14,8 @@ import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
+import { HistoryPanel } from "@/components/history/HistoryPanel";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollectionTree } from "./CollectionTree";
 
 export function Sidebar() {
@@ -25,6 +27,7 @@ export function Sidebar() {
   const removeCollection = useWorkspace((s) => s.removeCollection);
   const closeWorkspace = useWorkspace((s) => s.closeWorkspace);
   const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<"tree" | "history">("tree");
   const [removing, setRemoving] = useState(false);
   const openTab = useTabs((s) => s.openTab);
 
@@ -97,7 +100,23 @@ export function Sidebar() {
         )}
       </div>
 
-      {active ? (
+      {active && (
+        <Tabs
+          value={view}
+          onValueChange={(v) => setView(v as "tree" | "history")}
+          className="px-2 pt-2"
+        >
+          <TabsList className="w-full">
+            <TabsTrigger value="tree">Requests</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+      {active && view === "history" ? (
+        <div className="flex min-h-0 flex-1 flex-col pt-2">
+          <HistoryPanel key={active.dir} dir={active.dir} />
+        </div>
+      ) : active ? (
         <CollectionTree key={active.dir} dir={active.dir} />
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">

@@ -53,7 +53,7 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
       {tab && tab.kind !== "collection" && (
         <span className="flex min-w-0 items-center gap-0.5">
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-          {tab.kind === "environments" ? (
+          {tab.kind === "environments" || tab.kind === "history" ? (
             <span className="px-1 font-medium">{tabTitle(tab)}</span>
           ) : (
             <EditableCrumb
