@@ -57,8 +57,8 @@ pub fn close_workspace(state: State<'_, AppState>) {
             .expect("watcher lock poisoned")
             .as_mut(),
     ) {
-        for dir in &previous.collection_dirs {
-            watcher.unwatch(dir);
+        for dir in previous.watched_dirs() {
+            watcher.unwatch(&dir);
         }
     }
 }

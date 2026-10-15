@@ -69,6 +69,15 @@ pub struct OpenWorkspace {
     pub collection_dirs: Vec<PathBuf>,
 }
 
+impl OpenWorkspace {
+    /// Every folder the file watcher watches for this workspace.
+    pub fn watched_dirs(&self) -> Vec<PathBuf> {
+        let mut dirs = self.collection_dirs.clone();
+        dirs.push(self.dir.join("environments"));
+        dirs
+    }
+}
+
 impl AppState {
     pub fn new(app_data_dir: PathBuf) -> Self {
         let secrets = if frida_secrets::keychain_available() {
@@ -171,11 +180,17 @@ impl AppState {
                 .expect("workspace lock poisoned")
                 .clone();
             if let Some(previous) = previous {
-                for old in &previous.collection_dirs {
-                    watcher.unwatch(old);
+                for old in previous.watched_dirs() {
+                    watcher.unwatch(&old);
                 }
             }
-            for new in &collection_dirs {
+            // Global environments live in the workspace's own `environments/` folder.
+            let global_envs = dir.join("environments");
+            let watched = collection_dirs
+                .iter()
+                .cloned()
+                .chain(std::iter::once(global_envs));
+            for new in &watched.collect::<Vec<_>>() {
                 // Let-chains (`if a && let Ok(..) = ..`) combine a condition and a pattern match.
                 if new.exists()
                     && let Err(err) = watcher.watch(new)
