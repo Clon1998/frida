@@ -56,15 +56,19 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
           value={request.method}
           onChange={(method) => update((r) => ({ ...r, method }))}
         />
-        <CodeEditor
-          singleLine
-          className="h-9 min-w-0 flex-1 overflow-hidden rounded-md border px-1 py-1.5 [&_.cm-content]:py-0"
-          placeholder="https://api.example.com/orders/:orderId"
-          value={request.url}
-          variables={variables}
-          onChange={setUrl}
-          onEnter={() => void send(dir, tab.path)}
-        />
+        {/* The editor floats over the content below, so it can grow downwards while editing
+            without moving anything (see the single-line theme in CodeEditor). */}
+        <div className="relative h-9 min-w-0 flex-1">
+          <CodeEditor
+            singleLine
+            className="absolute inset-x-0 top-0 z-20 min-h-9 rounded-md border bg-background px-1 py-1.5 has-[.cm-focused]:shadow-md has-[.cm-focused]:ring-2 has-[.cm-focused]:ring-ring/40"
+            placeholder="https://api.example.com/orders/:orderId"
+            value={request.url}
+            variables={variables}
+            onChange={setUrl}
+            onEnter={() => void send(dir, tab.path)}
+          />
+        </div>
         <Button
           variant={inspectorOpen ? "secondary" : "ghost"}
           size="icon"

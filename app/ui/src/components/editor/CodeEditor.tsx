@@ -56,18 +56,17 @@ const theme = EditorView.theme({
 });
 
 /**
- * Single-line editors (the URL bar) scroll sideways like a normal input: no scrollbar strip and
- * no vertical scrolling, which would otherwise show up inside the small field.
+ * Single-line editors (the URL bar) behave like Postman's: one line ending in "…" while not
+ * focused, and wrapped onto as many lines as needed (growing downwards, same width) while
+ * editing. Wrapping is always on; the unfocused look overrides it with CSS.
  */
 const singleLineTheme = EditorView.theme({
-  ".cm-scroller": {
-    overflowX: "auto",
-    overflowY: "hidden",
-    scrollbarWidth: "none",
-    lineHeight: "1.5rem",
-  },
-  ".cm-scroller::-webkit-scrollbar": { display: "none" },
+  ".cm-scroller": { overflow: "hidden", lineHeight: "1.5rem" },
   ".cm-content, .cm-line": { padding: "0 2px" },
+  // URLs have no spaces, so allow breaks anywhere while editing.
+  "&.cm-focused .cm-content": { wordBreak: "break-all" },
+  "&:not(.cm-focused) .cm-content": { whiteSpace: "pre" },
+  "&:not(.cm-focused) .cm-line": { overflow: "hidden", textOverflow: "ellipsis" },
 });
 
 /** Keeps a single-line editor on one line: pasted newlines become spaces. */
@@ -112,6 +111,7 @@ export function CodeEditor({
           minimalSetup,
           singleLineFilter,
           singleLineTheme,
+          EditorView.lineWrapping,
           Prec.highest(keymap.of([{ key: "Enter", run: () => (onEnterRef.current?.(), true) }])),
         ]
       : [basicSetup, EditorView.lineWrapping];
