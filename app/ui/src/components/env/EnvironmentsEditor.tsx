@@ -5,7 +5,6 @@ import { commands, type EnvScope } from "@/bindings";
 import { CellInput, GridCell, GridRow, GridTable } from "@/components/request/GridTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
@@ -160,6 +159,9 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
   /** Secret values the user revealed, by variable name. */
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState(false);
+  /** Like Bruno: plain variables and secrets are edited on separate tabs. */
+  const [view, setView] = useState<"vars" | "secrets">("vars");
+  const keychain = useEnvs((s) => s.backend?.keychain !== false);
 
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(original) || Object.keys(pending).length > 0;
@@ -172,18 +174,6 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
       }
       return { ...d, variables: d.variables.map((v, i) => (i === index ? { ...v, ...patch } : v)) };
     });
-
-  const toggleSecret = (index: number, secret: boolean) => {
-    const variable = draft.variables[index];
-    if (!variable) return;
-    if (secret) {
-      // The plain value becomes the secret's value; it moves to the keychain on save.
-      if (variable.value) setPending((p) => ({ ...p, [variable.name]: variable.value ?? "" }));
-      updateVar(index, { secret: true, value: null });
-    } else {
-      updateVar(index, { secret: false, value: pending[variable.name] ?? "" });
-    }
-  };
 
   const reveal = async (name: string) => {
     if (revealed[name] !== undefined) {
@@ -233,7 +223,17 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
     }
   };
 
-  const rows = [...draft.variables, { name: "", value: "", secret: false, source: null }];
+  const secrets = view === "secrets";
+  // Rows of the current tab with their position in `draft.variables`; the extra row adds a new
+  // variable of this tab's kind at the end.
+  const rows = [
+    ...draft.variables.map((v, index) => ({ v, index })).filter(({ v }) => v.secret === secrets),
+    {
+      v: { name: "", value: secrets ? null : "", secret: secrets, source: null } as EnvVar,
+      index: draft.variables.length,
+    },
+  ];
+  const secretCount = draft.variables.filter((v) => v.secret).length;
 
   return (
     <div className="flex max-w-4xl flex-col gap-3">
@@ -272,15 +272,28 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
         </Button>
       </div>
 
+      <Tabs value={view} onValueChange={(v) => setView(v as "vars" | "secrets")}>
+        <TabsList>
+          <TabsTrigger value="vars">Variables ({draft.variables.length - secretCount})</TabsTrigger>
+          <TabsTrigger value="secrets">Secrets ({secretCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {secrets && (
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Secret values are stored in {keychain ? "the OS keychain" : "an encrypted file"} on this
+          machine. Only the names are saved in the environment file, so teammates see which secrets
+          they need to fill in.
+        </p>
+      )}
+
       <GridTable
         columns={[
-          { label: "Variable", width: "30%" },
+          { label: secrets ? "Secret" : "Variable", width: "30%" },
           { label: "Value" },
-          { label: "Secret", width: "4rem" },
           { label: "", width: "2.25rem" },
         ]}
       >
-        {rows.map((v, index) => {
+        {rows.map(({ v, index }) => {
           const isNew = index === draft.variables.length;
           const wasSet = entry.setSecrets.includes(v.name);
           const shown = revealed[v.name];
@@ -288,9 +301,11 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
             <GridRow key={index}>
               <GridCell>
                 <CellInput
-                  placeholder={isNew ? "Add variable" : "name"}
+                  placeholder={isNew ? (secrets ? "Add secret" : "Add variable") : "name"}
                   value={v.name}
-                  onChange={(e) => updateVar(index, { name: e.target.value })}
+                  onChange={(e) =>
+                    updateVar(index, { name: e.target.value, secret: secrets, value: v.value })
+                  }
                 />
               </GridCell>
               <GridCell>
@@ -298,11 +313,15 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
                   <div className="flex items-center gap-1 pr-1">
                     <CellInput
                       type={shown !== undefined ? "text" : "password"}
-                      placeholder={wasSet ? "•••••••• (stored in keychain)" : "unset"}
+                      // Secret values are keyed by name, so a new secret needs its name first.
+                      disabled={isNew}
+                      placeholder={
+                        isNew ? "enter a name first" : wasSet ? "•••••••• (stored)" : "unset"
+                      }
                       value={pending[v.name] ?? shown ?? ""}
                       onChange={(e) => setPending((p) => ({ ...p, [v.name]: e.target.value }))}
                     />
-                    {!wasSet && pending[v.name] === undefined && (
+                    {!isNew && !wasSet && pending[v.name] === undefined && (
                       <Badge variant="outline">unset</Badge>
                     )}
                     {v.source && <Badge variant="secondary">AWS</Badge>}
@@ -325,15 +344,6 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
                     onChange={(e) => updateVar(index, { value: e.target.value })}
                   />
                 )}
-              </GridCell>
-              <GridCell center>
-                <Checkbox
-                  className="align-middle"
-                  disabled={isNew}
-                  checked={v.secret}
-                  onCheckedChange={(checked) => toggleSecret(index, checked === true)}
-                  aria-label="Secret"
-                />
               </GridCell>
               <GridCell center>
                 {!isNew && (
