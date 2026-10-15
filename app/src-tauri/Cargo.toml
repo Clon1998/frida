@@ -26,6 +26,10 @@ tracing-appender = { workspace = true }
 specta = { workspace = true }
 specta-typescript = { workspace = true }
 tauri-specta = { workspace = true }
+tauri-plugin-dialog = "2.8.3"
+tauri-plugin-opener = "2.7.2"
+tokio-util = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

@@ -2,10 +2,16 @@
 //! forward to the `frida-*` crates, where all the real logic lives.
 
 mod commands;
+mod error;
 mod logging;
+mod state;
 
+use frida_core::watch::FsWatcher;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
-use tauri_specta::{Builder, collect_commands};
+use tauri_specta::{Builder, Event, collect_commands, collect_events};
+
+use crate::state::AppState;
 
 /// Where the generated TypeScript bindings are written, relative to this crate's directory.
 ///
@@ -14,20 +20,61 @@ use tauri_specta::{Builder, collect_commands};
 #[cfg(any(debug_assertions, test))]
 const BINDINGS_PATH: &str = "../ui/src/bindings.ts";
 
-/// Builds the tauri-specta builder that knows every command (and, later, event).
+/// Emitted when files in a watched collection change on disk (git pull, an editor, or Frida
+/// itself). The UI reloads the tree and checks open tabs.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct FsChanged {
+    /// Absolute paths of the changed files and folders.
+    pub paths: Vec<String>,
+}
+
+/// Builds the tauri-specta builder that knows every command and event.
 ///
 /// It's a separate function so both [`run`] and the `export_bindings` test can use it.
 /// The `tauri::Wry` type parameter is the concrete webview runtime Tauri uses on desktop.
 fn specta_builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![commands::get_about_info])
+    use commands::{app, collection, http, workspace};
+
+    Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            app::get_about_info,
+            app::get_settings,
+            app::set_theme,
+            app::get_collection_state,
+            app::save_collection_state,
+            workspace::create_workspace,
+            workspace::open_workspace,
+            workspace::reload_workspace,
+            workspace::close_workspace,
+            workspace::create_collection,
+            workspace::add_collection,
+            workspace::remove_collection,
+            collection::get_tree,
+            collection::read_request,
+            collection::save_request,
+            collection::read_folder,
+            collection::create_request,
+            collection::create_request_from,
+            collection::create_folder,
+            collection::rename_item,
+            collection::duplicate_request,
+            collection::delete_item,
+            collection::move_item,
+            collection::reveal_item,
+            http::send_request,
+            http::cancel_request,
+            http::save_response_body,
+        ])
+        .events(collect_events![FsChanged])
 }
 
 /// Writes `app/ui/src/bindings.ts` from the registered commands and their types.
 #[cfg(any(debug_assertions, test))]
 fn export_bindings(builder: &Builder<tauri::Wry>) -> anyhow::Result<()> {
+    use anyhow::Context;
     // `CARGO_MANIFEST_DIR` makes the path independent of the working directory.
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(BINDINGS_PATH);
-    use anyhow::Context;
     builder
         .export(specta_typescript::Typescript::default(), &path)
         .with_context(|| format!("failed to export TypeScript bindings to {}", path.display()))
@@ -42,12 +89,38 @@ pub fn run() {
     export_bindings(&builder).expect("failed to export TypeScript bindings");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
-        .setup(|app| {
-            let log_dir = app.path().app_data_dir()?.join("logs");
-            let guard = logging::init(&log_dir)?;
+        .setup(move |app| {
+            builder.mount_events(app);
+
+            let data_dir = app.path().app_data_dir()?;
+            let guard = logging::init(&data_dir.join("logs"))?;
             // Keep the guard alive for the whole app lifetime (see `logging::init`).
             app.manage(guard);
+
+            let state = AppState::new(data_dir);
+            // The watcher calls back on its own thread. `AppHandle` is cheap to clone and
+            // safe to use from any thread, so the closure owns its own copy.
+            let handle = app.handle().clone();
+            let watcher = FsWatcher::new(move |paths| {
+                let paths = paths
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect();
+                if let Err(err) = (FsChanged { paths }).emit(&handle) {
+                    tracing::warn!(%err, "could not emit fs-changed event");
+                }
+            });
+            match watcher {
+                Ok(watcher) => {
+                    *state.watcher.lock().expect("watcher lock poisoned") = Some(watcher);
+                }
+                Err(err) => tracing::warn!(%err, "file watcher disabled"),
+            }
+            app.manage(state);
+
             tracing::info!(version = env!("CARGO_PKG_VERSION"), "Frida started");
             Ok(())
         })

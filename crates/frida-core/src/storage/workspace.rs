@@ -2,6 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
 use super::collection::{create_collection, load_collection};
 use super::paths::{COLLECTION_FILE, ENVIRONMENTS_DIR, WORKSPACE_FILE};
 use crate::error::{CoreError, Result};
@@ -19,6 +22,60 @@ pub fn create_workspace(dir: &Path, name: &str) -> Result<Workspace> {
     let envs = dir.join(ENVIRONMENTS_DIR);
     std::fs::create_dir_all(&envs).map_err(|e| CoreError::io(&envs, e))?;
     Ok(workspace)
+}
+
+/// A workspace as the UI shows it: its collections with names, or an error per collection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceOverview {
+    pub dir: String,
+    pub name: String,
+    pub collections: Vec<CollectionSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CollectionSummary {
+    /// Absolute folder of the collection.
+    pub dir: String,
+    /// `None` when `collection.yaml` couldn't be read (see `error`).
+    pub id: Option<String>,
+    pub name: String,
+    /// Why the collection couldn't be loaded, e.g. the folder was moved or deleted.
+    pub error: Option<String>,
+}
+
+/// Opens a workspace and loads the name and id of each collection. A broken or missing
+/// collection is reported in its summary instead of failing the whole workspace.
+pub fn load_overview(dir: &Path) -> Result<WorkspaceOverview> {
+    let workspace = open_workspace(dir)?;
+    let collections = workspace
+        .collections
+        .iter()
+        .map(|entry| {
+            let col_dir = collection_dir(dir, entry);
+            let shown_dir = col_dir.canonicalize().unwrap_or_else(|_| col_dir.clone());
+            match load_collection(&col_dir) {
+                Ok(collection) => CollectionSummary {
+                    dir: shown_dir.to_string_lossy().to_string(),
+                    id: Some(collection.id),
+                    name: collection.name,
+                    error: None,
+                },
+                Err(err) => CollectionSummary {
+                    dir: shown_dir.to_string_lossy().to_string(),
+                    id: None,
+                    name: entry.path.clone(),
+                    error: Some(err.to_string()),
+                },
+            }
+        })
+        .collect();
+    Ok(WorkspaceOverview {
+        dir: dir.to_string_lossy().to_string(),
+        name: workspace.name,
+        collections,
+    })
 }
 
 pub fn open_workspace(dir: &Path) -> Result<Workspace> {

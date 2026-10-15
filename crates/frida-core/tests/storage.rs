@@ -302,3 +302,21 @@ fn workspace_add_create_and_remove_collections() {
     // Removing only edits the workspace file; the collection itself stays.
     assert!(outside.path().join("collection.yaml").exists());
 }
+
+#[test]
+fn overview_reports_broken_collections_without_failing() {
+    let ws = tempfile::tempdir().unwrap();
+    storage::create_workspace(ws.path(), "EIP").unwrap();
+    let good = ws.path().join("orders");
+    storage::create_collection_in_workspace(ws.path(), &good, "Orders API").unwrap();
+    let gone = ws.path().join("gone");
+    storage::create_collection_in_workspace(ws.path(), &gone, "Gone").unwrap();
+    std::fs::remove_dir_all(&gone).unwrap();
+
+    let overview = storage::load_overview(ws.path()).unwrap();
+    assert_eq!(overview.name, "EIP");
+    assert_eq!(overview.collections[0].name, "Orders API");
+    assert!(overview.collections[0].error.is_none());
+    assert!(overview.collections[1].id.is_none());
+    assert!(overview.collections[1].error.is_some());
+}
