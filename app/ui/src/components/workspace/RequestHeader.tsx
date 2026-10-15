@@ -8,9 +8,9 @@ import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { EditableCrumb } from "./EditableCrumb";
 
 /**
- * The bar above the editor: where the open item lives (collection › folders › item), each part
- * renamable by clicking it, a Save button while there are unsaved changes, and the environment
- * picker.
+ * The bar above the editor: where the open item lives (collection › folders › item), with the
+ * open item renamable by clicking its name, a Save button while there are unsaved changes, and
+ * the environment picker.
  */
 export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
   const collection = useActiveCollection();
@@ -24,21 +24,20 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
 
   return (
     <div className="flex h-10 shrink-0 items-center gap-0.5 border-b px-3 text-sm">
-      {collection && (
+      {/* Only the open entry can be renamed: the collection only from its settings tab. */}
+      {collection && tab?.kind === "collection" ? (
         <EditableCrumb
-          className="text-muted-foreground"
+          className="font-medium"
           value={collection.name}
           onRename={(name) => void actions.renameCollection(dir, name)}
         />
+      ) : (
+        <span className="truncate px-1 text-muted-foreground">{collection?.name}</span>
       )}
       {trail.map((folder) => (
         <span key={folder.path} className="flex min-w-0 items-center gap-0.5">
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-          <EditableCrumb
-            className="text-muted-foreground"
-            value={folder.name}
-            onRename={(name) => void actions.renameItem(dir, folder.path, name)}
-          />
+          <span className="truncate px-1 text-muted-foreground">{folder.name}</span>
         </span>
       ))}
       {tab && tab.kind !== "collection" && (
@@ -60,7 +59,7 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
       {tab?.kind === "collection" && (
         <span className="flex items-center gap-0.5">
           <ChevronRight className="size-3.5 text-muted-foreground" />
-          <span className="px-1 font-medium">Settings</span>
+          <span className="px-1 text-muted-foreground">Settings</span>
         </span>
       )}
       {dirty && (
