@@ -10,7 +10,7 @@
 - **tauri-specta wiring**: the example command `get_about_info` returns `frida_core::AboutInfo`. The UI calls it
   through the generated, typed `commands.getAboutInfo()` in `app/ui/src/bindings.ts`.
 - **Logging**: `tracing` writes to `<app data dir>/logs/frida.YYYY-MM-DD.log`, rotated daily with 7 files kept,
-  and also to stderr in debug builds. On macOS the app data dir is `~/Library/Application Support/dev.frida-http.app`.
+  and also to stderr in debug builds. On macOS the app data dir is `~/Library/Application Support/io.github.clon1998.frida`.
 - **CI** (`.github/workflows/ci.yml`): fmt, clippy, cargo test, a bindings drift check, UI typecheck/lint/test,
   then a build matrix for macOS arm64/x64, Windows x64 and Linux x64 that uploads the bundles as artifacts.
 - Placeholder app icon generated from `assets/app-icon.svg` with `pnpm tauri icon`.

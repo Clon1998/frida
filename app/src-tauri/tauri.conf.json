@@ -3,7 +3,7 @@
   "productName": "Frida",
   "mainBinaryName": "frida-http",
   "version": "0.1.0",
-  "identifier": "dev.frida-http.app",
+  "identifier": "io.github.clon1998.frida",
   "build": {
     "beforeDevCommand": "pnpm --dir ui dev",
     "devUrl": "http://localhost:5173",
