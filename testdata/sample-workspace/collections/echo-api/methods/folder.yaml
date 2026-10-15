@@ -1,0 +1,14 @@
+version: 1
+name: Methods
+seq: 1
+vars: []
+headers: []
+auth:
+  mode: inherit
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

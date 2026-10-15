@@ -1,0 +1,30 @@
+version: 1
+name: "Put XML"
+seq: 2
+method: PUT
+url: "http://localhost:8787/orders/1"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: xml
+  json: ""
+  xml: |-
+    <order>
+      <item>book</item>
+    </order>
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

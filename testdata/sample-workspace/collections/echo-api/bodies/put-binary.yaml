@@ -1,0 +1,27 @@
+version: 1
+name: "Put binary file"
+seq: 6
+method: PUT
+url: "http://localhost:8787/files/hello.txt"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: binary
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: "files/hello.txt"
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

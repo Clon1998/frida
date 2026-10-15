@@ -1,0 +1,33 @@
+version: 1
+name: "Post form"
+seq: 4
+method: POST
+url: "http://localhost:8787/login"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: form-urlencoded
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded:
+  - name: username
+    value: "alice"
+    enabled: true
+  - name: remember
+    value: "true"
+    enabled: true
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

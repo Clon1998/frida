@@ -1,0 +1,35 @@
+version: 1
+name: "Post multipart"
+seq: 5
+method: POST
+url: "http://localhost:8787/upload"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: multipart
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart:
+  - name: note
+    type: text
+    value: "hi"
+    enabled: true
+  - name: file
+    type: file
+    value: "files/hello.txt"
+    enabled: true
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

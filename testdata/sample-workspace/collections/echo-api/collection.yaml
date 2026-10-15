@@ -1,0 +1,23 @@
+version: 1
+id: 3b0b8f2e-5c1d-4f7a-9e2b-6a1c0d9e8f71
+name: Echo API
+vars: []
+headers:
+- name: Accept
+  value: application/json
+  enabled: true
+auth:
+  mode: none
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: 30000
+  tls:
+    verify: true
+    caCertPaths: []
+docs: |
+  Requests against the local test server. Start it with:
+
+      cargo run -p frida-testserver

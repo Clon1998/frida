@@ -1,0 +1,29 @@
+version: 1
+name: "Delete order"
+seq: 2
+method: DELETE
+url: "http://localhost:8787/orders/:orderId"
+params:
+  query: []
+  path:
+  - name: orderId
+    value: "42"
+headers: []
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

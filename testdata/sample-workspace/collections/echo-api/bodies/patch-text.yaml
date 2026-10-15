@@ -1,0 +1,28 @@
+version: 1
+name: "Patch text"
+seq: 3
+method: PATCH
+url: "http://localhost:8787/notes/1"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: text
+  json: ""
+  xml: ""
+  text: |-
+    Plain text body
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

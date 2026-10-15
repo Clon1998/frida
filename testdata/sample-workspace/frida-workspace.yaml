@@ -1,0 +1,4 @@
+version: 1
+name: Sample
+collections:
+- path: ./collections/echo-api

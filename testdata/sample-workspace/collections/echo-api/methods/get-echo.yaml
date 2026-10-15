@@ -1,0 +1,33 @@
+version: 1
+name: "Get echo"
+seq: 1
+method: GET
+url: "http://localhost:8787/echo?expand=items&limit=10"
+params:
+  query:
+  - name: expand
+    value: "items"
+    enabled: true
+  - name: limit
+    value: "10"
+    enabled: true
+  path: []
+headers: []
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

@@ -1,0 +1,27 @@
+version: 1
+name: "Get image"
+seq: 3
+method: GET
+url: "http://localhost:8787/image.png"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

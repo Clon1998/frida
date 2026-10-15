@@ -1,0 +1,30 @@
+version: 1
+name: "Slow request (cancel me)"
+seq: 4
+method: GET
+url: "http://localhost:8787/slow?ms=10000"
+params:
+  query:
+  - name: ms
+    value: "10000"
+    enabled: true
+  path: []
+headers: []
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""

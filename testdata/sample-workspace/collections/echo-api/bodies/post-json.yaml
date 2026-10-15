@@ -1,0 +1,31 @@
+version: 1
+name: "Post JSON"
+seq: 1
+method: POST
+url: "http://localhost:8787/orders"
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: json
+  json: |-
+    {
+      "item": "book",
+      "quantity": 2
+    }
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
