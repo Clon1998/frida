@@ -81,7 +81,7 @@ describe("RequestEditor params", () => {
     render(<Harness />);
     typeUrl("http://x/a");
     // The query table's empty "add" row is the first Name/Value pair on the Params tab.
-    const [name] = screen.getAllByPlaceholderText("Name");
+    const [name] = screen.getAllByPlaceholderText("Add name");
     if (!name) throw new Error("no name input");
     fireEvent.change(name, { target: { value: "q" } });
     const [value] = screen.getAllByPlaceholderText("Value");

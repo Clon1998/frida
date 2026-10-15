@@ -53,6 +53,9 @@ interface EnvsState {
   backend: SecretBackendStatus | null;
   /** Bumped whenever environments or the selection change, so the inspector refreshes. */
   version: number;
+  /** Which scope the environment editor tab shows. */
+  editorScope: "global" | "collection";
+  setEditorScope: (scope: "global" | "collection") => void;
 
   load: (dir: string) => Promise<void>;
   select: (scope: EnvScope, name: string | null) => Promise<void>;
@@ -70,6 +73,8 @@ export const useEnvs = create<EnvsState>((set, get) => ({
   activeCollection: null,
   backend: null,
   version: 0,
+  editorScope: "collection",
+  setEditorScope: (editorScope) => set({ editorScope }),
 
   load: async (dir) => {
     try {

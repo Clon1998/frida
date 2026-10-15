@@ -3,10 +3,10 @@ import { useState } from "react";
 import type { KeyValue as RawKeyValue } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { bulkToRows, rowsToBulk } from "@/lib/bulk";
 import type { Complete } from "@/lib/model";
+import { CellInput, GridCell, GridRow, GridTable } from "./GridTable";
 
 type KeyValue = Complete<RawKeyValue>;
 
@@ -18,8 +18,8 @@ interface KeyValueTableProps {
 }
 
 /**
- * Editable `name | value` rows with an enabled checkbox. Typing into the empty last row adds a
- * new row. "Bulk edit" switches to a text area with one `name: value` per line.
+ * Editable `name | value` rows with an enabled checkbox, as a table. Typing into the empty last
+ * row adds a new row. "Bulk edit" switches to a text area with one `name: value` per line.
  */
 export function KeyValueTable({
   rows,
@@ -52,7 +52,7 @@ export function KeyValueTable({
           className="h-6 px-0 text-xs"
           onClick={() => setBulkText(bulkText === null ? rowsToBulk(rows) : null)}
         >
-          {bulkText === null ? "Bulk edit" : "Key/value edit"}
+          {bulkText === null ? "Bulk edit" : "Table edit"}
         </Button>
       </div>
 
@@ -68,41 +68,58 @@ export function KeyValueTable({
           }}
         />
       ) : (
-        shown.map((row, index) => {
-          const isNew = index === rows.length;
-          return (
-            <div key={index} className="flex items-center gap-2">
-              <Checkbox
-                checked={row.enabled}
-                disabled={isNew}
-                onCheckedChange={(checked) => update(index, { enabled: checked === true })}
-                aria-label="Enabled"
-              />
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder={namePlaceholder}
-                value={row.name}
-                onChange={(e) => update(index, { name: e.target.value })}
-              />
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder={valuePlaceholder}
-                value={row.value}
-                onChange={(e) => update(index, { value: e.target.value })}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 shrink-0"
-                disabled={isNew}
-                onClick={() => remove(index)}
-                aria-label="Remove row"
-              >
-                <Trash2 />
-              </Button>
-            </div>
-          );
-        })
+        <GridTable
+          columns={[
+            { label: "", width: "2.25rem" },
+            { label: namePlaceholder, width: "35%" },
+            { label: valuePlaceholder },
+            { label: "", width: "2.25rem" },
+          ]}
+        >
+          {shown.map((row, index) => {
+            const isNew = index === rows.length;
+            return (
+              <GridRow key={index} muted={!row.enabled}>
+                <GridCell center>
+                  <Checkbox
+                    className="align-middle"
+                    checked={row.enabled}
+                    disabled={isNew}
+                    onCheckedChange={(checked) => update(index, { enabled: checked === true })}
+                    aria-label="Enabled"
+                  />
+                </GridCell>
+                <GridCell>
+                  <CellInput
+                    placeholder={isNew ? `Add ${namePlaceholder.toLowerCase()}` : namePlaceholder}
+                    value={row.name}
+                    onChange={(e) => update(index, { name: e.target.value })}
+                  />
+                </GridCell>
+                <GridCell>
+                  <CellInput
+                    placeholder={valuePlaceholder}
+                    value={row.value}
+                    onChange={(e) => update(index, { value: e.target.value })}
+                  />
+                </GridCell>
+                <GridCell center>
+                  {!isNew && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => remove(index)}
+                      aria-label="Remove row"
+                    >
+                      <Trash2 />
+                    </Button>
+                  )}
+                </GridCell>
+              </GridRow>
+            );
+          })}
+        </GridTable>
       )}
     </div>
   );

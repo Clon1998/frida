@@ -1,8 +1,8 @@
 import type { PathParam as RawPathParam } from "@/bindings";
 import type { Complete } from "@/lib/model";
+import { CellInput, GridCell, GridRow, GridTable } from "./GridTable";
 
 type PathParam = Complete<RawPathParam>;
-import { Input } from "@/components/ui/input";
 
 interface PathParamsTableProps {
   params: PathParam[];
@@ -19,20 +19,28 @@ export function PathParamsTable({ params, onChange }: PathParamsTableProps) {
     );
   }
   return (
-    <div className="flex flex-col gap-1">
+    <GridTable columns={[{ label: "Name", width: "35%" }, { label: "Value" }]}>
       {params.map((param, index) => (
-        <div key={param.name} className="flex items-center gap-2">
-          <Input className="h-8 font-mono text-xs" value={param.name} readOnly tabIndex={-1} />
-          <Input
-            className="h-8 font-mono text-xs"
-            placeholder="Value"
-            value={param.value}
-            onChange={(e) =>
-              onChange(params.map((p, i) => (i === index ? { ...p, value: e.target.value } : p)))
-            }
-          />
-        </div>
+        <GridRow key={param.name}>
+          <GridCell>
+            <CellInput
+              value={param.name}
+              readOnly
+              tabIndex={-1}
+              className="text-muted-foreground"
+            />
+          </GridCell>
+          <GridCell>
+            <CellInput
+              placeholder="Value"
+              value={param.value}
+              onChange={(e) =>
+                onChange(params.map((p, i) => (i === index ? { ...p, value: e.target.value } : p)))
+              }
+            />
+          </GridCell>
+        </GridRow>
       ))}
-    </div>
+    </GridTable>
   );
 }

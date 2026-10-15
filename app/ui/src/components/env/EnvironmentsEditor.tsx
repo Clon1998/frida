@@ -1,7 +1,8 @@
 import { Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { commands, type EnvScope } from "@/bindings";
+import { CellInput, GridCell, GridRow, GridTable } from "@/components/request/GridTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,7 +25,8 @@ type ScopeKind = "global" | "collection";
 export function EnvironmentsEditor({ dir }: { dir: string }) {
   const collection = useActiveCollection();
   const backend = useEnvs((s) => s.backend);
-  const [kind, setKind] = useState<ScopeKind>("collection");
+  const kind = useEnvs((s) => s.editorScope);
+  const setKind = useEnvs((s) => s.setEditorScope);
   const entries = useEnvs((s) => (kind === "global" ? s.global : s.collection));
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -270,79 +272,91 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-[1fr_2fr_auto_auto] items-center gap-x-2 gap-y-1 text-sm">
-        <span className="text-xs font-medium text-muted-foreground">Variable</span>
-        <span className="text-xs font-medium text-muted-foreground">Value</span>
-        <span className="text-xs font-medium text-muted-foreground">Secret</span>
-        <span />
+      <GridTable
+        columns={[
+          { label: "Variable", width: "30%" },
+          { label: "Value" },
+          { label: "Secret", width: "4rem" },
+          { label: "", width: "2.25rem" },
+        ]}
+      >
         {rows.map((v, index) => {
           const isNew = index === draft.variables.length;
           const wasSet = entry.setSecrets.includes(v.name);
           const shown = revealed[v.name];
           return (
-            <Fragment key={index}>
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder="name"
-                value={v.name}
-                onChange={(e) => updateVar(index, { name: e.target.value })}
-              />
-              {v.secret ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    className="h-8 font-mono text-xs"
-                    type={shown !== undefined ? "text" : "password"}
-                    placeholder={wasSet ? "•••••••• (stored in keychain)" : "unset"}
-                    value={pending[v.name] ?? shown ?? ""}
-                    onChange={(e) => setPending((p) => ({ ...p, [v.name]: e.target.value }))}
-                  />
-                  {!wasSet && pending[v.name] === undefined && (
-                    <Badge variant="outline">unset</Badge>
-                  )}
-                  {v.source && <Badge variant="secondary">AWS</Badge>}
-                  {wasSet && pending[v.name] === undefined && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      aria-label={shown !== undefined ? "Hide value" : "Reveal value"}
-                      onClick={() => void reveal(v.name)}
-                    >
-                      {shown !== undefined ? <EyeOff /> : <Eye />}
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <Input
-                  className="h-8 font-mono text-xs"
-                  placeholder="value"
-                  value={v.value ?? ""}
-                  onChange={(e) => updateVar(index, { value: e.target.value })}
+            <GridRow key={index}>
+              <GridCell>
+                <CellInput
+                  placeholder={isNew ? "Add variable" : "name"}
+                  value={v.name}
+                  onChange={(e) => updateVar(index, { name: e.target.value })}
                 />
-              )}
-              <Checkbox
-                className="mx-auto"
-                disabled={isNew}
-                checked={v.secret}
-                onCheckedChange={(checked) => toggleSecret(index, checked === true)}
-                aria-label="Secret"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                disabled={isNew}
-                aria-label="Remove variable"
-                onClick={() =>
-                  setDraft((d) => ({ ...d, variables: d.variables.filter((_, i) => i !== index) }))
-                }
-              >
-                <Trash2 />
-              </Button>
-            </Fragment>
+              </GridCell>
+              <GridCell>
+                {v.secret ? (
+                  <div className="flex items-center gap-1 pr-1">
+                    <CellInput
+                      type={shown !== undefined ? "text" : "password"}
+                      placeholder={wasSet ? "•••••••• (stored in keychain)" : "unset"}
+                      value={pending[v.name] ?? shown ?? ""}
+                      onChange={(e) => setPending((p) => ({ ...p, [v.name]: e.target.value }))}
+                    />
+                    {!wasSet && pending[v.name] === undefined && (
+                      <Badge variant="outline">unset</Badge>
+                    )}
+                    {v.source && <Badge variant="secondary">AWS</Badge>}
+                    {wasSet && pending[v.name] === undefined && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        aria-label={shown !== undefined ? "Hide value" : "Reveal value"}
+                        onClick={() => void reveal(v.name)}
+                      >
+                        {shown !== undefined ? <EyeOff /> : <Eye />}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <CellInput
+                    placeholder="value"
+                    value={v.value ?? ""}
+                    onChange={(e) => updateVar(index, { value: e.target.value })}
+                  />
+                )}
+              </GridCell>
+              <GridCell center>
+                <Checkbox
+                  className="align-middle"
+                  disabled={isNew}
+                  checked={v.secret}
+                  onCheckedChange={(checked) => toggleSecret(index, checked === true)}
+                  aria-label="Secret"
+                />
+              </GridCell>
+              <GridCell center>
+                {!isNew && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    aria-label="Remove variable"
+                    onClick={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        variables: d.variables.filter((_, i) => i !== index),
+                      }))
+                    }
+                  >
+                    <Trash2 />
+                  </Button>
+                )}
+              </GridCell>
+            </GridRow>
           );
         })}
-      </div>
+      </GridTable>
 
       <ConfirmDialog
         open={deleting}
