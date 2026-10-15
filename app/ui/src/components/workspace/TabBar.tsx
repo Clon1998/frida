@@ -1,5 +1,5 @@
 import { Folder, History, Layers, Settings, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -29,6 +29,18 @@ export function TabBar({ dir }: { dir: string }) {
   const save = useTabs((s) => s.save);
   const revert = useTabs((s) => s.revert);
   const openCurlExport = useDialogs((s) => s.openCurlExport);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Keep the active tab visible when it changes (e.g. opened from the sidebar).
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar || active === null) return;
+    const el = [...bar.querySelectorAll<HTMLElement>("[data-tab-path]")].find(
+      (node) => node.dataset.tabPath === active,
+    );
+    el?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active, tabs.length]);
+
   /** Tabs waiting for "close without saving?" confirmation. */
   const [confirmClose, setConfirmClose] = useState<string[] | null>(null);
 
@@ -48,18 +60,27 @@ export function TabBar({ dir }: { dir: string }) {
 
   return (
     <>
-      <div className="flex h-9 shrink-0 items-end overflow-x-auto border-b bg-muted/30">
+      <div
+        ref={barRef}
+        onWheel={(e) => {
+          // A normal mouse wheel scrolls vertically; turn that into sideways scrolling here.
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY;
+        }}
+        className="flex h-9 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b bg-muted/30 [scrollbar-width:thin]"
+      >
         {tabs.map((tab, index) => (
           <ContextMenu key={tab.path}>
             <ContextMenuTrigger asChild>
               <div
                 title={tab.path}
+                data-tab-path={tab.path}
                 onClick={() => setActive(dir, tab.path)}
                 onAuxClick={(e) => {
                   if (e.button === 1) requestClose([tab.path]);
                 }}
                 className={cn(
-                  "group flex h-full max-w-56 min-w-0 cursor-default items-center gap-1.5 border-r px-3 text-sm select-none",
+                  // Fixed minimum width: tabs never shrink; the bar scrolls instead.
+                  "group flex h-full w-auto max-w-56 min-w-36 shrink-0 cursor-default items-center gap-1.5 border-r px-3 text-sm select-none",
                   tab.path === active ? "bg-background" : "text-muted-foreground hover:bg-accent",
                 )}
               >
