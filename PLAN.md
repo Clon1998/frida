@@ -490,9 +490,9 @@ the UI typechecked and linted, PLAN.md checkboxes updated, and a short summary i
 - [x] File watcher with reload and a conflict prompt.
 
 **Acceptance:** you can create a collection, add requests, send all methods with each body type against the local test server, and the files on disk look like §4 examples.
-*Status 2026-10-15: implemented. Automated: `tests/sample_workspace.rs` sends every method and body type of
-`testdata/sample-workspace` to the test server, and `tests/format_roundtrip.rs` snapshots the files. Waiting for a
-manual pass through the UI.*
+*Status 2026-10-15: done. Automated: `tests/sample_workspace.rs` sends every method and body type of
+`testdata/sample-workspace` to the test server, and `tests/format_roundtrip.rs` snapshots the files. Manually checked
+in the UI; further UI polish is deferred.*
 
 ### M2: Environments, variables, secrets, inspector
 - [ ] Global and collection environments, selectors, and the env editor.

@@ -1,6 +1,6 @@
 # Changelog
 
-## M1: Storage, tree, requests, sending (2026-10-15, awaiting manual acceptance)
+## M1: Storage, tree, requests, sending (2026-10-15)
 
 ### What was built
 - **On-disk format** (`crates/frida-core/src/model/`, `yaml.rs`): typed models for every §4 file, YAML via
