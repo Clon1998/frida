@@ -8,7 +8,15 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { AlertTriangle, ChevronRight, Folder, FolderOpen, FolderPlus, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Plus,
+  SquareTerminal,
+} from "lucide-react";
 import { useState } from "react";
 import type { TreeNode } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -30,6 +38,7 @@ import { NameDialog } from "@/components/workspace/NameDialog";
 import { methodColor } from "@/lib/methods";
 import { type DropPosition, dropPosition, moveTarget } from "@/lib/tree";
 import * as actions from "@/stores/actions";
+import { useDialogs } from "@/stores/dialogs";
 import { useTabs } from "@/stores/tabs";
 import { useWorkspace } from "@/stores/workspace";
 import { cn } from "cn";
@@ -86,13 +95,19 @@ export function CollectionTree({ dir }: { dir: string }) {
     remove: (path: string, name: string, isFolder: boolean) =>
       setDialog({ kind: "delete", path, name, isFolder }),
     folderSettings: (path: string) => void openTab(dir, path),
+    fromCurl: (parent: string) => useDialogs.getState().openCurlImport(dir, parent),
+    copyCurl: (path: string) => useDialogs.getState().openCurlExport(dir, path),
   };
 
   return (
     <>
       <div className="flex h-8 shrink-0 items-center justify-between px-3">
         <span className="text-xs font-medium text-muted-foreground">Requests</span>
-        <AddMenu onRequest={() => menu.newRequest("")} onFolder={() => menu.newFolder("")} />
+        <AddMenu
+          onRequest={() => menu.newRequest("")}
+          onFolder={() => menu.newFolder("")}
+          onCurl={() => menu.fromCurl("")}
+        />
       </div>
       <ContextMenu>
         <ContextMenuTrigger asChild>
@@ -132,6 +147,9 @@ export function CollectionTree({ dir }: { dir: string }) {
         <ContextMenuContent>
           <ContextMenuItem onSelect={() => menu.newRequest("")}>New request</ContextMenuItem>
           <ContextMenuItem onSelect={() => menu.newFolder("")}>New folder</ContextMenuItem>
+          <ContextMenuItem onSelect={() => menu.fromCurl("")}>
+            New request from curl…
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => void actions.revealItem(dir, "")}>
             Reveal in file manager
@@ -192,6 +210,8 @@ interface TreeRowProps {
     rename: (node: TreeNode & { name: string }) => void;
     remove: (path: string, name: string, isFolder: boolean) => void;
     folderSettings: (path: string) => void;
+    fromCurl: (parent: string) => void;
+    copyCurl: (path: string) => void;
   };
 }
 
@@ -263,6 +283,7 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
                   <AddMenu
                     onRequest={() => menu.newRequest(node.path)}
                     onFolder={() => menu.newFolder(node.path)}
+                    onCurl={() => menu.fromCurl(node.path)}
                   />
                 </span>
               </>
@@ -300,6 +321,9 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
               <ContextMenuItem onSelect={() => menu.newFolder(node.path)}>
                 New folder
               </ContextMenuItem>
+              <ContextMenuItem onSelect={() => menu.fromCurl(node.path)}>
+                New request from curl…
+              </ContextMenuItem>
               <ContextMenuItem onSelect={() => menu.folderSettings(node.path)}>
                 Settings…
               </ContextMenuItem>
@@ -312,6 +336,11 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
           {node.kind === "request" && (
             <ContextMenuItem onSelect={() => void actions.duplicateRequest(dir, node.path)}>
               Duplicate
+            </ContextMenuItem>
+          )}
+          {node.kind === "request" && (
+            <ContextMenuItem onSelect={() => menu.copyCurl(node.path)}>
+              Copy as curl
             </ContextMenuItem>
           )}
           <ContextMenuItem
@@ -348,7 +377,15 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
 }
 
 /** A small "+" that offers a new request or folder. Clicks don't reach the row underneath. */
-function AddMenu({ onRequest, onFolder }: { onRequest: () => void; onFolder: () => void }) {
+function AddMenu({
+  onRequest,
+  onFolder,
+  onCurl,
+}: {
+  onRequest: () => void;
+  onFolder: () => void;
+  onCurl: () => void;
+}) {
   return (
     // Non-modal, so the name dialog it opens gets focus cleanly when the menu closes.
     <DropdownMenu modal={false}>
@@ -370,6 +407,9 @@ function AddMenu({ onRequest, onFolder }: { onRequest: () => void; onFolder: () 
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onFolder}>
           <FolderPlus /> New folder
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onCurl}>
+          <SquareTerminal /> New request from curl…
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -82,6 +82,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             history::list_history,
             history::get_history_entry,
             history::clear_history,
+            history::restore_history_entry,
             history::export_curl,
             history::import_curl,
             http::send_request,

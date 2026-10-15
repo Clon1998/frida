@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/context-menu";
 import { methodColor } from "@/lib/methods";
 import * as actions from "@/stores/actions";
+import { useDialogs } from "@/stores/dialogs";
 import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { cn } from "cn";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -27,6 +28,7 @@ export function TabBar({ dir }: { dir: string }) {
   const closeTabs = useTabs((s) => s.closeTabs);
   const save = useTabs((s) => s.save);
   const revert = useTabs((s) => s.revert);
+  const openCurlExport = useDialogs((s) => s.openCurlExport);
   /** Tabs waiting for "close without saving?" confirmation. */
   const [confirmClose, setConfirmClose] = useState<string[] | null>(null);
 
@@ -91,6 +93,11 @@ export function TabBar({ dir }: { dir: string }) {
               <ContextMenuItem disabled={!isDirty(tab)} onSelect={() => revert(dir, tab.path)}>
                 Revert changes
               </ContextMenuItem>
+              {tab.kind === "request" && (
+                <ContextMenuItem onSelect={() => openCurlExport(dir, tab.path)}>
+                  Copy as curl
+                </ContextMenuItem>
+              )}
               {tab.kind === "request" && (
                 <ContextMenuItem onSelect={() => void actions.duplicateRequest(dir, tab.path)}>
                   Duplicate request

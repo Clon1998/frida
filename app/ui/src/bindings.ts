@@ -86,6 +86,11 @@ export const commands = {
 	 */
 	getHistoryEntry: (id: number) => typedError<HistoryEntry, ApiError>(__TAURI_INVOKE("get_history_entry", { id })),
 	clearHistory: () => typedError<null, ApiError>(__TAURI_INVOKE("clear_history")),
+	/**
+	 *  "Restore as new request": creates a request in the collection root from a history entry and
+	 *  returns its path.
+	 */
+	restoreHistoryEntry: (dir: string, id: number) => typedError<string, ApiError>(__TAURI_INVOKE("restore_history_entry", { dir, id })),
 	/**  "Copy as curl" for the editor's current request at `path` in collection `dir`. */
 	exportCurl: (dir: string, path: string, request: Request, options: CurlOptions) => typedError<string, ApiError>(__TAURI_INVOKE("export_curl", { dir, path, request, options })),
 	/**  Parses a curl command into a request (not saved yet). */

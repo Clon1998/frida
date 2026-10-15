@@ -326,7 +326,7 @@ fn url_decode(text: &str) -> String {
 }
 
 /// Query rows from the URL, kept raw like the UI does.
-fn query_params(url: &str) -> Vec<KeyValue> {
+pub fn query_params(url: &str) -> Vec<KeyValue> {
     let Some((_, query)) = url.split_once('?') else {
         return Vec::new();
     };

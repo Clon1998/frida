@@ -79,6 +79,38 @@ impl NewEntry {
     }
 }
 
+impl HistoryEntry {
+    /// A new request with this entry's method, URL, headers and body ("Restore as new
+    /// request"). Masked secrets stay `***`; the user fills them in again.
+    pub fn to_request(&self) -> crate::model::Request {
+        use crate::model::{BodyMode, Request};
+        let mut request = Request::new(format!("{} (from history)", self.summary.request_name));
+        request.method = self.summary.method.clone();
+        request.url = self.summary.url.clone();
+        request.params.query = crate::import::query_params(&request.url);
+        let content_type = self
+            .request_headers
+            .iter()
+            .find(|h| h.name.eq_ignore_ascii_case("content-type"))
+            .map(|h| h.value.to_lowercase())
+            .unwrap_or_default();
+        request.headers = self.request_headers.clone();
+        if let Some(body) = self.request_body.clone().filter(|b| !b.is_empty()) {
+            if content_type.contains("json") {
+                request.body.mode = BodyMode::Json;
+                request.body.json = body;
+            } else if content_type.contains("xml") {
+                request.body.mode = BodyMode::Xml;
+                request.body.xml = body;
+            } else {
+                request.body.mode = BodyMode::Text;
+                request.body.text = body;
+            }
+        }
+        request
+    }
+}
+
 /// A row in the history list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

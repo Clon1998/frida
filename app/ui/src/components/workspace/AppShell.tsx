@@ -2,6 +2,8 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { Columns2, Rows2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
+import { CurlExportDialog } from "@/components/curl/CurlExportDialog";
+import { CurlImportDialog } from "@/components/curl/CurlImportDialog";
 import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
@@ -78,6 +80,8 @@ export function AppShell() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
+      <CurlExportDialog />
+      <CurlImportDialog />
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
         <div className="flex-1" />

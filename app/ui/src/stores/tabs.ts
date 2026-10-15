@@ -3,6 +3,7 @@ import { type ApiError, commands, type ResponseView } from "@/bindings";
 import { showError, toApiError, unwrap } from "@/lib/api";
 import { type CollectionModel, type FolderModel, fromRust, type RequestModel } from "@/lib/model";
 import { isUnder } from "@/lib/tree";
+import { useDialogs } from "./dialogs";
 import { useWorkspace } from "./workspace";
 
 /** Fields every tab has: the document as saved on disk and as edited. */
@@ -300,6 +301,8 @@ export const useTabs = create<TabsState>((set, get) => {
           requestId: null,
         }));
       }
+      // A history entry was written; let the history list refresh.
+      useDialogs.getState().bumpHistory();
     },
 
     cancel: async (dir, path) => {

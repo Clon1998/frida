@@ -2,4 +2,4 @@
 
 mod curl;
 
-pub use curl::{CurlImport, import_curl};
+pub use curl::{CurlImport, import_curl, query_params};

@@ -1,4 +1,9 @@
-import { Braces, Loader2, Send, X } from "lucide-react";
+import { Braces, Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { toast } from "sonner";
+import { commands } from "@/bindings";
+import { showError, unwrap } from "@/lib/api";
+import { fromRust } from "@/lib/model";
+import { useDialogs } from "@/stores/dialogs";
 import { useState } from "react";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { InspectorPanel } from "@/components/inspector/InspectorPanel";
@@ -32,6 +37,30 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const { report, variables } = useInspection(dir, tab.path, request);
   const unresolved = report?.vars.filter((v) => !v.resolved).length ?? 0;
+  const openCurlExport = useDialogs((s) => s.openCurlExport);
+
+  /** Pasting a curl command into the URL bar turns this request into it (PLAN.md §11.3). */
+  const pasteCurl = (text: string) => {
+    if (!/^\s*curl(\.exe)?\s/.test(text)) return false;
+    void unwrap(commands.importCurl(text)).then((result) => {
+      const imported = fromRust(result.request);
+      // Keep this request's identity (name, order, docs); take everything curl describes.
+      update((r) => ({
+        ...r,
+        method: imported.method,
+        url: imported.url,
+        params: imported.params,
+        headers: imported.headers,
+        body: imported.body,
+        auth: imported.auth.mode === "custom" ? imported.auth : r.auth,
+        settings: imported.settings.timeoutMs ? imported.settings : r.settings,
+      }));
+      toast.success("Imported curl command", {
+        description: result.warnings.length ? result.warnings.join("\n") : undefined,
+      });
+    }, showError);
+    return true;
+  };
 
   const update = (change: (r: Request) => Request) =>
     updateDraft<RequestTab>(dir, tab.path, change);
@@ -67,8 +96,19 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
             variables={variables}
             onChange={setUrl}
             onEnter={() => void send(dir, tab.path)}
+            onPasteText={pasteCurl}
           />
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0"
+          title="Copy as curl"
+          aria-label="Copy as curl"
+          onClick={() => openCurlExport(dir, tab.path)}
+        >
+          <SquareTerminal />
+        </Button>
         <Button
           variant={inspectorOpen ? "secondary" : "ghost"}
           size="icon"

@@ -20,6 +20,8 @@ interface CodeEditorProps {
   singleLine?: boolean;
   onEnter?: () => void;
   placeholder?: string;
+  /** Called with pasted text; return `true` to handle it instead of inserting it. */
+  onPasteText?: (text: string) => boolean;
 }
 
 const languageExtension = (language: CodeLanguage): Extension =>
@@ -90,18 +92,21 @@ export function CodeEditor({
   singleLine = false,
   onEnter,
   placeholder,
+  onPasteText,
 }: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onEnterRef = useRef(onEnter);
+  const onPasteRef = useRef(onPasteText);
   const languageSlot = useRef(new Compartment());
   const readOnlySlot = useRef(new Compartment());
 
   useEffect(() => {
     onChangeRef.current = onChange;
     onEnterRef.current = onEnter;
-  }, [onChange, onEnter]);
+    onPasteRef.current = onPasteText;
+  }, [onChange, onEnter, onPasteText]);
 
   // Create the editor once.
   useEffect(() => {
@@ -129,6 +134,16 @@ export function CodeEditor({
             EditorState.readOnly.of(readOnly),
             EditorView.editable.of(!readOnly),
           ]),
+          EditorView.domEventHandlers({
+            paste: (event) => {
+              const text = event.clipboardData?.getData("text/plain");
+              if (text && onPasteRef.current?.(text)) {
+                event.preventDefault();
+                return true;
+              }
+              return false;
+            },
+          }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
           }),

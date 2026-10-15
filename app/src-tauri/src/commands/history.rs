@@ -101,3 +101,18 @@ pub fn import_curl(command: String) -> ApiResult<CurlImport> {
             .with_hint("Paste a complete curl command, e.g. copied from the browser's dev tools.")
     })
 }
+
+/// "Restore as new request": creates a request in the collection root from a history entry and
+/// returns its path.
+#[tauri::command]
+#[specta::specta]
+pub async fn restore_history_entry(
+    state: State<'_, AppState>,
+    dir: String,
+    id: u32,
+) -> ApiResult<String> {
+    let root = state.collection_dir(&dir)?;
+    let history = store(&state)?;
+    let entry = blocking(move || Ok(history.get(id)?)).await?;
+    Ok(storage::create_request(&root, "", &entry.to_request())?)
+}
