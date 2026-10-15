@@ -48,6 +48,7 @@ axum = "0.8.9"
 rcgen = { version = "0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
 tokio-rustls = "0.26.6"
 time = "0.3.55"
+notify-debouncer-full = "0.7.0"
 
 # Rust <-> TypeScript type generation. The Tauri 2 compatible line of tauri-specta is still a
 # release candidate, and it requires an *exact* specta version, so both are pinned with `=`.

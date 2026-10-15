@@ -10,6 +10,7 @@ pub mod http;
 pub mod local_state;
 pub mod model;
 pub mod storage;
+pub mod watch;
 pub mod yaml;
 
 pub use about::{AboutInfo, about};
