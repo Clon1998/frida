@@ -60,14 +60,25 @@ interface CollectionTabs {
   active: string | null;
   /** Folders expanded in the sidebar tree (persisted together with the tabs). */
   expanded: string[];
+  /**
+   * The preview tab (italic), like Bruno and VS Code: opened by a single click, replaced by the
+   * next single click and closed when another tab is activated. Editing or double-clicking it
+   * makes it a normal tab.
+   */
+  preview?: string | null;
 }
 
 interface TabsState {
   /** Tab sets by collection folder: each collection has its own tabs (PLAN.md §14). */
   byCollection: Record<string, CollectionTabs>;
 
-  /** Opens (or focuses) the tab for `path`. The kind follows from the path, see {@link kindOf}. */
-  openTab: (dir: string, path: string) => Promise<void>;
+  /**
+   * Opens (or focuses) the tab for `path`. The kind follows from the path, see {@link kindOf}.
+   * With `preview`, it opens as the preview tab (see {@link CollectionTabs.preview}).
+   */
+  openTab: (dir: string, path: string, options?: { preview?: boolean }) => Promise<void>;
+  /** Turns the preview tab at `path` into a normal tab. */
+  pin: (dir: string, path: string) => void;
   closeTab: (dir: string, path: string) => void;
   /** Closes several tabs at once (close others / to the right / saved / all). */
   closeTabs: (dir: string, paths: string[]) => void;
@@ -101,7 +112,19 @@ interface TabsState {
   toggleExpanded: (dir: string, folder: string, expanded?: boolean) => void;
 }
 
-const EMPTY: CollectionTabs = { tabs: [], active: null, expanded: [] };
+const EMPTY: CollectionTabs = { tabs: [], active: null, expanded: [], preview: null };
+
+/**
+ * Makes `path` the active tab. An untouched preview tab is closed when another tab becomes
+ * active, so browsing the sidebar doesn't pile up tabs.
+ */
+function activate(c: CollectionTabs, path: string | null): CollectionTabs {
+  const preview = c.preview ?? null;
+  if (preview === null || preview === path) return { ...c, active: path };
+  const previewTab = c.tabs.find((t) => t.path === preview);
+  if (previewTab && isDirty(previewTab)) return { ...c, active: path, preview: null };
+  return { ...c, tabs: c.tabs.filter((t) => t.path !== preview), active: path, preview: null };
+}
 
 /**
  * The kind of tab for a path: `""` is the collection, `*.yaml` a request, anything else a
@@ -231,18 +254,33 @@ export const useTabs = create<TabsState>((set, get) => {
   return {
     byCollection: {},
 
-    openTab: async (dir, path) => {
+    openTab: async (dir, path, options) => {
+      const preview = options?.preview === true;
       if (findTab(dir, path)) {
         get().setActive(dir, path);
+        if (!preview) get().pin(dir, path);
         return;
       }
       try {
         const tab = await loadTab(dir, path);
-        setCollection(dir, (c) => ({ ...c, tabs: [...c.tabs, tab], active: path }));
+        setCollection(dir, (c) => {
+          const old = c.preview ?? null;
+          const oldTab = c.tabs.find((t) => t.path === old);
+          if (preview && old !== null && oldTab && !isDirty(oldTab)) {
+            // The new preview takes the old preview's place in the tab bar.
+            const tabs = c.tabs.map((t) => (t.path === old ? tab : t));
+            return { ...c, tabs, active: path, preview: path };
+          }
+          const opened = activate({ ...c, tabs: [...c.tabs, tab] }, path);
+          return { ...opened, preview: preview ? path : (opened.preview ?? null) };
+        });
       } catch (e) {
         showError(e);
       }
     },
+
+    pin: (dir, path) =>
+      setCollection(dir, (c) => (c.preview === path ? { ...c, preview: null } : c)),
 
     closeTab: (dir, path) =>
       setCollection(dir, (c) => {
@@ -253,7 +291,8 @@ export const useTabs = create<TabsState>((set, get) => {
           // Activate the neighbour, like browsers do.
           active = tabs[Math.min(index, tabs.length - 1)]?.path ?? null;
         }
-        return { ...c, tabs, active };
+        const preview = c.preview === path ? null : (c.preview ?? null);
+        return { ...c, tabs, active, preview };
       }),
 
     closeTabs: (dir, paths) =>
@@ -271,7 +310,8 @@ export const useTabs = create<TabsState>((set, get) => {
             .find((t) => !closing.has(t.path));
           active = (after ?? before)?.path ?? null;
         }
-        return { ...c, tabs, active };
+        const preview = c.preview && closing.has(c.preview) ? null : (c.preview ?? null);
+        return { ...c, tabs, active, preview };
       }),
 
     applyRename: (dir, path, name) =>
@@ -289,11 +329,14 @@ export const useTabs = create<TabsState>((set, get) => {
     revert: (dir, path) =>
       updateTab(dir, path, (t) => ({ ...t, draft: t.original, conflict: null }) as DocumentTab),
 
-    setActive: (dir, path) => setCollection(dir, (c) => ({ ...c, active: path })),
+    setActive: (dir, path) => setCollection(dir, (c) => activate(c, path)),
 
-    updateDraft: (dir, path, update) =>
+    updateDraft: (dir, path, update) => {
       // `as never`: the caller chose `T` to match the tab at `path`; TS can't check that link.
-      updateTab(dir, path, (t) => ({ ...t, draft: update(t.draft as never) }) as DocumentTab),
+      updateTab(dir, path, (t) => ({ ...t, draft: update(t.draft as never) }) as DocumentTab);
+      // Editing a preview tab keeps it open.
+      get().pin(dir, path);
+    },
 
     save: async (dir, path) => {
       const tab = findTab(dir, path);
@@ -351,7 +394,12 @@ export const useTabs = create<TabsState>((set, get) => {
         const active = tabs.some((t) => t.path === state.activeTab)
           ? state.activeTab
           : (tabs[0]?.path ?? null);
-        setCollection(dir, () => ({ tabs, active, expanded: state.expandedFolders }));
+        setCollection(dir, () => ({
+          tabs,
+          active,
+          expanded: state.expandedFolders,
+          preview: null,
+        }));
       } catch (e) {
         showError(e);
       }
@@ -364,6 +412,7 @@ export const useTabs = create<TabsState>((set, get) => {
           tabs: c.tabs.map((t) => (isDocument(t) ? { ...t, path: rename(t.path) } : t)),
           active: c.active !== null ? rename(c.active) : null,
           expanded: c.expanded.map(rename),
+          preview: c.preview ? rename(c.preview) : null,
         };
       }),
 

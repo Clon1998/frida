@@ -24,6 +24,8 @@ const NO_TABS: Tab[] = [];
 export function TabBar({ dir }: { dir: string }) {
   const tabs = useTabs((s) => s.byCollection[dir]?.tabs) ?? NO_TABS;
   const active = useTabs((s) => s.byCollection[dir]?.active ?? null);
+  const preview = useTabs((s) => s.byCollection[dir]?.preview ?? null);
+  const pin = useTabs((s) => s.pin);
   const setActive = useTabs((s) => s.setActive);
   const closeTabs = useTabs((s) => s.closeTabs);
   const save = useTabs((s) => s.save);
@@ -75,6 +77,7 @@ export function TabBar({ dir }: { dir: string }) {
                 title={tab.path}
                 data-tab-path={tab.path}
                 onClick={() => setActive(dir, tab.path)}
+                onDoubleClick={() => pin(dir, tab.path)}
                 onAuxClick={(e) => {
                   if (e.button === 1) requestClose([tab.path]);
                 }}
@@ -85,7 +88,16 @@ export function TabBar({ dir }: { dir: string }) {
                 )}
               >
                 <TabIcon tab={tab} />
-                <span className="truncate">{tabTitle(tab)}</span>
+                <span
+                  className={cn("truncate", tab.path === preview && "italic")}
+                  title={
+                    tab.path === preview
+                      ? "Preview: double-click or edit to keep it open"
+                      : undefined
+                  }
+                >
+                  {tabTitle(tab)}
+                </span>
                 <button
                   type="button"
                   aria-label="Close tab"

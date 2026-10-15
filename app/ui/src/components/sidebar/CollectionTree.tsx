@@ -227,12 +227,21 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
 
   // Like Bruno: clicking a folder opens its settings tab and expands/collapses it. The chevron
   // only expands/collapses.
+  // Single click opens a preview tab (replaced by the next single click); double click keeps
+  // the tab open, like Bruno, Postman and VS Code.
   const onClick = () => {
     if (node.kind === "folder") {
       toggleExpanded(dir, node.path);
-      void openTab(dir, node.path);
+      void openTab(dir, node.path, { preview: true });
     }
-    if (node.kind === "request") void openTab(dir, node.path);
+    if (node.kind === "request") void openTab(dir, node.path, { preview: true });
+  };
+  const onDoubleClick = () => {
+    if (node.kind === "folder") {
+      // Undo the second click's toggle, so a double click doesn't collapse the folder again.
+      toggleExpanded(dir, node.path, true);
+    }
+    if (node.kind !== "invalid") void openTab(dir, node.path);
   };
 
   return (
@@ -247,6 +256,7 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
             {...draggable.attributes}
             {...draggable.listeners}
             onClick={onClick}
+            onDoubleClick={onDoubleClick}
             style={{ paddingLeft: 8 + depth * 14 }}
             className={cn(
               "group flex h-7 cursor-default items-center gap-1.5 pr-2 select-none hover:bg-accent",

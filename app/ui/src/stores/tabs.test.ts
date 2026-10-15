@@ -81,3 +81,44 @@ describe("closing several tabs", () => {
     expect(state()?.active).toBeNull();
   });
 });
+
+describe("preview tabs", () => {
+  beforeEach(() => {
+    useTabs.setState({ byCollection: {} });
+    // Every folder tab reads the same folder document; good enough for tab bookkeeping.
+    mockIPC((cmd) => (cmd === "read_folder" ? folder : null));
+  });
+  afterEach(() => clearMocks());
+  const state = () => useTabs.getState().byCollection["/col"];
+  const paths = () => state()?.tabs.map((t) => t.path);
+
+  it("replaces the preview tab on the next single click", async () => {
+    await useTabs.getState().openTab("/col", "a", { preview: true });
+    await useTabs.getState().openTab("/col", "b", { preview: true });
+    expect(paths()).toEqual(["b"]);
+    expect(state()?.preview).toBe("b");
+  });
+
+  it("keeps pinned tabs and pins on double click", async () => {
+    await useTabs.getState().openTab("/col", "a");
+    await useTabs.getState().openTab("/col", "b", { preview: true });
+    await useTabs.getState().openTab("/col", "b"); // double click
+    await useTabs.getState().openTab("/col", "c", { preview: true });
+    expect(paths()).toEqual(["a", "b", "c"]);
+  });
+
+  it("closes an untouched preview when another tab is activated", async () => {
+    await useTabs.getState().openTab("/col", "a");
+    await useTabs.getState().openTab("/col", "b", { preview: true });
+    useTabs.getState().setActive("/col", "a");
+    expect(paths()).toEqual(["a"]);
+  });
+
+  it("editing a preview tab pins it", async () => {
+    await useTabs.getState().openTab("/col", "a");
+    await useTabs.getState().openTab("/col", "b", { preview: true });
+    useTabs.getState().updateDraft<FolderTab>("/col", "b", (f) => ({ ...f, docs: "edited" }));
+    useTabs.getState().setActive("/col", "a");
+    expect(paths()).toEqual(["a", "b"]);
+  });
+});

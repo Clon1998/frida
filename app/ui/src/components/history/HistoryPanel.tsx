@@ -78,7 +78,8 @@ export function HistoryPanel({ dir }: { dir: string }) {
           <button
             key={e.id}
             type="button"
-            onClick={() => void openTab(dir, `${HISTORY_TAB_PREFIX}${e.id}`)}
+            onClick={() => void openTab(dir, `${HISTORY_TAB_PREFIX}${e.id}`, { preview: true })}
+            onDoubleClick={() => void openTab(dir, `${HISTORY_TAB_PREFIX}${e.id}`)}
             className="flex w-full flex-col gap-0.5 px-3 py-1.5 text-left hover:bg-accent"
           >
             <span className="flex items-center gap-2">
