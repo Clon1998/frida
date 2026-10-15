@@ -10,10 +10,6 @@ describe("App", () => {
       addEventListener: () => {},
       removeEventListener: () => {},
     }));
-    // Pretend to be the Rust side of the `get_about_info` command.
-    mockIPC((cmd) => {
-      if (cmd === "get_about_info") return { productName: "Frida", coreVersion: "9.9.9" };
-    });
   });
 
   afterEach(() => {
@@ -22,9 +18,19 @@ describe("App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the core version returned by the backend", async () => {
+  it("shows the start screen with recent workspaces when none is open", async () => {
+    // Pretend to be the Rust side of the `get_settings` command.
+    mockIPC((cmd) => {
+      if (cmd === "get_settings") return { recentWorkspaces: ["/work/eip"], theme: "system" };
+    });
     render(<App />);
-    const about = await screen.findByTestId("about");
-    expect(about.textContent).toBe("Frida core v9.9.9");
+    expect(screen.getByText("New workspace…")).toBeTruthy();
+    expect(await screen.findByText("/work/eip")).toBeTruthy();
+  });
+
+  it("renders before settings have loaded", () => {
+    mockIPC(() => new Promise(() => {})); // never resolves
+    render(<App />);
+    expect(screen.getByText("Open workspace…")).toBeTruthy();
   });
 });

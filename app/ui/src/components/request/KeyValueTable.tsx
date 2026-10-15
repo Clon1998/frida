@@ -1,0 +1,78 @@
+import { Trash2 } from "lucide-react";
+import type { KeyValue as RawKeyValue } from "@/bindings";
+import type { Complete } from "@/lib/model";
+
+type KeyValue = Complete<RawKeyValue>;
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+
+interface KeyValueTableProps {
+  rows: KeyValue[];
+  onChange: (rows: KeyValue[]) => void;
+  namePlaceholder?: string;
+  valuePlaceholder?: string;
+}
+
+/**
+ * Editable `name | value` rows with an enabled checkbox. Typing into the empty last row adds a
+ * new row, so there is no separate "Add" button.
+ */
+export function KeyValueTable({
+  rows,
+  onChange,
+  namePlaceholder = "Name",
+  valuePlaceholder = "Value",
+}: KeyValueTableProps) {
+  const update = (index: number, patch: Partial<KeyValue>) => {
+    if (index === rows.length) {
+      onChange([...rows, { name: "", value: "", enabled: true, ...patch }]);
+    } else {
+      onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    }
+  };
+  const remove = (index: number) => onChange(rows.filter((_, i) => i !== index));
+
+  // One extra, empty row at the end for adding.
+  const shown = [...rows, { name: "", value: "", enabled: true }];
+
+  return (
+    <div className="flex flex-col gap-1">
+      {shown.map((row, index) => {
+        const isNew = index === rows.length;
+        return (
+          <div key={index} className="flex items-center gap-2">
+            <Checkbox
+              checked={row.enabled}
+              disabled={isNew}
+              onCheckedChange={(checked) => update(index, { enabled: checked === true })}
+              aria-label="Enabled"
+            />
+            <Input
+              className="h-8 font-mono text-xs"
+              placeholder={namePlaceholder}
+              value={row.name}
+              onChange={(e) => update(index, { name: e.target.value })}
+            />
+            <Input
+              className="h-8 font-mono text-xs"
+              placeholder={valuePlaceholder}
+              value={row.value}
+              onChange={(e) => update(index, { value: e.target.value })}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0"
+              disabled={isNew}
+              onClick={() => remove(index)}
+              aria-label="Remove row"
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
