@@ -56,6 +56,8 @@ getrandom = "0.4.3"
 sha2 = "0.11.1"
 reqwest_cookie_store = "0.10.0"
 cookie_store = "0.22.1"
+shell-words = "1.1.1"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 
 # Rust <-> TypeScript type generation. The Tauri 2 compatible line of tauri-specta is still a
 # release candidate, and it requires an *exact* specta version, so both are pinned with `=`.

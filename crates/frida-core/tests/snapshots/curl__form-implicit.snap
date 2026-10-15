@@ -1,0 +1,39 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: POST /login
+seq: 0
+method: POST
+url: https://example.com/login
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: form-urlencoded
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded:
+  - name: user
+    value: alice
+    enabled: true
+  - name: pass
+    value: s&cret
+    enabled: true
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: []

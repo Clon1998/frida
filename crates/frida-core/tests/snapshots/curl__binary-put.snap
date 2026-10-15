@@ -1,0 +1,33 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: PUT /files/data.bin
+seq: 0
+method: PUT
+url: https://example.com/files/data.bin
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: binary
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: data.bin
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: []

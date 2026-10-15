@@ -1,0 +1,4 @@
+curl 'https://api.example.com/v2/orders?status=open&limit=10' \
+  -H 'Accept: application/json' \
+  -H 'X-Correlation-Id: 123e4567' \
+  --compressed -sSL

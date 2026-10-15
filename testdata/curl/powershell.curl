@@ -1,0 +1,2 @@
+curl.exe -X DELETE 'https://api.example.com/orders/42' `
+  -H 'X-Reason: duplicate'

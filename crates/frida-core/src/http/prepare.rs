@@ -89,7 +89,7 @@ pub fn prepare(ctx: RequestContext<'_>, request: &Request) -> Result<PreparedReq
 }
 
 /// Adds `http://` when the user typed `localhost:3000/x` without a scheme, like most clients do.
-fn normalize_url(url: &str) -> String {
+pub(crate) fn normalize_url(url: &str) -> String {
     let url = url.trim();
     if url.contains("://") {
         url.to_string()
@@ -100,7 +100,7 @@ fn normalize_url(url: &str) -> String {
 
 /// Replaces `:name` path segments with the request's path param values.
 /// Only the path is touched, never the host (`localhost:8080`) or the query string.
-fn apply_path_params(url: &str, request: &Request) -> String {
+pub(crate) fn apply_path_params(url: &str, request: &Request) -> String {
     if request.params.path.is_empty() {
         return url.to_string();
     }
@@ -135,7 +135,7 @@ fn apply_path_params(url: &str, request: &Request) -> String {
 
 /// Merges headers collection → folders (outermost first) → request. A later definition of the
 /// same name (case-insensitive) replaces the earlier one. Disabled rows are skipped.
-fn merge_headers(ctx: RequestContext<'_>, request: &Request) -> Vec<(String, String)> {
+pub(crate) fn merge_headers(ctx: RequestContext<'_>, request: &Request) -> Vec<(String, String)> {
     let layers = std::iter::once(&ctx.collection.headers)
         .chain(ctx.folders.iter().map(|f| &f.headers))
         .chain(std::iter::once(&request.headers));

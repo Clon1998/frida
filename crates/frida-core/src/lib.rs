@@ -6,8 +6,10 @@
 
 mod about;
 pub mod auth;
+pub mod codegen;
 pub mod error;
 pub mod http;
+pub mod import;
 pub mod local_state;
 pub mod model;
 pub mod secrets;

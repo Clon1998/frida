@@ -1,0 +1,44 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: GET /me
+seq: 0
+method: GET
+url: https://example.com/me
+params:
+  query: []
+  path: []
+headers:
+- name: Cookie
+  value: session=abc; theme=dark
+  enabled: true
+- name: User-Agent
+  value: Frida/0.1
+  enabled: true
+- name: Referer
+  value: https://example.com/
+  enabled: true
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: [
+    "ignored unsupported option --unknown-flag",
+]

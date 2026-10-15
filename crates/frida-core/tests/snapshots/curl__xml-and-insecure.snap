@@ -1,0 +1,38 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: PATCH /soap
+seq: 0
+method: PATCH
+url: https://localhost:8443/soap
+params:
+  query: []
+  path: []
+headers:
+- name: Content-Type
+  value: text/xml
+  enabled: true
+body:
+  mode: xml
+  json: ""
+  xml: <order id="1"/>
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: [
+    "-k: TLS verification is a collection setting in Frida (Collection settings → TLS)",
+]

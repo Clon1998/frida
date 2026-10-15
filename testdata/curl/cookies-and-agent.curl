@@ -1,0 +1,1 @@
+curl https://example.com/me -b 'session=abc; theme=dark' -A 'Frida/0.1' -e https://example.com/ -o out.json --unknown-flag

@@ -1,0 +1,4 @@
+curl https://auth.example.com/oauth/token \
+  -u 'my-client:my-secret' \
+  --data-urlencode 'grant_type=client_credentials' \
+  --data-urlencode 'scope=orders/read orders/write'

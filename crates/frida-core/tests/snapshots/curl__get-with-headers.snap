@@ -1,0 +1,45 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: GET /v2/orders
+seq: 0
+method: GET
+url: https://api.example.com/v2/orders?status=open&limit=10
+params:
+  query:
+  - name: status
+    value: open
+    enabled: true
+  - name: limit
+    value: "10"
+    enabled: true
+  path: []
+headers:
+- name: Accept
+  value: application/json
+  enabled: true
+- name: X-Correlation-Id
+  value: "123e4567"
+  enabled: true
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: []

@@ -1,0 +1,39 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: GET /search
+seq: 0
+method: GET
+url: https://example.com/search?q=rust&page=2
+params:
+  query:
+  - name: q
+    value: rust
+    enabled: true
+  - name: page
+    value: "2"
+    enabled: true
+  path: []
+headers: []
+body:
+  mode: none
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: 5000
+docs: ""
+
+warnings: []

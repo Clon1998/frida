@@ -1,0 +1,1 @@
+curl -k -X PATCH 'https://localhost:8443/soap' -H 'Content-Type: text/xml' --data-raw '<order id="1"/>'

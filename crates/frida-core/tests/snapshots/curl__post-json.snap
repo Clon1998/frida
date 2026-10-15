@@ -1,0 +1,36 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: POST /orders
+seq: 0
+method: POST
+url: https://api.example.com/orders
+params:
+  query: []
+  path: []
+headers:
+- name: Authorization
+  value: Bearer eyJhbGciOi.payload.sig
+  enabled: true
+body:
+  mode: json
+  json: "{\"item\":\"book\",\"quantity\":2,\"note\":\"it's urgent\"}"
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: []

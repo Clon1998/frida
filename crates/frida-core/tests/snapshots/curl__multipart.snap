@@ -1,0 +1,41 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: POST /upload
+seq: 0
+method: POST
+url: https://example.com/upload
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: multipart
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded: []
+  multipart:
+  - name: note
+    type: text
+    value: hello
+    enabled: true
+  - name: file
+    type: file
+    value: ./report.pdf
+    enabled: true
+  binaryPath: ""
+auth:
+  mode: inherit
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: []

@@ -16,6 +16,8 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 reqwest = { workspace = true }
 reqwest_cookie_store = { workspace = true }
+shell-words = { workspace = true }
+rusqlite = { workspace = true }
 cookie_store = { workspace = true }
 frida-secrets = { workspace = true }
 sha2 = { workspace = true }

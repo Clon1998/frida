@@ -163,6 +163,15 @@ impl OAuth2Manager {
         Ok(self.store(TokenKey::of(config), fresh))
     }
 
+    /// The cached, unexpired token for `config`, without fetching (used by curl export).
+    pub fn cached(&self, config: &OAuth2Config) -> Option<Token> {
+        let tokens = self.tokens.lock().expect("token cache lock");
+        tokens
+            .get(&TokenKey::of(config))
+            .filter(|t| t.expires_at.is_none_or(|at| at > SystemTime::now()))
+            .cloned()
+    }
+
     /// All cached tokens, for the token viewer.
     pub fn list(&self) -> Vec<TokenInfo> {
         let tokens = self.tokens.lock().expect("token cache lock");

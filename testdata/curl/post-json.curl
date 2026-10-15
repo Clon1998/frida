@@ -1,0 +1,4 @@
+curl -X POST https://api.example.com/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOi.payload.sig" \
+  -d '{"item":"book","quantity":2,"note":"it'\''s urgent"}'

@@ -1,0 +1,1 @@
+curl -F 'note=hello' -F 'file=@./report.pdf;type=application/pdf' https://example.com/upload

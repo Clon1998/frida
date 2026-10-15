@@ -1,0 +1,43 @@
+---
+source: crates/frida-core/tests/curl.rs
+expression: snapshot
+---
+version: 1
+name: POST /oauth/token
+seq: 0
+method: POST
+url: https://auth.example.com/oauth/token
+params:
+  query: []
+  path: []
+headers: []
+body:
+  mode: form-urlencoded
+  json: ""
+  xml: ""
+  text: ""
+  formUrlEncoded:
+  - name: grant_type
+    value: client_credentials
+    enabled: true
+  - name: scope
+    value: orders/read orders/write
+    enabled: true
+  multipart: []
+  binaryPath: ""
+auth:
+  mode: custom
+  schemes:
+  - type: basic
+    username: my-client
+    password: my-secret
+vars: []
+scripts:
+  pre: ""
+  post: ""
+tests: ""
+settings:
+  timeoutMs: null
+docs: ""
+
+warnings: []
