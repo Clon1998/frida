@@ -1,12 +1,10 @@
-import { ChevronDown, Layers, Settings } from "lucide-react";
+import { Check, ChevronDown, Layers, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -48,23 +46,19 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
         <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground">
           {kind === "collection" ? "Collection" : "Global"}
         </DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={active ?? NONE}
-          onValueChange={(value) => void select(scopeOf(kind, dir), value === NONE ? null : value)}
-        >
-          <DropdownMenuRadioItem value={NONE}>No environment</DropdownMenuRadioItem>
-          {entries.map((e) => (
-            <DropdownMenuRadioItem key={e.environment.name} value={e.environment.name}>
-              <span
-                className={cn(
-                  "size-2 shrink-0 rounded-full",
-                  envColor(e.environment.color)?.dot ?? "border",
-                )}
-              />
-              {e.environment.name}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        {[null, ...entries.map((e) => e.environment)].map((env) => {
+          const name = env?.name ?? null;
+          return (
+            <DropdownMenuItem
+              key={name ?? NONE}
+              onSelect={() => void select(scopeOf(kind, dir), name)}
+            >
+              <EnvDot color={env?.color ?? null} />
+              <span className="flex-1 truncate">{name ?? "No environment"}</span>
+              {active === name && <Check className="size-4" />}
+            </DropdownMenuItem>
+          );
+        })}
         <DropdownMenuItem className="text-muted-foreground" onSelect={() => configure(kind)}>
           <Settings /> Configure {kind === "collection" ? "collection" : "global"} environments…
         </DropdownMenuItem>
@@ -92,5 +86,18 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
         {section("global")}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** The environment's color, or a hollow ring when it has none, so names line up. */
+function EnvDot({ color }: { color: string | null }) {
+  const c = envColor(color);
+  return (
+    <span
+      className={cn(
+        "size-2.5 shrink-0 rounded-full",
+        c ? c.dot : "border border-muted-foreground/60",
+      )}
+    />
   );
 }

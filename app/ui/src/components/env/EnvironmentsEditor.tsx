@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
+import { Ban, Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { commands, type EnvScope } from "@/bindings";
@@ -81,7 +81,7 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
                   <span
                     className={cn(
                       "size-2 shrink-0 rounded-full",
-                      envColor(e.environment.color)?.dot ?? "border",
+                      envColor(e.environment.color)?.dot ?? "border border-muted-foreground/60",
                     )}
                   />
                   <span className="truncate">{e.environment.name}</span>
@@ -264,10 +264,12 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
               aria-label="No color"
               onClick={() => setDraft((d) => ({ ...d, color: null }))}
               className={cn(
-                "size-5 rounded-full border border-dashed",
-                draft.color === null && "ring-2 ring-ring ring-offset-1",
+                "flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground",
+                draft.color === null && "text-foreground ring-2 ring-ring ring-offset-1",
               )}
-            />
+            >
+              <Ban className="size-5" />
+            </button>
             {ENV_COLORS.map((c) => (
               <button
                 key={c.name}
