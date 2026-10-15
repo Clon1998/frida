@@ -7,6 +7,7 @@
 mod about;
 pub mod error;
 pub mod model;
+pub mod storage;
 pub mod yaml;
 
 pub use about::{AboutInfo, about};
