@@ -1613,6 +1613,12 @@ dependencies = [
 [[package]]
 name = "frida-git"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "specta",
+ "tempfile",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "frida-http"
