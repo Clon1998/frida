@@ -1,7 +1,15 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FolderModel } from "@/lib/model";
-import { type FolderTab, isDirty, kindOf, useTabs } from "./tabs";
+import { useEnvs } from "./envs";
+import {
+  type CollectionTab,
+  ENVIRONMENTS_TAB,
+  type FolderTab,
+  isDirty,
+  kindOf,
+  useTabs,
+} from "./tabs";
 
 const folder: FolderModel = {
   version: 1,
@@ -136,5 +144,51 @@ describe("preview tabs and no-op updates", () => {
     expect(useTabs.getState().byCollection["/col"]?.preview).toBe("a");
     await useTabs.getState().openTab("/col", "b", { preview: true });
     expect(useTabs.getState().byCollection["/col"]?.tabs.map((t) => t.path)).toEqual(["b"]);
+  });
+});
+
+describe("unsaved indicators", () => {
+  afterEach(() => {
+    clearMocks();
+    useEnvs.setState({ editorDrafts: {} });
+  });
+
+  it("marks the collection tab dirty after an edit", async () => {
+    const collection = {
+      version: 1,
+      id: "0d6c2a4e-8f1b-4c3d-9e5a-7b8c9d0e1f2a",
+      name: "API",
+      vars: [],
+      headers: [],
+      auth: { mode: "none" },
+      scripts: { pre: "", post: "" },
+      tests: "",
+      settings: { timeoutMs: 30000, tls: { verify: true, caCertPaths: [] } },
+      docs: "",
+    };
+    mockIPC((cmd) => (cmd === "read_collection" ? collection : null));
+    useTabs.setState({ byCollection: {} });
+    await useTabs.getState().openTab("/col", "");
+    const tab = () => useTabs.getState().byCollection["/col"]?.tabs[0] as CollectionTab;
+    expect(isDirty(tab())).toBe(false);
+    useTabs.getState().updateDraft<CollectionTab>("/col", "", (c) => ({ ...c, docs: "x" }));
+    expect(isDirty(tab())).toBe(true);
+  });
+
+  it("marks the environments tab dirty while the editor has unsaved edits", () => {
+    const envTab = { kind: "environments", path: ENVIRONMENTS_TAB } as const;
+    expect(isDirty(envTab)).toBe(false);
+    useEnvs.getState().setEditorDraft("k", {
+      draft: { version: 1, name: "dev", color: null, variables: [] },
+      pending: {},
+    });
+    expect(isDirty(envTab)).toBe(true);
+    useTabs.setState({
+      byCollection: {
+        "/col": { tabs: [envTab], active: envTab.path, expanded: [], preview: null },
+      },
+    });
+    useTabs.getState().closeTabs("/col", [ENVIRONMENTS_TAB]);
+    expect(isDirty(envTab)).toBe(false);
   });
 });

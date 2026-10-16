@@ -17,13 +17,23 @@ import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { showError, unwrap } from "@/lib/api";
 import { forDisk, secretOps } from "@/lib/envs";
-import { type EnvEntry, type EnvModel, type EnvVar, scopeOf, useEnvs } from "@/stores/envs";
+import {
+  type EnvDraft,
+  type EnvEntry,
+  type EnvModel,
+  type EnvVar,
+  envDraftKey,
+  scopeOf,
+  useEnvs,
+} from "@/stores/envs";
 import { useSubTab } from "@/stores/subTabs";
 import { useActiveCollection } from "@/stores/workspace";
 import { ENV_COLORS, envColor } from "@/lib/envColors";
 import { cn } from "cn";
 
 type ScopeKind = "global" | "collection";
+
+const NO_PENDING: Record<string, string> = {};
 
 /**
  * The environment editor tab (PLAN.md §14): global and collection environments, their
@@ -40,6 +50,7 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
   const setSelected = (name: string | null) => setSelectedIn(kind, name);
   const [creating, setCreating] = useState(false);
   const scope = scopeOf(kind, dir);
+  const drafts = useEnvs((s) => s.editorDrafts);
 
   // Keep a valid selection when the list or the scope changes.
   const current = entries.find((e) => e.environment.name === selected) ?? entries[0] ?? null;
@@ -107,6 +118,12 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
                         )}
                       />
                       <span className="truncate">{e.environment.name}</span>
+                      {drafts[envDraftKey(scope, e.environment.name)] && (
+                        <span
+                          className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground"
+                          title="Unsaved changes"
+                        />
+                      )}
                     </span>
                   </button>
                 </ContextMenuTrigger>
@@ -193,9 +210,37 @@ interface EnvFormProps {
 /** Edits one environment. Changes are kept here until "Save". */
 function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
   const original = entry.environment;
-  const [draft, setDraft] = useState<EnvModel>(original);
+  const draftKey = envDraftKey(scope, original.name);
+  const stored = useEnvs((s) => s.editorDrafts[draftKey]);
+  const setStored = useEnvs((s) => s.setEditorDraft);
+  const draft = stored?.draft ?? original;
   /** Secret values typed in this session, by variable name. */
-  const [pending, setPending] = useState<Record<string, string>>({});
+  const pending = stored?.pending ?? NO_PENDING;
+  /** Keeps an entry in the store only while something differs from the saved environment. */
+  const store = (next: EnvDraft) => {
+    const changed =
+      JSON.stringify(next.draft) !== JSON.stringify(original) ||
+      Object.keys(next.pending).length > 0;
+    setStored(draftKey, changed ? next : null);
+  };
+  const setDraft = (change: EnvModel | ((d: EnvModel) => EnvModel)) => {
+    const current = useEnvs.getState().editorDrafts[draftKey];
+    const base = current?.draft ?? original;
+    store({
+      draft: typeof change === "function" ? change(base) : change,
+      pending: current?.pending ?? {},
+    });
+  };
+  const setPending = (
+    change: Record<string, string> | ((p: Record<string, string>) => Record<string, string>),
+  ) => {
+    const current = useEnvs.getState().editorDrafts[draftKey];
+    const base = current?.pending ?? {};
+    store({
+      draft: current?.draft ?? original,
+      pending: typeof change === "function" ? change(base) : change,
+    });
+  };
   /** Secret values the user revealed, by variable name. */
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState(false);
@@ -244,7 +289,7 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
       for (const variable of ops.delete) {
         await unwrap(commands.deleteSecret(scope, cleaned.name, variable));
       }
-      setPending({});
+      setStored(draftKey, null);
       setRevealed({});
       if (cleaned.name !== original.name) onRenamed(cleaned.name);
       await useEnvs.getState().load(dir);
@@ -276,6 +321,7 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
   const remove = async () => {
     try {
       await unwrap(commands.deleteEnvironment(scope, original.name));
+      setStored(draftKey, null);
       await useEnvs.getState().load(dir);
     } catch (e) {
       showError(e);
@@ -342,8 +388,7 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
           size="sm"
           disabled={!dirty}
           onClick={() => {
-            setDraft(original);
-            setPending({});
+            setStored(draftKey, null);
           }}
         >
           Revert

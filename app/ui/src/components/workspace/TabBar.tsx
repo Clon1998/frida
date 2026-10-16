@@ -11,6 +11,7 @@ import {
 import { methodColor } from "@/lib/methods";
 import * as actions from "@/stores/actions";
 import { useDialogs } from "@/stores/dialogs";
+import { useEnvs } from "@/stores/envs";
 import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { cn } from "cn";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -25,6 +26,8 @@ export function TabBar({ dir }: { dir: string }) {
   const tabs = useTabs((s) => s.byCollection[dir]?.tabs) ?? NO_TABS;
   const active = useTabs((s) => s.byCollection[dir]?.active ?? null);
   const preview = useTabs((s) => s.byCollection[dir]?.preview ?? null);
+  // Re-render when the environment editor's unsaved state changes (its dot reads the store).
+  useEnvs((s) => s.editorDrafts);
   const pin = useTabs((s) => s.pin);
   const setActive = useTabs((s) => s.setActive);
   const closeTabs = useTabs((s) => s.closeTabs);

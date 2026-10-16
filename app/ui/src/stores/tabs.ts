@@ -4,6 +4,7 @@ import { showError, toApiError, unwrap } from "@/lib/api";
 import { type CollectionModel, type FolderModel, fromRust, type RequestModel } from "@/lib/model";
 import { isUnder } from "@/lib/tree";
 import { useDialogs } from "./dialogs";
+import { envEditorDirty, useEnvs } from "./envs";
 import { useWorkspace } from "./workspace";
 
 /** Fields every tab has: the document as saved on disk and as edited. */
@@ -140,7 +141,11 @@ export function kindOf(path: string): TabKind {
 export const isDocument = (tab: Tab): tab is DocumentTab =>
   tab.kind !== "environments" && tab.kind !== "history";
 
-export const isDirty = (tab: Tab) => isDocument(tab) && !same(tab.draft, tab.original);
+/** Unsaved changes: a document's draft differs, or the environment editor has edits. */
+export const isDirty = (tab: Tab) =>
+  tab.kind === "environments"
+    ? envEditorDirty(useEnvs.getState())
+    : isDocument(tab) && !same(tab.draft, tab.original);
 
 /** The name shown on the tab and in the header. */
 export const tabTitle = (tab: Tab) => {
@@ -295,7 +300,9 @@ export const useTabs = create<TabsState>((set, get) => {
         return { ...c, tabs, active, preview };
       }),
 
-    closeTabs: (dir, paths) =>
+    closeTabs: (dir, paths) => {
+      // Closing the environment editor discards its unsaved edits (after the confirmation).
+      if (paths.includes(ENVIRONMENTS_TAB)) useEnvs.getState().clearEditorDrafts();
       setCollection(dir, (c) => {
         const closing = new Set(paths);
         const tabs = c.tabs.filter((t) => !closing.has(t.path));
@@ -312,7 +319,8 @@ export const useTabs = create<TabsState>((set, get) => {
         }
         const preview = c.preview && closing.has(c.preview) ? null : (c.preview ?? null);
         return { ...c, tabs, active, preview };
-      }),
+      });
+    },
 
     applyRename: (dir, path, name) =>
       updateTab(

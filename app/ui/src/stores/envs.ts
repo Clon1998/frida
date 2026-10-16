@@ -65,10 +65,32 @@ interface EnvsState {
   editorSelected: { global: string | null; collection: string | null };
   setEditorSelected: (scope: "global" | "collection", name: string | null) => void;
 
+  /**
+   * Unsaved edits in the environment editor, by {@link envDraftKey}. In the store (not the
+   * form) so they survive switching tabs and so the tab bar can show the unsaved dot. Only
+   * environments with changes have an entry.
+   */
+  editorDrafts: Record<string, EnvDraft>;
+  /** Stores `draft` for `key`, or removes it when `null` (saved, reverted, discarded). */
+  setEditorDraft: (key: string, draft: EnvDraft | null) => void;
+  clearEditorDrafts: () => void;
+
   load: (dir: string) => Promise<void>;
   select: (scope: EnvScope, name: string | null) => Promise<void>;
   unlock: (password: string) => Promise<boolean>;
 }
+
+/** An environment being edited: the variables, plus secret values typed but not saved yet. */
+export interface EnvDraft {
+  draft: EnvModel;
+  pending: Record<string, string>;
+}
+
+export const envDraftKey = (scope: EnvScope, name: string) => `${JSON.stringify(scope)}:${name}`;
+
+/** Whether the environment editor has unsaved changes. */
+export const envEditorDirty = (s: Pick<EnvsState, "editorDrafts">) =>
+  Object.keys(s.editorDrafts).length > 0;
 
 export const scopeOf = (kind: "global" | "collection", dir: string): EnvScope =>
   kind === "global" ? { kind: "global" } : { kind: "collection", dir };
@@ -84,6 +106,13 @@ export const useEnvs = create<EnvsState>((set, get) => ({
   editorScope: "collection",
   setEditorScope: (editorScope) => set({ editorScope }),
   editorSelected: { global: null, collection: null },
+  editorDrafts: {},
+  setEditorDraft: (key, draft) =>
+    set((s) => {
+      const others = Object.fromEntries(Object.entries(s.editorDrafts).filter(([k]) => k !== key));
+      return { editorDrafts: draft ? { ...others, [key]: draft } : others };
+    }),
+  clearEditorDrafts: () => set({ editorDrafts: {} }),
   setEditorSelected: (scope, name) =>
     set((s) => ({ editorSelected: { ...s.editorSelected, [scope]: name } })),
 
