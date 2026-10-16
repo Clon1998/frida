@@ -12,6 +12,7 @@ pub mod history;
 pub mod http;
 pub mod import;
 pub mod local_state;
+mod mask;
 pub mod model;
 pub mod secrets;
 pub mod storage;

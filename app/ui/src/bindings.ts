@@ -157,6 +157,7 @@ export const commands = {
 
 /** Events */
 export const events = {
+	consoleLogged: makeEvent<ConsoleLogged>("console-logged"),
 	fsChanged: makeEvent<FsChanged>("fs-changed"),
 };
 
@@ -278,6 +279,47 @@ export type CollectionSummary = {
 	name: string,
 	/**  Why the collection couldn't be loaded, e.g. the folder was moved or deleted. */
 	error: string | null,
+};
+
+/**  A body as text. Binary bodies are summarized instead of shown. */
+export type ConsoleBody = {
+	text: string,
+	/**  The body was longer than [`MAX_CONSOLE_BODY`] and was cut. */
+	truncated: boolean,
+};
+
+export type ConsoleEntry = {
+	id: string,
+	timestamp: string,
+	requestName: string,
+	requestPath: string,
+	method: string,
+	url: string,
+	requestHeaders: KeyValue[],
+	requestBody: ConsoleBody | null,
+	/**  `None` when there was no response (see `error`). */
+	response: ConsoleResponse | null,
+	error: string | null,
+};
+
+/**
+ *  Emitted after every send (successful or not): the raw request and response for the console.
+ *  Secret values are already masked.
+ */
+export type ConsoleLogged = {
+	entry: ConsoleEntry,
+};
+
+export type ConsoleResponse = {
+	httpVersion: string,
+	status: number,
+	statusText: string,
+	headers: KeyValue[],
+	body: ConsoleBody | null,
+	timeMs: number,
+	sizeBytes: number,
+	/**  The URL after redirects. */
+	finalUrl: string,
 };
 
 /**  One cookie as the cookie viewer shows it. */

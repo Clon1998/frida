@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 
 use frida_core::auth::TokenInfo;
 use frida_core::history::NewEntry;
-use frida_core::http::{self, ExecuteInput, ResponseView};
+use frida_core::http::{self, ConsoleEntry, ExecuteInput, ResponseView};
+use tauri_specta::Event;
+
+use crate::ConsoleLogged;
 use frida_core::model::{Environment, Request};
 use frida_core::secrets;
 use frida_core::storage;
@@ -61,6 +64,7 @@ pub(crate) async fn load_active_envs(
 #[tauri::command]
 #[specta::specta]
 pub async fn send_request(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     request_id: String,
     dir: String,
@@ -96,6 +100,7 @@ pub async fn send_request(
         .remove(&request_id);
 
     record_history(&state, &root, &path, &request, &result);
+    log_to_console(&app, &request_id, &path, &request, &result);
     let response = result?.response;
     let id = uuid::Uuid::new_v4().to_string();
     let view = ResponseView::new(id.clone(), &response);
@@ -110,6 +115,39 @@ pub async fn send_request(
         "response received"
     );
     Ok(view)
+}
+
+/// Sends the raw request and response (or the error) to the console panel.
+fn log_to_console(
+    app: &tauri::AppHandle,
+    request_id: &str,
+    path: &str,
+    request: &Request,
+    result: &Result<http::Executed, frida_core::CoreError>,
+) {
+    let entry = match result {
+        Ok(executed) => ConsoleEntry::from_send(
+            request_id.to_string(),
+            &request.name,
+            path,
+            &executed.sent,
+            Ok(&executed.response),
+            &executed.sensitive,
+        ),
+        // Not sent (invalid URL, auth failed, cancelled, ...): show it as typed, which contains
+        // `{{placeholders}}` rather than secret values.
+        Err(err) => ConsoleEntry::not_sent(
+            request_id.to_string(),
+            &request.name,
+            path,
+            &request.method,
+            &request.url,
+            err.to_string(),
+        ),
+    };
+    if let Err(err) = (ConsoleLogged { entry }).emit(app) {
+        tracing::warn!(%err, "could not emit console entry");
+    }
 }
 
 /// Writes a history entry in the background, so the response isn't delayed. Cancelled requests

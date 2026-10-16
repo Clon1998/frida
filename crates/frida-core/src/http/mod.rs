@@ -1,11 +1,13 @@
 //! HTTP execution (PLAN.md §7): prepare a request, send it, and present the response.
 
+mod console;
 mod cookies;
 mod execute;
 mod prepare;
 mod send;
 mod view;
 
+pub use console::{ConsoleBody, ConsoleEntry, ConsoleResponse, MAX_CONSOLE_BODY};
 pub use cookies::{CookieJar, CookieView, clear_cookies, list_cookies};
 pub use execute::{ExecuteInput, Executed, execute, export_curl, fetch_tokens, inspect};
 pub use prepare::{

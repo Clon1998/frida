@@ -23,6 +23,8 @@ pub struct HttpResponse {
     pub elapsed: Duration,
     /// The URL after redirects.
     pub final_url: String,
+    /// e.g. `HTTP/1.1` or `HTTP/2.0`, for the console's status line.
+    pub http_version: String,
 }
 
 /// Why sending failed. Each variant maps to a clear message in the UI.
@@ -100,6 +102,8 @@ async fn send_inner(
 
     let status = response.status();
     let final_url = response.url().to_string();
+    // `Version`'s Debug output is already the protocol name, e.g. "HTTP/1.1".
+    let http_version = format!("{:?}", response.version());
     let headers = response
         .headers()
         .iter()
@@ -123,6 +127,7 @@ async fn send_inner(
         body,
         elapsed: started.elapsed(),
         final_url,
+        http_version,
     })
 }
 

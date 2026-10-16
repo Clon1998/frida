@@ -16,6 +16,7 @@ use specta::Type;
 
 use crate::error::{CoreError, Result};
 use crate::http::{HttpResponse, PreparedBody, PreparedRequest, ResponseView};
+use crate::mask::Masker;
 use crate::model::KeyValue;
 use crate::vars::iso_timestamp;
 
@@ -23,8 +24,6 @@ use crate::vars::iso_timestamp;
 pub const MAX_STORED_BODY: usize = 1024 * 1024;
 /// Default number of entries kept (PLAN.md §13; configurable).
 pub const DEFAULT_RETENTION: usize = 500;
-
-const MASK: &str = "***";
 
 /// One send, ready to be stored. Built with [`NewEntry::from_send`].
 pub struct NewEntry {
@@ -325,6 +324,7 @@ impl HistoryStore {
                 body: response_body.unwrap_or_default(),
                 elapsed: Duration::from_millis(u64::from(summary.time_ms.unwrap_or(0))),
                 final_url: final_url.unwrap_or_default(),
+                http_version: "HTTP/1.1".into(),
             };
             ResponseView::new(format!("history-{}", summary.id), &http)
         });
@@ -374,42 +374,6 @@ fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistorySummary>
     })
 }
 
-/// Replaces known secret values with `***` in text and in UTF-8 bodies.
-struct Masker {
-    /// Longest first, so a secret containing another one is masked as a whole.
-    secrets: Vec<String>,
-}
-
-impl Masker {
-    fn new(sensitive: &[String]) -> Self {
-        let mut secrets: Vec<String> = sensitive
-            .iter()
-            .filter(|s| !s.is_empty())
-            .cloned()
-            .collect();
-        secrets.sort_by_key(|s| std::cmp::Reverse(s.len()));
-        secrets.dedup();
-        Self { secrets }
-    }
-
-    fn text(&self, text: &str) -> String {
-        let mut out = text.to_string();
-        for secret in &self.secrets {
-            out = out.replace(secret.as_str(), MASK);
-        }
-        out
-    }
-
-    /// Text bodies are masked; binary bodies are stored as they are (a secret could only be
-    /// found in them by accident, and replacing bytes would corrupt them).
-    fn bytes(&self, bytes: &[u8]) -> Vec<u8> {
-        match std::str::from_utf8(bytes) {
-            Ok(text) => self.text(text).into_bytes(),
-            Err(_) => bytes.to_vec(),
-        }
-    }
-}
-
 fn cap(bytes: &[u8]) -> (Vec<u8>, bool) {
     if bytes.len() > MAX_STORED_BODY {
         (bytes[..MAX_STORED_BODY].to_vec(), true)
@@ -453,6 +417,7 @@ mod tests {
             body: body.as_bytes().to_vec(),
             elapsed: Duration::from_millis(42),
             final_url: "http://x/".into(),
+            http_version: "HTTP/1.1".into(),
         }
     }
 
