@@ -1,5 +1,31 @@
 # Changelog
 
+## M8: AWS (2026-10-16)
+
+### What was built
+- **Secrets Manager** (`crates/frida-secrets/src/aws.rs`): profiles from `~/.aws/config` and `credentials` (SSO
+  marked), `GetSecretValue` with the chosen profile and optional region, JSON key picking, a 15-minute in-memory
+  cache with "refresh secrets", and actionable errors (expired SSO → `aws sso login --profile X`).
+- **Pipeline** (`crates/frida-core/src/secrets.rs` `fill_aws_secrets`): AWS-backed secret variables are filled when
+  sending (cache only while inspecting); a missing profile becomes a clear "choose a profile" error.
+- **UI**: a source column (Keychain / AWS: secret id, JSON key, region) for secrets, the AWS profile picker and
+  "Refresh secrets" in the environment editor, a profile prompt on first use that resends afterwards, the login
+  command with a copy button in send errors, and the Cognito preset in the OAuth2 editor.
+
+### Rust things worth understanding in this milestone
+1. **Testing around an SDK with a trait** (`SecretFetcher` in `aws.rs`). The real `SdkFetcher` and the tests'
+   fake implement the same trait; `AwsSecrets` holds an `Arc<dyn SecretFetcher>`, like injecting an interface in
+   Spring and passing a mock in tests.
+2. **Not holding a lock across `.await`** (`AwsSecrets::get`). The cache is read, the lock dropped, AWS awaited, then
+   the lock taken again to store the value: holding a `std::sync::Mutex` guard over an await could block a runtime
+   thread (and the guard isn't `Send`).
+3. **Closures vs. borrows** (`profile_index` in `aws.rs`). A closure that pushes into `profiles` borrows it mutably
+   for as long as the closure lives, so the loop couldn't touch `profiles` itself; a plain function taking
+   `&mut Vec` borrows only for each call.
+4. **Error enums with data for the UI** (`CoreError::AwsProfileRequired`, `ApiError.aws`). The error carries the
+   environment name and a fix command, so the UI can act on it instead of parsing message text.
+
+
 ## M7: Git panel (2026-10-16)
 
 ### What was built

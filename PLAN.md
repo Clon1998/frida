@@ -551,10 +551,14 @@ unstage, diff, commit, push, fetch, ff-pull, refused diverged pull, blocked swit
 `git init`). Destructive commands are refused by an allowlist (`crates/frida-git/src/run.rs`, unit-tested).*
 
 ### M8: AWS
-- [ ] Profile discovery, profile mapping per env, the Secrets Manager provider, TTL caching and a refresh action. Actionable SSO errors.
-- [ ] Cognito OAuth2 preset.
+- [x] Profile discovery, profile mapping per env, the Secrets Manager provider, TTL caching and a refresh action. Actionable SSO errors.
+- [x] Cognito OAuth2 preset.
 
 **Acceptance:** unit tests run with a mocked SDK client (or a localstack-style test if feasible), and the UI flow prompts for a profile on first use.
+*Status 2026-10-16: done (automated): `crates/frida-secrets/src/aws.rs` (fake fetcher: cache/TTL/refresh, JSON keys,
+error classification, profile parsing), `crates/frida-core/tests/aws.rs` (filling AWS secrets, missing profile,
+expired SSO), `app/ui/src/components/env/AwsProfileDialog.test.tsx` (first send asks for a profile, saves it and
+sends again). Not tested against real AWS here.*
 
 ### M9: Bruno import
 - [x] §11.2. (Done before M7, see the decisions log.)
@@ -724,6 +728,15 @@ Deviations from and clarifications of this plan, newest last.
   `origin/<branch>`. Branch switching is refused while *tracked* files have changes (untracked files don't block).
   The status bar shows branch, changed files and ahead/behind; it refreshes on file changes and window focus
   (the watcher ignores `.git`). Diffs open in a dialog with a simple diff highlighter.
+
+- **2026-10-16 AWS (M8).** The SDK sits behind a `SecretFetcher` trait (`frida-secrets::aws`) so tests use a fake.
+  The profile per environment is local state (collection state / app settings), never the shared file. Sending
+  fetches AWS secrets that aren't cached; the inspector (and curl export) only reads the cache, so typing never
+  calls AWS. An environment with AWS secrets but no profile fails the send with `aws_profile_required`; the UI asks
+  for a profile and sends again. Errors carry the environment and, for expired SSO, the `aws sso login --profile X`
+  command (copy button). Profiles are parsed from the INI files (`AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE`
+  respected). The Cognito preset is a UI helper that fills token/auth URLs from domain + region (stored only as
+  `preset: cognito` and the URLs). Added crates: aws-config, aws-sdk-secretsmanager (planned in §2).
 
 ## 17. Testing strategy
 
