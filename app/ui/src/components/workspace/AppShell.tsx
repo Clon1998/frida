@@ -36,7 +36,6 @@ export function AppShell() {
   const setInspectorOpen = useUi((s) => s.setInspectorOpen);
   const report = useUi((s) => s.report);
   const consoleOpen = useConsole((s) => s.open);
-  const consoleUnseen = useConsole((s) => s.entries.length - s.seen);
   const toggleConsole = useConsole((s) => s.toggle);
   const showInspector = inspectorOpen && dir !== null && tab?.kind === "request";
 
@@ -133,11 +132,6 @@ export function AppShell() {
           onClick={toggleConsole}
         >
           <SquareChevronUp className="size-3.5" /> Console
-          {!consoleOpen && consoleUnseen > 0 && (
-            <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
-              {consoleUnseen}
-            </span>
-          )}
         </Button>
         <Button
           variant="ghost"

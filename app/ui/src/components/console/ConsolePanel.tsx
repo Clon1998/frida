@@ -1,23 +1,26 @@
 import { ChevronRight, Copy, Search, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ConsoleEntry } from "@/bindings";
+import type { ConsoleBody, ConsoleEntry } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { methodColor } from "@/lib/methods";
-import { rawRequest, rawResponse } from "@/lib/rawHttp";
-import { useConsole } from "@/stores/console";
+import { prettyBody, rawExchange } from "@/lib/rawHttp";
+import { type ConsoleView, useConsole } from "@/stores/console";
 import { cn } from "cn";
 
 /**
- * The console (like Postman's and Bruno's): every send of this session, newest at the bottom,
- * expandable to the raw request and response. Secret values arrive masked.
+ * The console (like Postman's and Bruno's): every send of this session, newest at the bottom.
+ * An entry expands to every detail of the exchange, either as sections ("Pretty") or as the
+ * raw HTTP text ("Raw"). Secret values arrive masked.
  */
 export function ConsolePanel() {
   const entries = useConsole((s) => s.entries);
   const clear = useConsole((s) => s.clear);
   const setOpen = useConsole((s) => s.setOpen);
+  const view = useConsole((s) => s.view);
+  const setView = useConsole((s) => s.setView);
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -43,6 +46,7 @@ export function ConsolePanel() {
         <span className="font-medium">Console</span>
         <span className="text-muted-foreground">{entries.length} requests</span>
         <div className="flex-1" />
+        <ViewToggle view={view} onChange={setView} />
         <div className="relative w-56">
           <Search className="absolute top-1.5 left-2 size-3.5 text-muted-foreground" />
           <Input
@@ -85,6 +89,7 @@ export function ConsolePanel() {
           <ConsoleRow
             key={e.id}
             entry={e}
+            view={view}
             open={expanded === e.id}
             onToggle={() => setExpanded(expanded === e.id ? null : e.id)}
           />
@@ -96,10 +101,12 @@ export function ConsolePanel() {
 
 function ConsoleRow({
   entry,
+  view,
   open,
   onToggle,
 }: {
   entry: ConsoleEntry;
+  view: ConsoleView;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -145,38 +152,165 @@ function ConsoleRow({
           </span>
         )}
       </button>
-      {open && (
-        <div className="grid grid-cols-2 gap-px bg-border">
-          <RawBlock title="Request" text={rawRequest(entry)} />
-          <RawBlock title="Response" text={rawResponse(entry)} />
-        </div>
+      {open && (view === "raw" ? <RawView entry={entry} /> : <PrettyView entry={entry} />)}
+    </div>
+  );
+}
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: ConsoleView;
+  onChange: (view: ConsoleView) => void;
+}) {
+  return (
+    <div className="flex rounded-md border p-px" role="radiogroup" aria-label="Entry view">
+      {(["pretty", "raw"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="radio"
+          aria-checked={view === v}
+          onClick={() => onChange(v)}
+          className={cn(
+            "rounded px-2 py-0.5 capitalize",
+            view === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground",
+          )}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The whole exchange as raw HTTP text, like Postman's "raw" log. */
+function RawView({ entry }: { entry: ConsoleEntry }) {
+  const text = rawExchange(entry);
+  return (
+    <div className="relative bg-muted/30">
+      <CopyButton label="raw log" text={text} className="absolute top-1 right-3" />
+      <pre className="max-h-96 overflow-auto px-3 py-2 pr-10 break-all whitespace-pre-wrap select-text">
+        {text}
+      </pre>
+    </div>
+  );
+}
+
+/** Every detail in sections, like Postman's expanded console entry. */
+function PrettyView({ entry }: { entry: ConsoleEntry }) {
+  const r = entry.response;
+  const general: [string, string][] = [
+    ["Request URL", entry.url],
+    ["Request Method", entry.method],
+  ];
+  if (r) {
+    general.push(["Status", `${r.status} ${r.statusText}`.trim()], ["Protocol", r.httpVersion]);
+    if (r.finalUrl && r.finalUrl !== entry.url) general.push(["Final URL", r.finalUrl]);
+    general.push(["Time", formatDuration(r.timeMs)], ["Size", formatBytes(r.sizeBytes)]);
+  } else {
+    general.push(["Error", entry.error ?? "no response"]);
+  }
+  general.push(["Request", `${entry.requestName} (${entry.requestPath})`]);
+  return (
+    <div className="max-h-96 overflow-auto bg-muted/30 pb-1 select-text">
+      <Section title="General">
+        <Pairs pairs={general} />
+      </Section>
+      <Section title="Request Headers" count={entry.requestHeaders.length}>
+        <Pairs pairs={entry.requestHeaders.map((h) => [h.name, h.value ?? ""])} />
+      </Section>
+      {entry.requestBody && (
+        <Section title="Request Body">
+          <Body body={entry.requestBody} />
+        </Section>
+      )}
+      {r && (
+        <Section title="Response Headers" count={r.headers.length}>
+          <Pairs pairs={r.headers.map((h) => [h.name, h.value ?? ""])} />
+        </Section>
+      )}
+      {r?.body && (
+        <Section title="Response Body">
+          <Body body={r.body} />
+        </Section>
       )}
     </div>
   );
 }
 
-function RawBlock({ title, text }: { title: string; text: string }) {
+function Section({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <details open className="group px-3 pt-1.5">
+      <summary className="flex cursor-default list-none items-center gap-1 font-sans font-medium select-none">
+        <ChevronRight className="size-3 transition-transform group-open:rotate-90" />
+        {title}
+        {count !== undefined && <span className="text-muted-foreground">({count})</span>}
+      </summary>
+      <div className="pt-1 pl-4">{children}</div>
+    </details>
+  );
+}
+
+function Pairs({ pairs }: { pairs: [string, string][] }) {
+  if (pairs.length === 0) return <p className="text-muted-foreground">None</p>;
+  return (
+    <table className="w-full">
+      <tbody>
+        {pairs.map(([name, value], i) => (
+          <tr key={i} className="align-top">
+            <td className="w-1/4 py-px pr-4 whitespace-nowrap text-muted-foreground">{name}</td>
+            <td className="py-px break-all">{value}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function Body({ body }: { body: ConsoleBody }) {
+  const text = prettyBody(body.text);
+  return (
+    <div className="relative">
+      <CopyButton label="body" text={body.text} className="absolute top-0 right-0" />
+      <pre className="pr-8 break-all whitespace-pre-wrap">{text}</pre>
+      {body.truncated && <p className="text-muted-foreground">… (truncated)</p>}
+    </div>
+  );
+}
+
+function CopyButton({
+  label,
+  text,
+  className,
+}: {
+  label: string;
+  text: string;
+  className?: string;
+}) {
   const copy = async () => {
     await navigator.clipboard.writeText(text);
-    toast.success(`${title} copied`);
+    toast.success(`Copied ${label}`);
   };
   return (
-    <div className="min-w-0 bg-muted/30">
-      <div className="flex items-center justify-between px-3 py-1 font-sans text-muted-foreground">
-        <span>{title}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-5"
-          aria-label={`Copy ${title}`}
-          onClick={() => void copy()}
-        >
-          <Copy />
-        </Button>
-      </div>
-      <pre className="max-h-80 overflow-auto px-3 pb-2 break-all whitespace-pre-wrap select-text">
-        {text}
-      </pre>
-    </div>
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn("size-5", className)}
+      title={`Copy ${label}`}
+      aria-label={`Copy ${label}`}
+      onClick={() => void copy()}
+    >
+      <Copy />
+    </Button>
   );
 }

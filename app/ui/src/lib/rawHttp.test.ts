@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConsoleEntry } from "@/bindings";
-import { rawRequest, rawResponse } from "./rawHttp";
+import { prettyBody, rawExchange, rawResponse, requestTarget } from "./rawHttp";
 
 const entry: ConsoleEntry = {
   id: "1",
@@ -8,8 +8,11 @@ const entry: ConsoleEntry = {
   requestName: "Create",
   requestPath: "create.yaml",
   method: "POST",
-  url: "https://api.example.com/orders",
-  requestHeaders: [{ name: "Content-Type", value: "application/json", enabled: true }],
+  url: "https://api.example.com/orders?draft=1",
+  requestHeaders: [
+    { name: "host", value: "api.example.com", enabled: true },
+    { name: "content-type", value: "application/json", enabled: true },
+  ],
   requestBody: { text: '{"item":"book"}', truncated: false },
   response: {
     httpVersion: "HTTP/1.1",
@@ -25,12 +28,21 @@ const entry: ConsoleEntry = {
 };
 
 describe("raw HTTP formatting", () => {
-  it("formats request and response like an HTTP message", () => {
-    expect(rawRequest(entry)).toBe(
-      'POST https://api.example.com/orders\nContent-Type: application/json\n\n{"item":"book"}',
-    );
-    expect(rawResponse(entry)).toBe(
-      'HTTP/1.1 201 Created\ncontent-type: application/json\n\n{"id":1}\n… (truncated)',
+  it("formats the exchange like Postman's raw console view", () => {
+    expect(rawExchange(entry)).toBe(
+      [
+        "POST /orders?draft=1 HTTP/1.1",
+        "host: api.example.com",
+        "content-type: application/json",
+        "",
+        '{"item":"book"}',
+        "",
+        "HTTP/1.1 201 Created",
+        "content-type: application/json",
+        "",
+        '{"id":1}',
+        "… (truncated)",
+      ].join("\n"),
     );
   });
 
@@ -38,5 +50,16 @@ describe("raw HTTP formatting", () => {
     expect(rawResponse({ ...entry, response: null, error: "connection refused" })).toBe(
       "Error: connection refused",
     );
+  });
+
+  it("keeps unparsable URLs (e.g. with placeholders) as they are", () => {
+    expect(requestTarget("{{base}}/orders")).toBe("{{base}}/orders");
+    expect(requestTarget("http://x:8787/")).toBe("/");
+  });
+
+  it("indents JSON bodies only", () => {
+    expect(prettyBody('{"a":1}')).toBe('{\n  "a": 1\n}');
+    expect(prettyBody("plain {text}")).toBe("plain {text}");
+    expect(prettyBody("{broken")).toBe("{broken");
   });
 });

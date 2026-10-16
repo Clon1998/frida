@@ -1,10 +1,11 @@
 import type { ConsoleEntry } from "@/bindings";
 
 /**
- * The entry as raw HTTP text, the way Postman's and Bruno's consoles show it:
+ * The whole exchange as raw HTTP text, the way Postman's console shows it in "raw" mode:
  *
- *     POST https://api.example.com/orders
- *     Content-Type: application/json
+ *     POST /orders HTTP/1.1
+ *     host: api.example.com
+ *     content-type: application/json
  *
  *     {"item":"book"}
  *
@@ -13,8 +14,14 @@ import type { ConsoleEntry } from "@/bindings";
  *
  *     {"id":1}
  */
+export function rawExchange(entry: ConsoleEntry): string {
+  return `${rawRequest(entry)}\n\n${rawResponse(entry)}`;
+}
+
+/** The request line uses the path (the host is in the `host` header), like on the wire. */
 export function rawRequest(entry: ConsoleEntry): string {
-  const lines = [`${entry.method} ${entry.url}`];
+  const version = entry.response?.httpVersion ?? "HTTP/1.1";
+  const lines = [`${entry.method} ${requestTarget(entry.url)} ${version}`];
   for (const h of entry.requestHeaders) lines.push(`${h.name}: ${h.value}`);
   if (entry.requestBody) {
     lines.push("", entry.requestBody.text);
@@ -33,4 +40,25 @@ export function rawResponse(entry: ConsoleEntry): string {
     if (r.body.truncated) lines.push("… (truncated)");
   }
   return lines.join("\n");
+}
+
+/** `/path?query` of an absolute URL; the URL as is when it can't be parsed. */
+export function requestTarget(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
+/** JSON bodies indented for the pretty view; anything else unchanged. */
+export function prettyBody(text: string): string {
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return text;
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
 }
