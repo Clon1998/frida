@@ -1,7 +1,8 @@
 name: CI
 
 # Lint & test run on every push/PR (except docs-only changes). The slow 4-OS build matrix
-# runs only on pull requests or when started by hand ("Run workflow" in the Actions tab).
+# runs only on pull requests or when started by hand ("Run workflow" in the Actions tab), where
+# you can tick which platforms to build and whether to run lint & test first.
 on:
   push:
     branches: [main]
@@ -9,9 +10,32 @@ on:
   pull_request:
     paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:
+    inputs:
+      checks:
+        description: Run lint & test before building
+        type: boolean
+        default: true
+      macos-arm64:
+        description: Build macOS (Apple Silicon)
+        type: boolean
+        default: true
+      macos-x64:
+        description: Build macOS (Intel)
+        type: boolean
+        default: true
+      windows-x64:
+        description: Build Windows
+        type: boolean
+        default: true
+      linux-x64:
+        description: Build Linux
+        type: boolean
+        default: true
 
+# A new push cancels the previous push/PR run on the same ref. Manual runs get their own group
+# (the run id), so a push to main never cancels a long manual build (Windows takes ~30 min).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -24,6 +48,7 @@ env:
 jobs:
   check:
     name: Lint & test
+    if: github.event_name != 'workflow_dispatch' || inputs.checks
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
@@ -73,27 +98,46 @@ jobs:
         working-directory: app/ui
         run: pnpm test
 
+  platforms:
+    name: Pick platforms
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+      - id: pick
+        env:
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          MACOS_ARM64: ${{ inputs.macos-arm64 }}
+          MACOS_X64: ${{ inputs.macos-x64 }}
+          WINDOWS_X64: ${{ inputs.windows-x64 }}
+          LINUX_X64: ${{ inputs.linux-x64 }}
+        # Pull requests build everything; manual runs build only the ticked platforms.
+        run: |
+          wanted() { [ "$MANUAL" != true ] || [ "$1" = true ]; }
+          entries=()
+          wanted "$MACOS_ARM64" && entries+=('{"name":"macos-arm64","os":"macos-latest","target":"aarch64-apple-darwin"}')
+          wanted "$MACOS_X64" && entries+=('{"name":"macos-x64","os":"macos-latest","target":"x86_64-apple-darwin"}')
+          wanted "$WINDOWS_X64" && entries+=('{"name":"windows-x64","os":"windows-latest","target":"x86_64-pc-windows-msvc"}')
+          # Oldest supported Ubuntu, so the AppImage/.deb run on as many distros as possible.
+          wanted "$LINUX_X64" && entries+=('{"name":"linux-x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu"}')
+          [ ${#entries[@]} -gt 0 ] || echo "::warning::No platform selected, nothing to build"
+          include="[$(IFS=,; echo "${entries[*]}")]"
+          echo "Building: $include"
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build (${{ matrix.name }})
-    needs: check
-    if: github.event_name != 'push'
+    needs: [check, platforms]
+    # Run when lint & test passed, or was skipped on purpose in a manual run.
+    if: >-
+      !cancelled() && github.event_name != 'push'
+      && needs.platforms.result == 'success' && needs.platforms.outputs.include != '[]'
+      && (needs.check.result == 'success' || needs.check.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: macos-arm64
-            os: macos-latest
-            target: aarch64-apple-darwin
-          - name: macos-x64
-            os: macos-latest
-            target: x86_64-apple-darwin
-          - name: windows-x64
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - name: linux-x64
-            # Oldest supported Ubuntu, so the AppImage/.deb run on as many distros as possible.
-            os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+        include: ${{ fromJSON(needs.platforms.outputs.include) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
