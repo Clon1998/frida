@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { suggestedFileName } from "@/lib/fileName";
 import { showError, unwrap } from "@/lib/api";
 import { bodyKind, formatBytes, formatDuration, prettyJson } from "@/lib/format";
 import { type RequestTab, useTabs } from "@/stores/tabs";
@@ -151,7 +152,10 @@ export function ResponsePanel({
   };
 
   const saveToFile = async () => {
-    const target = await save({ title: "Save response body" });
+    const target = await save({
+      title: "Save response body",
+      defaultPath: suggestedFileName(response.contentType, response.headers),
+    });
     if (!target) return;
     try {
       await unwrap(commands.saveResponseBody(response.id, target));
