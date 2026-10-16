@@ -97,6 +97,16 @@ export const commands = {
 	 *  Returns the copy's name.
 	 */
 	duplicateEnvironment: (scope: EnvScope, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("duplicate_environment", { scope, name })),
+	/**  The AWS profiles in `~/.aws/config` and `~/.aws/credentials`. */
+	listAwsProfiles: () => typedError<AwsProfile[], ApiError>(__TAURI_INVOKE("list_aws_profiles")),
+	getAwsProfile: (scope: EnvScope, environment: string) => typedError<string | null, ApiError>(__TAURI_INVOKE("get_aws_profile", { scope, environment })),
+	/**
+	 *  Chooses (or with `None` forgets) the AWS profile of an environment. Kept in local state:
+	 *  profile names are personal, so they don't go into the shared environment file.
+	 */
+	setAwsProfile: (scope: EnvScope, environment: string, profile: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_aws_profile", { scope, environment, profile })),
+	/**  "Refresh secrets": forgets the cached AWS values, so the next send fetches them again. */
+	refreshAwsSecrets: () => __TAURI_INVOKE<void>("refresh_aws_secrets"),
 	deleteEnvironment: (scope: EnvScope, name: string) => typedError<null, ApiError>(__TAURI_INVOKE("delete_environment", { scope, name })),
 	/**  Stores a secret value in the keychain (never in YAML). */
 	setSecret: (scope: EnvScope, environment: string, variable: string, value: string) => typedError<null, ApiError>(__TAURI_INVOKE("set_secret", { scope, environment, variable, value })),
@@ -223,6 +233,8 @@ export type ApiError = {
 	message: string,
 	/**  What the user can do about it, when there is something useful to say. */
 	hint: string | null,
+	/**  For AWS problems: which environment, and a command that fixes it (for a copy button). */
+	aws: AwsErrorInfo | null,
 };
 
 export type ApiKeyLocation = "header" | "query";
@@ -236,6 +248,8 @@ export type AppSettings = {
 	activeGlobalEnvironments?: { [key in string]: string },
 	/**  How many history entries are kept (PLAN.md §13). */
 	historySize?: number,
+	/**  The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`. */
+	awsProfiles?: { [key in string]: string },
 };
 
 /**
@@ -271,6 +285,23 @@ export type AvailableVar = {
 	isSecret: boolean,
 	/**  `false` for a secret whose value isn't set yet: using it leaves `{{name}}` as written. */
 	hasValue: boolean,
+};
+
+/**  Extra details of AWS errors, so the UI can ask for a profile or offer the login command. */
+export type AwsErrorInfo = {
+	environment: string,
+	/**  The global environment (otherwise the collection's). */
+	global: boolean | null,
+	/**  e.g. `aws sso login --profile dev`. */
+	fixCommand: string | null,
+};
+
+/**  A profile from the AWS config files. */
+export type AwsProfile = {
+	name: string,
+	/**  Uses IAM Identity Center (SSO) login. */
+	sso: boolean,
+	region: string | null,
 };
 
 /**
@@ -337,6 +368,8 @@ export type CollectionState = {
 	expandedFolders?: string[],
 	/**  The active collection environment. */
 	activeEnvironment?: string | null,
+	/**  The AWS profile per collection environment (PLAN.md §9.1), for AWS-backed secrets. */
+	awsProfiles?: { [key in string]: string },
 };
 
 export type CollectionSummary = {
@@ -483,7 +516,9 @@ export type Environment_Serialize = {
 	variables: EnvVariable_Serialize[],
 };
 
-export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script" | "git";
+export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script" | "git" | 
+/**  An environment with AWS secrets has no AWS profile yet: the UI asks for one. */
+"aws_profile_required" | "aws";
 
 /**  One changed file. Status letters as in `git status --short` (`M`, `A`, `D`, `R`, ...). */
 export type FileChange = {

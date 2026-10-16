@@ -40,6 +40,8 @@ pub struct AppState {
     pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,
     /// OAuth2 tokens, in memory, shared by all collections (tokens are keyed by provider).
     pub oauth: OAuth2Manager,
+    /// AWS Secrets Manager values, cached in memory for 15 minutes (PLAN.md §9.1).
+    pub aws: Arc<frida_secrets::aws::AwsSecrets>,
     /// Request history. `Arc` so it can be moved into `spawn_blocking` closures. `None` if the
     /// database couldn't be opened (history is then simply off; sending still works).
     pub history: Option<Arc<HistoryStore>>,
@@ -106,6 +108,7 @@ impl AppState {
             }
         };
         Self {
+            aws: Arc::new(frida_secrets::aws::AwsSecrets::with_sdk()),
             history,
             local: LocalStore::new(app_data_dir),
             workspace: Mutex::new(None),

@@ -15,13 +15,35 @@ use frida_core::vars::ResolveReport;
 use tauri::State;
 use tokio_util::sync::CancellationToken;
 
-use super::env::active_environments;
+use super::env::{active_environments, aws_profile};
 use crate::error::{ApiError, ApiResult, ErrorCode, blocking};
 use crate::state::AppState;
+use crate::state::EnvScope;
+use frida_core::secrets::AwsFetch;
 
 /// The active global and collection environment of a collection, with secret values filled in
-/// from the keychain. Keychain access is blocking, so it runs off the async runtime.
+/// from the keychain (blocking, so off the async runtime) and from AWS Secrets Manager
+/// (`aws`: fetch when sending, cache only when inspecting).
 pub(crate) async fn load_active_envs(
+    state: &AppState,
+    collection_dir: &Path,
+    aws: AwsFetch,
+) -> ApiResult<(Option<Environment>, Option<Environment>)> {
+    let (mut global, mut collection) = load_keychain_envs(state, collection_dir).await?;
+    let dir_text = collection_dir.to_string_lossy().to_string();
+    if let Some(env) = &mut global {
+        let profile = aws_profile(state, &EnvScope::Global, &env.name)?;
+        secrets::fill_aws_secrets(env, true, profile.as_deref(), &state.aws, aws).await?;
+    }
+    if let Some(env) = &mut collection {
+        let scope = EnvScope::Collection { dir: dir_text };
+        let profile = aws_profile(state, &scope, &env.name)?;
+        secrets::fill_aws_secrets(env, false, profile.as_deref(), &state.aws, aws).await?;
+    }
+    Ok((global, collection))
+}
+
+async fn load_keychain_envs(
     state: &AppState,
     collection_dir: &Path,
 ) -> ApiResult<(Option<Environment>, Option<Environment>)> {
@@ -72,7 +94,7 @@ pub async fn send_request(
     request: Request,
 ) -> ApiResult<ResponseView> {
     let root = state.collection_dir(&dir)?;
-    let (global_env, collection_env) = load_active_envs(&state, &root).await?;
+    let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
     let workspace_dir = state.workspace_dir().ok();
     let cancel = CancellationToken::new();
@@ -223,7 +245,7 @@ pub async fn inspect_request(
     request: Request,
 ) -> ApiResult<ResolveReport> {
     let root = state.collection_dir(&dir)?;
-    let (global_env, collection_env) = load_active_envs(&state, &root).await?;
+    let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::CacheOnly).await?;
     let store = state.session_store(&root);
     let workspace_dir = state.workspace_dir().ok();
     let report = http::inspect(&ExecuteInput {
@@ -252,7 +274,7 @@ pub async fn fetch_oauth2_tokens(
     request: Option<Request>,
 ) -> ApiResult<Vec<TokenInfo>> {
     let root = state.collection_dir(&dir)?;
-    let (global_env, collection_env) = load_active_envs(&state, &root).await?;
+    let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
     let workspace_dir = state.workspace_dir().ok();
     // Folders and the collection: a stand-in request inside them that inherits their auth.

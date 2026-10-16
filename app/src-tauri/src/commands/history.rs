@@ -11,6 +11,7 @@ use tauri::State;
 use super::http::load_active_envs;
 use crate::error::{ApiError, ApiResult, ErrorCode, blocking};
 use crate::state::AppState;
+use frida_core::secrets::AwsFetch;
 
 /// How many entries the history list shows at most.
 const LIST_LIMIT: usize = 500;
@@ -74,7 +75,7 @@ pub async fn export_curl(
     options: CurlOptions,
 ) -> ApiResult<String> {
     let root = state.collection_dir(&dir)?;
-    let (global_env, collection_env) = load_active_envs(&state, &root).await?;
+    let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::CacheOnly).await?;
     let store = state.session_store(&root);
     let workspace_dir = state.workspace_dir().ok();
     let input = ExecuteInput {

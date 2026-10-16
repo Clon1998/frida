@@ -23,6 +23,8 @@ pub struct AppSettings {
     pub active_global_environments: std::collections::BTreeMap<String, String>,
     /// How many history entries are kept (PLAN.md §13).
     pub history_size: u32,
+    /// The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`.
+    pub aws_profiles: std::collections::BTreeMap<String, String>,
 }
 
 impl Default for AppSettings {
@@ -32,6 +34,7 @@ impl Default for AppSettings {
             theme: ThemePreference::default(),
             active_global_environments: Default::default(),
             history_size: crate::history::DEFAULT_RETENTION as u32,
+            aws_profiles: Default::default(),
         }
     }
 }
@@ -65,6 +68,8 @@ pub struct CollectionState {
     pub expanded_folders: Vec<String>,
     /// The active collection environment.
     pub active_environment: Option<String>,
+    /// The AWS profile per collection environment (PLAN.md §9.1), for AWS-backed secrets.
+    pub aws_profiles: std::collections::BTreeMap<String, String>,
 }
 
 /// Reads and writes the local state files below one base directory (the app data dir).
@@ -107,6 +112,7 @@ impl LocalStore {
             collection_id,
             &CollectionState {
                 active_environment: current.active_environment,
+                aws_profiles: current.aws_profiles,
                 ..view.clone()
             },
         )
@@ -185,6 +191,7 @@ mod tests {
             active_tab: Some("a.yaml".into()),
             expanded_folders: vec!["orders".into()],
             active_environment: Some("dev".into()),
+            aws_profiles: [("prod".to_string(), "work-sso".to_string())].into(),
         };
         store.save_collection_state(id, &state).unwrap();
         assert_eq!(store.load_collection_state(id).unwrap(), state);
@@ -230,6 +237,7 @@ mod tests {
                 id,
                 &CollectionState {
                     active_environment: Some("dev".into()),
+                    aws_profiles: [("prod".to_string(), "work".to_string())].into(),
                     ..CollectionState::default()
                 },
             )
@@ -246,6 +254,10 @@ mod tests {
             .unwrap();
         let loaded = store.load_collection_state(id).unwrap();
         assert_eq!(loaded.active_environment.as_deref(), Some("dev"));
+        assert_eq!(
+            loaded.aws_profiles.get("prod").map(String::as_str),
+            Some("work")
+        );
         assert_eq!(loaded.open_tabs, vec!["a.yaml"]);
     }
 }

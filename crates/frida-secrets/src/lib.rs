@@ -7,10 +7,11 @@
 //!   password. Used when no OS keychain is available (e.g. headless Linux).
 //! - [`MemoryStore`]: for tests.
 //!
-//! AWS Secrets Manager (M8) adds a separate, async provider on top of this.
+//! AWS Secrets Manager (M8) is a separate, async provider: see [`aws`].
 //!
 //! All stores do blocking I/O. Callers in async code must use `tokio::task::spawn_blocking`.
 
+pub mod aws;
 mod encrypted_file;
 mod keychain;
 mod memory;

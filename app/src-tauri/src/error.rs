@@ -4,6 +4,7 @@ use frida_core::CoreError;
 use frida_core::auth::OAuth2Error;
 use frida_core::http::SendError;
 use frida_secrets::SecretError;
+use frida_secrets::aws::AwsError;
 use serde::Serialize;
 use specta::Type;
 
@@ -16,6 +17,19 @@ pub struct ApiError {
     pub message: String,
     /// What the user can do about it, when there is something useful to say.
     pub hint: Option<String>,
+    /// For AWS problems: which environment, and a command that fixes it (for a copy button).
+    pub aws: Option<AwsErrorInfo>,
+}
+
+/// Extra details of AWS errors, so the UI can ask for a profile or offer the login command.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsErrorInfo {
+    pub environment: String,
+    /// The global environment (otherwise the collection's).
+    pub global: Option<bool>,
+    /// e.g. `aws sso login --profile dev`.
+    pub fix_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
@@ -40,6 +54,9 @@ pub enum ErrorCode {
     Auth,
     Script,
     Git,
+    /// An environment with AWS secrets has no AWS profile yet: the UI asks for one.
+    AwsProfileRequired,
+    Aws,
 }
 
 impl ApiError {
@@ -48,6 +65,7 @@ impl ApiError {
             code,
             message: message.into(),
             hint: None,
+            aws: None,
         }
     }
 
@@ -73,6 +91,47 @@ impl From<CoreError> for ApiError {
                 .with_hint("It may have been moved or deleted outside Frida."),
             CoreError::InvalidInput(_) => ApiError::new(ErrorCode::InvalidInput, message),
             CoreError::Send(send) => send.into(),
+            CoreError::AwsProfileRequired {
+                environment,
+                global,
+            } => ApiError {
+                aws: Some(AwsErrorInfo {
+                    environment,
+                    global: Some(global),
+                    fix_command: None,
+                }),
+                ..ApiError::new(ErrorCode::AwsProfileRequired, message)
+            },
+            CoreError::Aws {
+                environment,
+                source,
+                ..
+            } => {
+                let fix_command = source.fix_command();
+                let hint = match &source {
+                    AwsError::SsoLogin { .. } => {
+                        "Log in with the command below in a terminal, then send again."
+                    }
+                    AwsError::NoCredentials { .. } => {
+                        "Check the profile in ~/.aws/config, or choose another one in the environment editor."
+                    }
+                    AwsError::NotFound { .. } | AwsError::MissingKey { .. } => {
+                        "Check the secret id, JSON key and region of the variable in the environment editor."
+                    }
+                    AwsError::AccessDenied { .. } => {
+                        "Use a profile that may read this secret (environment editor → AWS profile)."
+                    }
+                    _ => "See the AWS message above.",
+                };
+                ApiError {
+                    aws: Some(AwsErrorInfo {
+                        environment,
+                        global: None,
+                        fix_command,
+                    }),
+                    ..ApiError::new(ErrorCode::Aws, message).with_hint(hint)
+                }
+            }
             CoreError::Script(_) => ApiError::new(ErrorCode::Script, message).with_hint(
                 "Fix the script at the line shown; its console.log output is in the console.",
             ),

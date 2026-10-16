@@ -2,11 +2,12 @@
 
 use std::path::Path;
 
+use frida_secrets::aws::{AwsSecretRef, AwsSecrets};
 use frida_secrets::{SecretKey, SecretStore};
 use sha2::{Digest, Sha256};
 
-use crate::error::Result;
-use crate::model::Environment;
+use crate::error::{CoreError, Result};
+use crate::model::{Environment, SecretSource};
 use crate::storage;
 
 /// The keychain scope of a workspace's global environments: a short hash of the workspace
@@ -32,7 +33,12 @@ pub fn fill_secret_values(
     store: &dyn SecretStore,
 ) -> Vec<String> {
     let mut errors = Vec::new();
-    for var in env.variables.iter_mut().filter(|v| v.secret) {
+    // AWS-backed secrets are filled by `fill_aws_secrets`, not from the keychain.
+    for var in env
+        .variables
+        .iter_mut()
+        .filter(|v| v.secret && v.source.is_none())
+    {
         let key = SecretKey::new(scope_id, &env.name, &var.name);
         match store.get(&key) {
             Ok(value) => var.value = value,
@@ -61,6 +67,77 @@ pub fn load_environment_with_secrets(
         tracing::warn!(environment = %env.name, %error, "could not read secret");
     }
     Ok(Some(env))
+}
+
+/// Whether to ask AWS for secrets that aren't cached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AwsFetch {
+    /// Sending: fetch what isn't cached.
+    Fetch,
+    /// Inspecting while typing: cached values only, never a network call.
+    CacheOnly,
+}
+
+/// Fills the secret variables of `env` whose source is AWS Secrets Manager (PLAN.md §9.1).
+/// `profile` is the AWS profile chosen for this environment; without one, and if the
+/// environment has AWS secrets, sending fails with [`CoreError::AwsProfileRequired`] so the UI
+/// can ask for it. With [`AwsFetch::CacheOnly`] missing values just stay unset.
+pub async fn fill_aws_secrets(
+    env: &mut Environment,
+    global: bool,
+    profile: Option<&str>,
+    aws: &AwsSecrets,
+    mode: AwsFetch,
+) -> Result<()> {
+    let has_aws = env
+        .variables
+        .iter()
+        .any(|v| v.secret && matches!(v.source, Some(SecretSource::AwsSecretsManager { .. })));
+    if !has_aws {
+        return Ok(());
+    }
+    let Some(profile) = profile else {
+        return match mode {
+            AwsFetch::CacheOnly => Ok(()),
+            AwsFetch::Fetch => Err(CoreError::AwsProfileRequired {
+                environment: env.name.clone(),
+                global,
+            }),
+        };
+    };
+    let env_name = env.name.clone();
+    for var in env.variables.iter_mut().filter(|v| v.secret) {
+        let Some(SecretSource::AwsSecretsManager {
+            secret_id,
+            json_key,
+            region,
+        }) = &var.source
+        else {
+            continue;
+        };
+        let secret = AwsSecretRef {
+            profile: profile.to_string(),
+            region: region.clone(),
+            secret_id: secret_id.clone(),
+            json_key: json_key.clone(),
+        };
+        let value = match mode {
+            AwsFetch::Fetch => Some(aws.get(&secret).await),
+            AwsFetch::CacheOnly => aws.cached(&secret),
+        };
+        match value {
+            Some(Ok(value)) => var.value = Some(value),
+            Some(Err(source)) => {
+                return Err(CoreError::Aws {
+                    environment: env_name,
+                    variable: var.name.clone(),
+                    source,
+                });
+            }
+            None => var.value = None,
+        }
+    }
+    Ok(())
 }
 
 /// Names of `env`'s secret variables that have a value in `store`. Blocking.

@@ -11,6 +11,7 @@ use frida_core::model::Environment;
 use frida_core::secrets;
 use frida_core::storage;
 use frida_secrets::SecretKey;
+use frida_secrets::aws::AwsProfile;
 use serde::Serialize;
 use specta::Type;
 use tauri::State;
@@ -318,4 +319,83 @@ pub fn clear_cookies(
     let collection_dir = state.collection_dir(&dir)?;
     http::clear_cookies(&state.cookie_jar(&collection_dir), domain.as_deref());
     Ok(())
+}
+
+/// The AWS profile chosen for environment `name` (PLAN.md §9.1), from local state.
+pub fn aws_profile(state: &AppState, scope: &EnvScope, name: &str) -> ApiResult<Option<String>> {
+    match scope {
+        EnvScope::Global => {
+            let key = global_aws_key(&state.workspace_dir()?, name);
+            Ok(state.local.load_settings().aws_profiles.get(&key).cloned())
+        }
+        EnvScope::Collection { dir } => {
+            let id = storage::load_collection(&state.collection_dir(dir)?)?.id;
+            Ok(state
+                .local
+                .load_collection_state(&id)?
+                .aws_profiles
+                .get(name)
+                .cloned())
+        }
+    }
+}
+
+fn global_aws_key(workspace_dir: &Path, env: &str) -> String {
+    format!("{}|{env}", workspace_dir.to_string_lossy())
+}
+
+/// The AWS profiles in `~/.aws/config` and `~/.aws/credentials`.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_aws_profiles() -> ApiResult<Vec<AwsProfile>> {
+    blocking(|| Ok(frida_secrets::aws::list_profiles())).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_aws_profile(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    environment: String,
+) -> ApiResult<Option<String>> {
+    aws_profile(&state, &scope, &environment)
+}
+
+/// Chooses (or with `None` forgets) the AWS profile of an environment. Kept in local state:
+/// profile names are personal, so they don't go into the shared environment file.
+#[tauri::command]
+#[specta::specta]
+pub fn set_aws_profile(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    environment: String,
+    profile: Option<String>,
+) -> ApiResult<()> {
+    match scope {
+        EnvScope::Global => {
+            let key = global_aws_key(&state.workspace_dir()?, &environment);
+            let mut settings = state.local.load_settings();
+            match profile {
+                Some(p) => settings.aws_profiles.insert(key, p),
+                None => settings.aws_profiles.remove(&key),
+            };
+            Ok(state.local.save_settings(&settings)?)
+        }
+        EnvScope::Collection { dir } => {
+            let id = storage::load_collection(&state.collection_dir(&dir)?)?.id;
+            let mut collection_state = state.local.load_collection_state(&id)?;
+            match profile {
+                Some(p) => collection_state.aws_profiles.insert(environment, p),
+                None => collection_state.aws_profiles.remove(&environment),
+            };
+            Ok(state.local.save_collection_state(&id, &collection_state)?)
+        }
+    }
+}
+
+/// "Refresh secrets": forgets the cached AWS values, so the next send fetches them again.
+#[tauri::command]
+#[specta::specta]
+pub fn refresh_aws_secrets(state: State<'_, AppState>) {
+    state.aws.clear(None);
 }

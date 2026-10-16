@@ -49,6 +49,18 @@ pub enum CoreError {
     #[error(transparent)]
     Auth(#[from] crate::auth::OAuth2Error),
 
+    /// An environment reads secrets from AWS but no AWS profile was chosen for it yet.
+    #[error("choose an AWS profile for environment {environment:?} to read its AWS secrets")]
+    AwsProfileRequired { environment: String, global: bool },
+
+    #[error("environment {environment:?}, variable {variable:?}: {source}")]
+    Aws {
+        environment: String,
+        variable: String,
+        #[source]
+        source: frida_secrets::aws::AwsError,
+    },
+
     /// A pre-request script failed, so the request was not sent.
     #[error("{0}")]
     Script(frida_script::ScriptError),

@@ -61,6 +61,10 @@ sha1 = "0.11.0"
 md-5 = "0.11.0"
 hmac = "0.13.0"
 
+# AWS Secrets Manager (frida-secrets, PLAN.md §9).
+aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
+aws-sdk-secretsmanager = "1.120.0"
+
 # Response decompression (see frida-core http/decode.rs). Already in the tree through reqwest.
 flate2 = "1.1.10"
 brotli = "9.0.0"
