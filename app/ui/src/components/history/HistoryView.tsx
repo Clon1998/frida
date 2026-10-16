@@ -1,4 +1,5 @@
 import { RotateCcw } from "lucide-react";
+import { useSubTab } from "@/stores/subTabs";
 import { useEffect, useState } from "react";
 import { commands, type HistoryEntry } from "@/bindings";
 import { CodeEditor } from "@/components/editor/CodeEditor";
@@ -14,6 +15,7 @@ import { cn } from "cn";
 
 /** A history entry, read-only: the request as sent and the response (PLAN.md §13). */
 export function HistoryView({ dir, path }: { dir: string; path: string }) {
+  const [subTab, setSubTab] = useSubTab(`history:${dir}:${path}`, "headers");
   const id = Number(path.split("/").pop());
   const [entry, setEntry] = useState<HistoryEntry | null>(null);
 
@@ -59,7 +61,7 @@ export function HistoryView({ dir, path }: { dir: string; path: string }) {
       </p>
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
         <ResizablePanel defaultSize="45" minSize={200}>
-          <Tabs defaultValue="headers" className="h-full gap-0">
+          <Tabs value={subTab} onValueChange={setSubTab} className="h-full gap-0">
             <TabsList className="mx-2 mt-2">
               <TabsTrigger value="headers">
                 Request headers ({entry.requestHeaders.length})
@@ -97,7 +99,7 @@ export function HistoryView({ dir, path }: { dir: string; path: string }) {
         <ResizableHandle />
         <ResizablePanel defaultSize="55" minSize={200}>
           {entry.response ? (
-            <ResponsePanel response={entry.response} />
+            <ResponsePanel response={entry.response} viewKey={`history:${dir}:${path}`} />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-sm text-destructive">
               {summary.error ?? "No response."}

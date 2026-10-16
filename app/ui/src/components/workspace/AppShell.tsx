@@ -67,7 +67,7 @@ export function AppShell() {
                     </ResizablePanel>
                     <ResizableHandle />
                     <ResizablePanel defaultSize="50" minSize={150}>
-                      <ResponseViewer tab={tab} />
+                      <ResponseViewer dir={dir} tab={tab} />
                     </ResizablePanel>
                   </ResizablePanelGroup>
                 )}

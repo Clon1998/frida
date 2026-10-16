@@ -1,4 +1,5 @@
 import { KeyValueTable } from "@/components/request/KeyValueTable";
+import { useSubTab } from "@/stores/subTabs";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { FolderModel } from "@/lib/model";
@@ -10,6 +11,7 @@ import { ScriptsSection, TestsNote, TextSection, VarsSection } from "./sections"
 
 /** Folder settings, opened as a tab: inherited by every request in the folder. */
 export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
+  const [subTab, setSubTab] = useSubTab(`folder:${dir}:${tab.path}`, "headers");
   const updateDraft = useTabs((s) => s.updateDraft);
   const folder = tab.draft;
   const update = (change: (f: FolderModel) => FolderModel) =>
@@ -21,7 +23,7 @@ export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
       <p className="px-3 pt-3 text-xs text-muted-foreground">
         Settings for every request in this folder and its subfolders. Requests can override them.
       </p>
-      <Tabs defaultValue="headers" className="min-h-0 flex-1 gap-0">
+      <Tabs value={subTab} onValueChange={setSubTab} className="min-h-0 flex-1 gap-0">
         <TabsList className="mx-2 mt-2">
           <TabsTrigger value="headers">Headers</TabsTrigger>
           <TabsTrigger value="auth">Auth</TabsTrigger>

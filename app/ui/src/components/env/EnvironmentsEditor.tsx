@@ -18,6 +18,7 @@ import { NameDialog } from "@/components/workspace/NameDialog";
 import { showError, unwrap } from "@/lib/api";
 import { forDisk, secretOps } from "@/lib/envs";
 import { type EnvEntry, type EnvModel, type EnvVar, scopeOf, useEnvs } from "@/stores/envs";
+import { useSubTab } from "@/stores/subTabs";
 import { useActiveCollection } from "@/stores/workspace";
 import { ENV_COLORS, envColor } from "@/lib/envColors";
 import { cn } from "cn";
@@ -199,7 +200,7 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState(false);
   /** Like Bruno: plain variables and secrets are edited on separate tabs. */
-  const [view, setView] = useState<"vars" | "secrets">("vars");
+  const [view, setView] = useSubTab(`env:${JSON.stringify(scope)}:${original.name}`, "vars");
   const keychain = useEnvs((s) => s.backend?.keychain !== false);
 
   const dirty =
@@ -371,7 +372,7 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
         </Button>
       </div>
 
-      <Tabs value={view} onValueChange={(v) => setView(v as "vars" | "secrets")}>
+      <Tabs value={view} onValueChange={setView}>
         <TabsList>
           <TabsTrigger value="vars">Variables ({draft.variables.length - secretCount})</TabsTrigger>
           <TabsTrigger value="secrets">Secrets ({secretCount})</TabsTrigger>

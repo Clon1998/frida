@@ -1,4 +1,5 @@
 import { open as openFile } from "@tauri-apps/plugin-dialog";
+import { useSubTab } from "@/stores/subTabs";
 import { FolderOpen, Trash2 } from "lucide-react";
 import { KeyValueTable } from "@/components/request/KeyValueTable";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { ScriptsSection, TestsNote, TextSection, VarsSection } from "./sections"
 
 /** Collection settings, opened as a tab. Saved in `collection.yaml`, shared through git. */
 export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab }) {
+  const [subTab, setSubTab] = useSubTab(`collection:${dir}`, "headers");
   const updateDraft = useTabs((s) => s.updateDraft);
   const collection = tab.draft;
   const update = (change: (c: CollectionModel) => CollectionModel) =>
@@ -40,7 +42,7 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
   return (
     <div className="flex h-full flex-col">
       <ConflictBanner dir={dir} tab={tab} />
-      <Tabs defaultValue="headers" className="min-h-0 flex-1 gap-0">
+      <Tabs value={subTab} onValueChange={setSubTab} className="min-h-0 flex-1 gap-0">
         <TabsList className="mx-2 mt-2">
           <TabsTrigger value="headers">Headers</TabsTrigger>
           <TabsTrigger value="auth">Auth</TabsTrigger>

@@ -1,4 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
+import { useSubTab } from "@/stores/subTabs";
 import { AlertCircle, CheckCircle2, Copy, Download, Loader2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -19,7 +20,7 @@ function statusColor(status: number) {
   return "bg-rose-600 text-white";
 }
 
-export function ResponseViewer({ tab }: { tab: RequestTab }) {
+export function ResponseViewer({ tab, dir }: { tab: RequestTab; dir: string }) {
   if (tab.requestId) {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -43,16 +44,25 @@ export function ResponseViewer({ tab }: { tab: RequestTab }) {
       </div>
     );
   }
-  return <ResponsePanel response={tab.response} />;
+  return <ResponsePanel response={tab.response} viewKey={`${dir}:${tab.path}`} />;
 }
 
 /** A response: status chips, body (pretty/raw/preview), headers, copy and save. */
-export function ResponsePanel({ response }: { response: ResponseView }) {
+export function ResponsePanel({
+  response,
+  viewKey,
+}: {
+  response: ResponseView;
+  /** Remembers the open sub-tab under this key (e.g. per request tab). */
+  viewKey: string;
+}) {
   const [pretty, setPretty] = useState(true);
   const kind = bodyKind(response.contentType, response.bodyText);
   const text = response.bodyText ?? "";
   const shown = pretty && kind === "json" ? prettyJson(text) : text;
   const hasPreview = kind === "image" || kind === "html";
+  const [stored, setSubTab] = useSubTab(`response:${viewKey}`, hasPreview ? "preview" : "body");
+  const subTab = stored === "preview" && !hasPreview ? "body" : stored;
   const { tests, errors } = response.scripts;
   const passed = tests.filter((t) => t.passed).length;
   const testsFailed = passed < tests.length || errors.length > 0;
@@ -108,7 +118,7 @@ export function ResponsePanel({ response }: { response: ResponseView }) {
         </p>
       )}
 
-      <Tabs defaultValue={hasPreview ? "preview" : "body"} className="min-h-0 flex-1 gap-0">
+      <Tabs value={subTab} onValueChange={setSubTab} className="min-h-0 flex-1 gap-0">
         <TabsList className="mx-2 mt-2">
           <TabsTrigger value="body">Body</TabsTrigger>
           {hasPreview && <TabsTrigger value="preview">Preview</TabsTrigger>}

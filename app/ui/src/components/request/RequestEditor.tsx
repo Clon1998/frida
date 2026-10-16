@@ -1,4 +1,5 @@
 import { Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { useSubTab } from "@/stores/subTabs";
 import { toast } from "sonner";
 import { commands } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
@@ -29,6 +30,7 @@ interface RequestEditorProps {
 }
 
 export function RequestEditor({ dir, tab }: RequestEditorProps) {
+  const [subTab, setSubTab] = useSubTab(`request:${dir}:${tab.path}`, "params");
   const updateDraft = useTabs((s) => s.updateDraft);
   const send = useTabs((s) => s.send);
   const cancel = useTabs((s) => s.cancel);
@@ -127,7 +129,7 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <Tabs defaultValue="params" className="min-h-0 min-w-0 flex-1 gap-0">
+        <Tabs value={subTab} onValueChange={setSubTab} className="min-h-0 min-w-0 flex-1 gap-0">
           <TabsList className="mx-2 mt-2">
             <TabsTrigger value="params">Params</TabsTrigger>
             <TabsTrigger value="body">Body</TabsTrigger>
