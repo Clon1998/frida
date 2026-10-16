@@ -4,6 +4,7 @@ import { FolderOpen, Trash2 } from "lucide-react";
 import type { MultipartField as RawMultipartField, MultipartKind } from "@/bindings";
 import type { Complete } from "@/lib/model";
 import { CellInput, GridCell, GridRow, GridTable, VarCellInput } from "./GridTable";
+import { useRowIds } from "./useRowIds";
 
 type MultipartField = Complete<RawMultipartField>;
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface MultipartTableProps {
 
 /** Multipart form fields: text values or files (stored as a path). */
 export function MultipartTable({ fields, onChange }: MultipartTableProps) {
+  const rowIds = useRowIds(fields.length);
   const update = (index: number, patch: Partial<MultipartField>) => {
     if (index === fields.length) {
       onChange([...fields, { name: "", type: "text", value: "", enabled: true, ...patch }]);
@@ -40,8 +42,11 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
   return (
     <GridTable
       reorder={{
-        count: fields.length,
-        onMove: (from, to) => onChange(arrayMove(fields, from, to)),
+        ids: rowIds.ids,
+        onMove: (from, to) => {
+          rowIds.move(from, to);
+          onChange(arrayMove(fields, from, to));
+        },
       }}
       columns={[
         { label: "", width: "2.25rem" },
@@ -54,7 +59,11 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
       {shown.map((field, index) => {
         const isNew = index === fields.length;
         return (
-          <GridRow key={index} muted={!field.enabled} sortIndex={isNew ? undefined : index}>
+          <GridRow
+            key={isNew ? "new" : rowIds.ids[index]}
+            muted={!field.enabled}
+            sortIndex={isNew ? undefined : index}
+          >
             <GridCell center>
               <Checkbox
                 className="align-middle"
@@ -109,7 +118,10 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
                   variant="ghost"
                   size="icon"
                   className="size-7"
-                  onClick={() => onChange(fields.filter((_, i) => i !== index))}
+                  onClick={() => {
+                    rowIds.remove(index);
+                    onChange(fields.filter((_, i) => i !== index));
+                  }}
                   aria-label="Remove field"
                 >
                   <Trash2 />

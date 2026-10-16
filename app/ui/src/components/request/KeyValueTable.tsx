@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { bulkToRows, rowsToBulk } from "@/lib/bulk";
 import type { Complete } from "@/lib/model";
 import { CellInput, GridCell, GridRow, GridTable, VarCellInput } from "./GridTable";
+import { useRowIds } from "./useRowIds";
 
 type KeyValue = Complete<RawKeyValue>;
 
@@ -39,7 +40,11 @@ export function KeyValueTable({
       onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
     }
   };
-  const remove = (index: number) => onChange(rows.filter((_, i) => i !== index));
+  const rowIds = useRowIds(rows.length);
+  const remove = (index: number) => {
+    rowIds.remove(index);
+    onChange(rows.filter((_, i) => i !== index));
+  };
 
   // One extra, empty row at the end for adding.
   const shown = [...rows, { name: "", value: "", enabled: true }];
@@ -71,8 +76,11 @@ export function KeyValueTable({
       ) : (
         <GridTable
           reorder={{
-            count: rows.length,
-            onMove: (from, to) => onChange(arrayMove(rows, from, to)),
+            ids: rowIds.ids,
+            onMove: (from, to) => {
+              rowIds.move(from, to);
+              onChange(arrayMove(rows, from, to));
+            },
           }}
           columns={[
             { label: "", width: "2.25rem" },
@@ -84,7 +92,11 @@ export function KeyValueTable({
           {shown.map((row, index) => {
             const isNew = index === rows.length;
             return (
-              <GridRow key={index} muted={!row.enabled} sortIndex={isNew ? undefined : index}>
+              <GridRow
+                key={isNew ? "new" : rowIds.ids[index]}
+                muted={!row.enabled}
+                sortIndex={isNew ? undefined : index}
+              >
                 <GridCell center>
                   <Checkbox
                     className="align-middle"

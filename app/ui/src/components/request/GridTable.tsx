@@ -25,19 +25,19 @@ export interface Column {
   width?: string;
 }
 
-/** Whether the surrounding table can be reordered (it then has a drag handle column). */
-const SortableContextFlag = createContext(false);
+/** The row ids of the surrounding reorderable table (`null`: not reorderable). */
+const SortableIds = createContext<string[] | null>(null);
 
 /** Makes a {@link GridTable}'s rows draggable. */
 export interface Reorder {
-  /** How many rows can be dragged (the trailing "add" row is not one of them). */
-  count: number;
+  /**
+   * One stable id per draggable row (the trailing "add" row has none), from `useRowIds`.
+   * Use the same ids as the rows' React keys.
+   */
+  ids: string[];
   /** Move the row at `from` so it ends up at `to`. */
   onMove: (from: number, to: number) => void;
 }
-
-const rowId = (index: number) => `row-${index}`;
-const indexOf = (id: string | number) => Number(String(id).slice(4));
 
 /**
  * A bordered table for editable rows, like Bruno and Postman: a header row, then one row per
@@ -86,14 +86,14 @@ export function GridTable({
             collisionDetection={closestCenter}
             onDragEnd={({ active, over }) => {
               if (over && active.id !== over.id)
-                reorder.onMove(indexOf(active.id), indexOf(over.id));
+                reorder.onMove(
+                  reorder.ids.indexOf(String(active.id)),
+                  reorder.ids.indexOf(String(over.id)),
+                );
             }}
           >
-            <SortableContext
-              items={Array.from({ length: reorder.count }, (_, i) => rowId(i))}
-              strategy={verticalListSortingStrategy}
-            >
-              <SortableContextFlag.Provider value={true}>{body}</SortableContextFlag.Provider>
+            <SortableContext items={reorder.ids} strategy={verticalListSortingStrategy}>
+              <SortableIds.Provider value={reorder.ids}>{body}</SortableIds.Provider>
             </SortableContext>
           </DndContext>
         ) : (
@@ -117,10 +117,11 @@ export function GridRow({
   muted?: boolean;
   sortIndex?: number;
 }) {
-  const sortable = useContext(SortableContextFlag);
+  const ids = useContext(SortableIds);
   const className = cn("border-b bg-background last:border-b-0", muted && "text-muted-foreground");
-  if (!sortable) return <tr className={className}>{children}</tr>;
-  if (sortIndex === undefined) {
+  if (!ids) return <tr className={className}>{children}</tr>;
+  const id = sortIndex === undefined ? undefined : ids[sortIndex];
+  if (id === undefined) {
     return (
       <tr className={className}>
         <td className="border-r" />
@@ -129,18 +130,18 @@ export function GridRow({
     );
   }
   return (
-    <SortableRow index={sortIndex} className={className}>
+    <SortableRow id={id} className={className}>
       {children}
     </SortableRow>
   );
 }
 
 function SortableRow({
-  index,
+  id,
   className,
   children,
 }: {
-  index: number;
+  id: string;
   className: string;
   children: ReactNode;
 }) {
@@ -152,7 +153,7 @@ function SortableRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: rowId(index) });
+  } = useSortable({ id });
   return (
     <tr
       ref={setNodeRef}

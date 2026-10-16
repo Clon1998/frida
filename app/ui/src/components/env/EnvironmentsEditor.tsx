@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AwsProfilePicker } from "./AwsProfilePicker";
+import { useRowIds } from "@/components/request/useRowIds";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { showError, unwrap } from "@/lib/api";
 import { forDisk, secretOps } from "@/lib/envs";
@@ -397,6 +398,10 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
     },
   ];
   const secretCount = draft.variables.filter((v) => v.secret).length;
+  // Stable row ids per tab (variables and secrets are separate lists), see useRowIds.
+  const varIds = useRowIds(draft.variables.length - secretCount);
+  const secretIds = useRowIds(secretCount);
+  const rowIds = secrets ? secretIds : varIds;
 
   return (
     <div className="flex max-w-4xl flex-col gap-3">
@@ -495,8 +500,9 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
 
       <GridTable
         reorder={{
-          count: rows.length - 1,
-          onMove: (from, to) =>
+          ids: rowIds.ids,
+          onMove: (from, to) => {
+            rowIds.move(from, to);
             // Rows are this tab's variables only; move within them, keep the others in place.
             setDraft((d) => {
               const positions = rows.slice(0, -1).map((r) => r.index);
@@ -511,7 +517,8 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
                 if (v) variables[pos] = v;
               });
               return { ...d, variables };
-            }),
+            });
+          },
         }}
         columns={[
           { label: "", width: "2.25rem" },
@@ -526,7 +533,11 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
           const wasSet = entry.setSecrets.includes(v.name);
           const shown = revealed[v.name];
           return (
-            <GridRow key={index} muted={!v.enabled} sortIndex={isNew ? undefined : rowIndex}>
+            <GridRow
+              key={isNew ? "new" : rowIds.ids[rowIndex]}
+              muted={!v.enabled}
+              sortIndex={isNew ? undefined : rowIndex}
+            >
               <GridCell center>
                 <Checkbox
                   className="align-middle"
@@ -628,12 +639,13 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
                     size="icon"
                     className="size-7"
                     aria-label="Remove variable"
-                    onClick={() =>
+                    onClick={() => {
+                      rowIds.remove(rowIndex);
                       setDraft((d) => ({
                         ...d,
                         variables: d.variables.filter((_, i) => i !== index),
-                      }))
-                    }
+                      }));
+                    }}
                   >
                     <Trash2 />
                   </Button>
