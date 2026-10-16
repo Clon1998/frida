@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, Trash2 } from "lucide-react";
 import type { MultipartField as RawMultipartField, MultipartKind } from "@/bindings";
 import type { Complete } from "@/lib/model";
-import { CellInput, GridCell, GridRow, GridTable } from "./GridTable";
+import { CellInput, GridCell, GridRow, GridTable, VarCellInput } from "./GridTable";
 
 type MultipartField = Complete<RawMultipartField>;
 import { Button } from "@/components/ui/button";
@@ -81,10 +81,10 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
               </Select>
             </GridCell>
             <GridCell>
-              <CellInput
+              <VarCellInput
                 placeholder={field.type === "file" ? "Path to file" : "Value"}
                 value={field.value}
-                onChange={(e) => update(index, { value: e.target.value })}
+                onChange={(value) => update(index, { value })}
               />
             </GridCell>
             <GridCell center>

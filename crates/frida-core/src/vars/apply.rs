@@ -2,7 +2,7 @@
 
 use super::resolver::Resolver;
 use super::scope::{ScopeInput, VarScope};
-use super::{ResolveReport, UsageLocation};
+use super::{AvailableVar, DYNAMIC_VARIABLES, ResolveReport, UsageLocation, VarSource};
 use crate::auth::effective_auth;
 use crate::model::{AuthScheme, Collection, Folder, KeyValue, Request};
 
@@ -40,13 +40,45 @@ pub fn resolve_context(input: &ScopeInput<'_>) -> ResolvedContext {
         .map(|scheme| resolve_auth(&mut resolver, scheme))
         .collect();
 
+    let mut report = resolver.finish();
+    report.available = available(&scope);
     ResolvedContext {
         request,
         collection,
         folders,
         auth,
-        report: resolver.finish(),
+        report,
     }
+}
+
+/// The winning definition of every name in scope (layers are ordered by priority), then the
+/// dynamic variables.
+fn available(scope: &VarScope) -> Vec<AvailableVar> {
+    let mut out: Vec<AvailableVar> = Vec::new();
+    for layer in &scope.layers {
+        for def in &layer.vars {
+            if out.iter().any(|v| v.name == def.name) {
+                continue;
+            }
+            out.push(AvailableVar {
+                name: def.name.clone(),
+                source: layer.source.clone(),
+                value: def.value.clone(),
+                is_secret: def.is_secret,
+                has_value: def.value.is_some(),
+            });
+        }
+    }
+    for name in DYNAMIC_VARIABLES {
+        out.push(AvailableVar {
+            name: format!("${name}"),
+            source: VarSource::Dynamic,
+            value: None,
+            is_secret: false,
+            has_value: true,
+        });
+    }
+    out
 }
 
 /// A copy of `request` with variables resolved in the URL, path params, headers and every

@@ -88,6 +88,19 @@ pub struct ResolvedVar {
     pub used_in: Vec<UsageLocation>,
 }
 
+/// A variable defined somewhere in the request's scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AvailableVar {
+    pub name: String,
+    pub source: VarSource,
+    /// `None` for secrets in a masked report and for secrets without a value.
+    pub value: Option<String>,
+    pub is_secret: bool,
+    /// `false` for a secret whose value isn't set yet: using it leaves `{{name}}` as written.
+    pub has_value: bool,
+}
+
 /// Everything the resolver found while resolving one request.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -96,6 +109,10 @@ pub struct ResolveReport {
     pub vars: Vec<ResolvedVar>,
     /// Problems such as cycles (`a → b → a`) or nesting deeper than [`MAX_DEPTH`].
     pub errors: Vec<String>,
+    /// Every variable that *could* be used here (the winning definition of each name, plus the
+    /// dynamic ones), for `{{` autocompletion and highlighting in the editors.
+    #[serde(default)]
+    pub available: Vec<AvailableVar>,
     /// Values of secrets that ended up in the request, so they can be masked in history and
     /// exports. Never sent to the UI ([`ResolveReport::masked`] empties it).
     #[serde(skip)]
@@ -124,9 +141,21 @@ impl ResolveReport {
                 var
             })
             .collect();
+        let available = self
+            .available
+            .iter()
+            .map(|var| {
+                let mut var = var.clone();
+                if var.is_secret {
+                    var.value = None;
+                }
+                var
+            })
+            .collect();
         Self {
             vars,
             errors: self.errors.clone(),
+            available,
             secret_values: Vec::new(),
         }
     }

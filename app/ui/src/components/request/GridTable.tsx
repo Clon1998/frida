@@ -1,4 +1,6 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import { type InputHTMLAttributes, type ReactNode, useContext } from "react";
+import { CodeEditor } from "@/components/editor/CodeEditor";
+import { VariablesContext } from "@/components/editor/variables";
 import { cn } from "cn";
 
 export interface Column {
@@ -62,6 +64,42 @@ export function CellInput({ className, ...props }: InputHTMLAttributes<HTMLInput
         className,
       )}
       {...props}
+    />
+  );
+}
+
+/**
+ * A cell input for values that may contain `{{variables}}`. Inside the request editor (which
+ * provides variable info) it is a one-line code editor with highlighting and `{{`
+ * autocompletion; elsewhere a plain input.
+ */
+export function VarCellInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const variables = useContext(VariablesContext);
+  if (!variables) {
+    return (
+      <CellInput
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  return (
+    <CodeEditor
+      singleLine
+      compact
+      className="w-full font-mono focus-within:bg-accent/40"
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
     />
   );
 }

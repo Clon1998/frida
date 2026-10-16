@@ -246,6 +246,17 @@ export type AuthScheme = ({ type: "basic"; username?: string; password?: string 
 	type: "oauth2",
 } & OAuth2Config;
 
+/**  A variable defined somewhere in the request's scope. */
+export type AvailableVar = {
+	name: string,
+	source: VarSource,
+	/**  `None` for secrets in a masked report and for secrets without a value. */
+	value: string | null,
+	isSecret: boolean,
+	/**  `false` for a secret whose value isn't set yet: using it leaves `{{name}}` as written. */
+	hasValue: boolean,
+};
+
 /**
  *  The request body. All modes are kept side by side, so switching the mode in the UI
  *  doesn't lose what was typed for another mode.
@@ -590,6 +601,11 @@ export type ResolveReport = {
 	vars: ResolvedVar[],
 	/**  Problems such as cycles (`a → b → a`) or nesting deeper than [`MAX_DEPTH`]. */
 	errors: string[],
+	/**
+	 *  Every variable that *could* be used here (the winning definition of each name, plus the
+	 *  dynamic ones), for `{{` autocompletion and highlighting in the editors.
+	 */
+	available?: AvailableVar[],
 };
 
 /**  One variable as the inspector shows it (PLAN.md §5.4). */

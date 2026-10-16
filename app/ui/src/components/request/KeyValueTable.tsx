@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { bulkToRows, rowsToBulk } from "@/lib/bulk";
 import type { Complete } from "@/lib/model";
-import { CellInput, GridCell, GridRow, GridTable } from "./GridTable";
+import { CellInput, GridCell, GridRow, GridTable, VarCellInput } from "./GridTable";
 
 type KeyValue = Complete<RawKeyValue>;
 
@@ -97,10 +97,10 @@ export function KeyValueTable({
                   />
                 </GridCell>
                 <GridCell>
-                  <CellInput
+                  <VarCellInput
                     placeholder={valuePlaceholder}
                     value={row.value}
-                    onChange={(e) => update(index, { value: e.target.value })}
+                    onChange={(value) => update(index, { value })}
                   />
                 </GridCell>
                 <GridCell center>

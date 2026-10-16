@@ -82,3 +82,42 @@ fn without_runtime_vars_the_request_layer_wins() {
     assert_eq!(x.value.as_deref(), Some("request"));
     assert_eq!(x.shadowed.len(), 5);
 }
+
+#[test]
+fn every_defined_variable_is_offered_and_secrets_stay_masked() {
+    let session = frida_core::http::SessionStore::with_runtime(&[]);
+    let ws = workspace();
+    let collection = ws.join("collections/api");
+    let request_rel = "orders/eu/get-x.yaml";
+    let request = storage::read_request(&collection, request_rel).unwrap();
+    let mut env = storage::find_environment(&collection, "dev")
+        .unwrap()
+        .unwrap();
+    env.variables.push(frida_core::model::EnvVariable {
+        name: "apiToken".into(),
+        value: Some("s3cr3t".into()),
+        secret: true,
+        source: None,
+    });
+    let report = inspect(&ExecuteInput {
+        collection_dir: &collection,
+        request_rel,
+        request: &request,
+        collection_env: Some(&env),
+        global_env: None,
+        session: session.session(None),
+        cookies: None,
+        oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
+    })
+    .unwrap()
+    .masked();
+    let names: Vec<&str> = report.available.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names.iter().filter(|n| **n == "x").count(), 1, "{names:?}");
+    assert!(names.contains(&"$uuid"));
+    let token = report
+        .available
+        .iter()
+        .find(|v| v.name == "apiToken")
+        .unwrap();
+    assert!(token.is_secret && token.has_value && token.value.is_none());
+}

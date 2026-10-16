@@ -1,6 +1,6 @@
 import type { PathParam as RawPathParam } from "@/bindings";
 import type { Complete } from "@/lib/model";
-import { CellInput, GridCell, GridRow, GridTable } from "./GridTable";
+import { CellInput, GridCell, GridRow, GridTable, VarCellInput } from "./GridTable";
 
 type PathParam = Complete<RawPathParam>;
 
@@ -31,11 +31,11 @@ export function PathParamsTable({ params, onChange }: PathParamsTableProps) {
             />
           </GridCell>
           <GridCell>
-            <CellInput
+            <VarCellInput
               placeholder="Value"
               value={param.value}
-              onChange={(e) =>
-                onChange(params.map((p, i) => (i === index ? { ...p, value: e.target.value } : p)))
+              onChange={(value) =>
+                onChange(params.map((p, i) => (i === index ? { ...p, value } : p)))
               }
             />
           </GridCell>

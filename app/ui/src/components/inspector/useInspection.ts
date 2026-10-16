@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { commands, type ResolveReport } from "@/bindings";
-import type { VariableMap } from "@/components/editor/variables";
+import type { VariableContext } from "@/components/editor/variables";
 import type { RequestModel } from "@/lib/model";
 import { useEnvs } from "@/stores/envs";
 
@@ -9,7 +9,8 @@ const DEBOUNCE_MS = 250;
 
 /**
  * Resolves the variables of the request being edited (debounced), whenever it or the active
- * environments change. Returns the report and a name → variable map for the editors.
+ * environments change. Returns the report and the variable context for the editors
+ * (`null` until the first report arrives).
  */
 export function useInspection(dir: string, path: string, request: RequestModel) {
   const envVersion = useEnvs((s) => s.version);
@@ -29,9 +30,20 @@ export function useInspection(dir: string, path: string, request: RequestModel) 
     };
   }, [dir, path, request, envVersion]);
 
-  const variables: VariableMap = useMemo(
-    () => new Map((report?.vars ?? []).map((v) => [v.name, v])),
-    [report],
+  const pathParamsKey = JSON.stringify(request.params.path);
+  const variables: VariableContext | null = useMemo(
+    () =>
+      report && {
+        used: new Map(report.vars.map((v) => [v.name, v])),
+        available: new Map((report.available ?? []).map((v) => [v.name, v])),
+        pathParams: new Map(
+          (JSON.parse(pathParamsKey) as { name: string; value: string }[]).map((p) => [
+            p.name,
+            p.value,
+          ]),
+        ),
+      },
+    [report, pathParamsKey],
   );
   return { report, variables };
 }

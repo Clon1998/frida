@@ -8,6 +8,7 @@ import { useDialogs } from "@/stores/dialogs";
 import { useUi } from "@/stores/ui";
 import { useEffect } from "react";
 import { CodeEditor } from "@/components/editor/CodeEditor";
+import { VariablesContext } from "@/components/editor/variables";
 import { useInspection } from "@/components/inspector/useInspection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,161 +83,168 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
     }));
 
   return (
-    <div className="flex h-full flex-col">
-      <ConflictBanner dir={dir} tab={tab} />
+    // Every editor below (URL, body, scripts, key/value cells) gets variable highlighting and
+    // `{{` autocompletion from this.
+    <VariablesContext.Provider value={variables}>
+      <div className="flex h-full flex-col">
+        <ConflictBanner dir={dir} tab={tab} />
 
-      <div className="flex items-center gap-2 border-b p-2">
-        <MethodSelect
-          value={request.method}
-          onChange={(method) => update((r) => ({ ...r, method }))}
-        />
-        {/* The editor floats over the content below, so it can grow downwards while editing
-            without moving anything (see the single-line theme in CodeEditor). */}
-        <div className="relative h-9 min-w-0 flex-1">
-          <CodeEditor
-            singleLine
-            className="absolute inset-x-0 top-0 z-20 min-h-9 rounded-md border bg-background px-1 py-1.5 has-[.cm-focused]:shadow-md has-[.cm-focused]:ring-2 has-[.cm-focused]:ring-ring/40"
-            placeholder="https://api.example.com/orders/:orderId"
-            value={request.url}
-            variables={variables}
-            onChange={setUrl}
-            onEnter={() => void send(dir, tab.path)}
-            onPasteText={pasteCurl}
+        <div className="flex items-center gap-2 border-b p-2">
+          <MethodSelect
+            value={request.method}
+            onChange={(method) => update((r) => ({ ...r, method }))}
           />
+          {/* The editor floats over the content below, so it can grow downwards while editing
+            without moving anything (see the single-line theme in CodeEditor). */}
+          <div className="relative h-9 min-w-0 flex-1">
+            <CodeEditor
+              singleLine
+              className="absolute inset-x-0 top-0 z-20 min-h-9 rounded-md border bg-background px-1 py-1.5 has-[.cm-focused]:shadow-md has-[.cm-focused]:ring-2 has-[.cm-focused]:ring-ring/40"
+              placeholder="https://api.example.com/orders/:orderId"
+              value={request.url}
+              pathParams
+              onChange={setUrl}
+              onEnter={() => void send(dir, tab.path)}
+              onPasteText={pasteCurl}
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0"
+            title="Copy as curl"
+            aria-label="Copy as curl"
+            onClick={() => openCurlExport(dir, tab.path)}
+          >
+            <SquareTerminal />
+          </Button>
+          {sending ? (
+            <Button variant="outline" onClick={() => void cancel(dir, tab.path)}>
+              <Loader2 className="animate-spin" />
+              Cancel
+              <X />
+            </Button>
+          ) : (
+            <Button onClick={() => void send(dir, tab.path)} title="Send (Ctrl/Cmd+Enter)">
+              <Send />
+              Send
+            </Button>
+          )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 shrink-0"
-          title="Copy as curl"
-          aria-label="Copy as curl"
-          onClick={() => openCurlExport(dir, tab.path)}
-        >
-          <SquareTerminal />
-        </Button>
-        {sending ? (
-          <Button variant="outline" onClick={() => void cancel(dir, tab.path)}>
-            <Loader2 className="animate-spin" />
-            Cancel
-            <X />
-          </Button>
-        ) : (
-          <Button onClick={() => void send(dir, tab.path)} title="Send (Ctrl/Cmd+Enter)">
-            <Send />
-            Send
-          </Button>
-        )}
-      </div>
 
-      <div className="flex min-h-0 flex-1">
-        <Tabs value={subTab} onValueChange={setSubTab} className="min-h-0 min-w-0 flex-1 gap-0">
-          <TabsList className="mx-2 mt-2">
-            <TabsTrigger value="params">Params</TabsTrigger>
-            <TabsTrigger value="body">Body</TabsTrigger>
-            <TabsTrigger value="headers">
-              Headers
-              {request.headers.length > 0 && (
-                <span className="text-muted-foreground">({request.headers.length})</span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="auth">Auth</TabsTrigger>
-            <TabsTrigger value="vars">Vars</TabsTrigger>
-            <TabsTrigger value="script">Script</TabsTrigger>
-            <TabsTrigger value="tests">Tests</TabsTrigger>
-            <TabsTrigger value="docs">Docs</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
+        <div className="flex min-h-0 flex-1">
+          <Tabs value={subTab} onValueChange={setSubTab} className="min-h-0 min-w-0 flex-1 gap-0">
+            <TabsList className="mx-2 mt-2">
+              <TabsTrigger value="params">Params</TabsTrigger>
+              <TabsTrigger value="body">Body</TabsTrigger>
+              <TabsTrigger value="headers">
+                Headers
+                {request.headers.length > 0 && (
+                  <span className="text-muted-foreground">({request.headers.length})</span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="auth">Auth</TabsTrigger>
+              <TabsTrigger value="vars">Vars</TabsTrigger>
+              <TabsTrigger value="script">Script</TabsTrigger>
+              <TabsTrigger value="tests">Tests</TabsTrigger>
+              <TabsTrigger value="docs">Docs</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="params" className="overflow-auto p-3">
-            <h3 className="mb-2 text-xs font-medium text-muted-foreground">Query</h3>
-            <KeyValueTable
-              rows={request.params.query}
-              onChange={(query) =>
-                update((r) => ({
-                  ...r,
-                  url: urlWithQueryParams(r.url, query),
-                  params: { ...r.params, query },
-                }))
-              }
-            />
-            <h3 className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Path</h3>
-            <PathParamsTable
-              params={request.params.path}
-              onChange={(path) => update((r) => ({ ...r, params: { ...r.params, path } }))}
-            />
-          </TabsContent>
-
-          <TabsContent value="body" className="min-h-0 p-3">
-            <BodyEditor
-              body={request.body}
-              variables={variables}
-              onChange={(body) => update((r) => ({ ...r, body }))}
-            />
-          </TabsContent>
-
-          <TabsContent value="headers" className="overflow-auto p-3">
-            <KeyValueTable
-              rows={request.headers}
-              onChange={(headers) => update((r) => ({ ...r, headers }))}
-              namePlaceholder="Header"
-            />
-          </TabsContent>
-
-          <TabsContent value="auth" className="overflow-auto p-3">
-            <AuthEditor
-              auth={request.auth as Auth}
-              canInherit
-              context={{ dir, path: tab.path, request }}
-              // `as`: the editor works with the generated type; see AuthEditor for why.
-              onChange={(auth) => update((r) => ({ ...r, auth: auth as Request["auth"] }))}
-            />
-          </TabsContent>
-
-          <TabsContent value="vars" className="overflow-auto p-3">
-            <VarsSection vars={request.vars} onChange={(vars) => update((r) => ({ ...r, vars }))} />
-          </TabsContent>
-
-          <TabsContent value="script" className="min-h-0 p-3">
-            <ScriptsSection
-              scripts={request.scripts}
-              onChange={(scripts) => update((r) => ({ ...r, scripts }))}
-            />
-          </TabsContent>
-
-          <TabsContent value="tests" className="min-h-0 p-3">
-            <TextSection
-              value={request.tests}
-              note={<TestsNote />}
-              language="javascript"
-              onChange={(tests) => update((r) => ({ ...r, tests }))}
-            />
-          </TabsContent>
-
-          <TabsContent value="docs" className="min-h-0 p-3">
-            <TextSection
-              value={request.docs}
-              onChange={(docs) => update((r) => ({ ...r, docs }))}
-            />
-          </TabsContent>
-
-          <TabsContent value="settings" className="overflow-auto p-3">
-            <label className="flex max-w-sm flex-col gap-1 text-sm">
-              Timeout (ms)
-              <Input
-                type="number"
-                min={1}
-                className="h-8"
-                placeholder="Inherit from folder / collection (default 30000)"
-                value={request.settings.timeoutMs ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value === "" ? null : Math.max(1, Number(e.target.value));
-                  update((r) => ({ ...r, settings: { ...r.settings, timeoutMs: value } }));
-                }}
+            <TabsContent value="params" className="overflow-auto p-3">
+              <h3 className="mb-2 text-xs font-medium text-muted-foreground">Query</h3>
+              <KeyValueTable
+                rows={request.params.query}
+                onChange={(query) =>
+                  update((r) => ({
+                    ...r,
+                    url: urlWithQueryParams(r.url, query),
+                    params: { ...r.params, query },
+                  }))
+                }
               />
-            </label>
-          </TabsContent>
-        </Tabs>
+              <h3 className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Path</h3>
+              <PathParamsTable
+                params={request.params.path}
+                onChange={(path) => update((r) => ({ ...r, params: { ...r.params, path } }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="body" className="min-h-0 p-3">
+              <BodyEditor
+                body={request.body}
+                onChange={(body) => update((r) => ({ ...r, body }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="headers" className="overflow-auto p-3">
+              <KeyValueTable
+                rows={request.headers}
+                onChange={(headers) => update((r) => ({ ...r, headers }))}
+                namePlaceholder="Header"
+              />
+            </TabsContent>
+
+            <TabsContent value="auth" className="overflow-auto p-3">
+              <AuthEditor
+                auth={request.auth as Auth}
+                canInherit
+                context={{ dir, path: tab.path, request }}
+                // `as`: the editor works with the generated type; see AuthEditor for why.
+                onChange={(auth) => update((r) => ({ ...r, auth: auth as Request["auth"] }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="vars" className="overflow-auto p-3">
+              <VarsSection
+                vars={request.vars}
+                onChange={(vars) => update((r) => ({ ...r, vars }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="script" className="min-h-0 p-3">
+              <ScriptsSection
+                scripts={request.scripts}
+                onChange={(scripts) => update((r) => ({ ...r, scripts }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="tests" className="min-h-0 p-3">
+              <TextSection
+                value={request.tests}
+                note={<TestsNote />}
+                language="javascript"
+                onChange={(tests) => update((r) => ({ ...r, tests }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="docs" className="min-h-0 p-3">
+              <TextSection
+                value={request.docs}
+                onChange={(docs) => update((r) => ({ ...r, docs }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="settings" className="overflow-auto p-3">
+              <label className="flex max-w-sm flex-col gap-1 text-sm">
+                Timeout (ms)
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-8"
+                  placeholder="Inherit from folder / collection (default 30000)"
+                  value={request.settings.timeoutMs ?? ""}
+                  onChange={(e) => {
+                    const value =
+                      e.target.value === "" ? null : Math.max(1, Number(e.target.value));
+                    update((r) => ({ ...r, settings: { ...r.settings, timeoutMs: value } }));
+                  }}
+                />
+              </label>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </VariablesContext.Provider>
   );
 }

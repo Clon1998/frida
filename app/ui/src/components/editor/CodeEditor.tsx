@@ -2,10 +2,16 @@ import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { Annotation, Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
+import { autocompletion, completionStatus } from "@codemirror/autocomplete";
 import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
 import { basicSetup, minimalSetup } from "codemirror";
-import { useEffect, useRef } from "react";
-import { setVariables, type VariableMap, variablesExtension } from "./variables";
+import { useContext, useEffect, useRef } from "react";
+import {
+  setVariables,
+  type VariableContext,
+  VariablesContext,
+  variablesExtension,
+} from "./variables";
 
 export type CodeLanguage = "json" | "xml" | "javascript" | "text";
 
@@ -15,10 +21,17 @@ interface CodeEditorProps {
   language?: CodeLanguage;
   readOnly?: boolean;
   className?: string;
-  /** Variables of the current request, for `{{var}}` highlighting and tooltips. */
-  variables?: VariableMap;
+  /**
+   * Variables for `{{var}}` highlighting, tooltips and autocompletion. Defaults to the
+   * surrounding {@link VariablesContext} (the request editor provides one).
+   */
+  variables?: VariableContext | null;
+  /** Also highlight `:pathParams` (the URL bar). */
+  pathParams?: boolean;
   /** One line only (e.g. the URL bar): newlines are removed, Enter calls `onEnter`. */
   singleLine?: boolean;
+  /** A single-line editor sized like a table cell input. */
+  compact?: boolean;
   onEnter?: () => void;
   placeholder?: string;
   /** Called with pasted text; return `true` to handle it instead of inserting it. */
@@ -88,6 +101,13 @@ const singleLineTheme = EditorView.theme({
  */
 const externalChange = Annotation.define<boolean>();
 
+/** Single-line editors in table cells: the height and padding of a plain cell input. */
+const compactTheme = EditorView.theme({
+  "&": { fontSize: "12px" },
+  ".cm-scroller": { lineHeight: "2rem" },
+  ".cm-content, .cm-line": { padding: "0 4px" },
+});
+
 /** Keeps a single-line editor on one line: pasted newlines become spaces. */
 const singleLineFilter = EditorState.transactionFilter.of((tr) => {
   if (!tr.docChanged || tr.newDoc.lines === 1) return tr;
@@ -105,12 +125,16 @@ export function CodeEditor({
   language = "text",
   readOnly = false,
   className,
-  variables,
+  variables: variablesProp,
+  pathParams = false,
   singleLine = false,
+  compact = false,
   onEnter,
   placeholder,
   onPasteText,
 }: CodeEditorProps) {
+  const contextVariables = useContext(VariablesContext);
+  const variables = variablesProp === undefined ? contextVariables : variablesProp;
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -133,8 +157,23 @@ export function CodeEditor({
           minimalSetup,
           singleLineFilter,
           singleLineTheme,
+          compact ? compactTheme : [],
           EditorView.lineWrapping,
-          Prec.highest(keymap.of([{ key: "Enter", run: () => (onEnterRef.current?.(), true) }])),
+          // minimalSetup has no autocompletion; `{{` suggestions need it.
+          autocompletion({ icons: false }),
+          Prec.highest(
+            keymap.of([
+              {
+                key: "Enter",
+                // With the suggestion list open, Enter picks a suggestion instead of sending.
+                run: (view) => {
+                  if (completionStatus(view.state) === "active") return false;
+                  onEnterRef.current?.();
+                  return true;
+                },
+              },
+            ]),
+          ),
         ]
       : [basicSetup, EditorView.lineWrapping];
     const editor = new EditorView({
@@ -144,7 +183,7 @@ export function CodeEditor({
         extensions: [
           lineMode,
           theme,
-          variablesExtension(),
+          variablesExtension({ pathParams }),
           placeholder ? placeholderExtension(placeholder) : [],
           languageSlot.current.of(languageExtension(language)),
           readOnlySlot.current.of([
@@ -203,7 +242,7 @@ export function CodeEditor({
   }, [readOnly]);
 
   useEffect(() => {
-    if (variables) view.current?.dispatch({ effects: setVariables.of(variables) });
+    view.current?.dispatch({ effects: setVariables.of(variables ?? null) });
   }, [variables]);
 
   return <div ref={host} className={className} />;

@@ -87,3 +87,39 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+/* {{variables}} and :pathParams in the editors (src/components/editor/variables.ts), like Bruno:
+   green when they have a value, red when they don't, amber for secrets. */
+.cm-var-resolved {
+  color: var(--color-emerald-700, oklch(50.8% 0.118 165.612));
+  background-color: color-mix(
+    in oklch,
+    var(--color-emerald-500, oklch(69.6% 0.17 162.48)) 14%,
+    transparent
+  );
+}
+.cm-var-secret {
+  color: var(--color-amber-700, oklch(55.5% 0.163 48.998));
+  background-color: color-mix(
+    in oklch,
+    var(--color-amber-500, oklch(76.9% 0.188 70.08)) 16%,
+    transparent
+  );
+}
+.cm-var-unresolved {
+  color: var(--color-red-700, oklch(50.5% 0.213 27.518));
+  background-color: color-mix(
+    in oklch,
+    var(--color-red-500, oklch(63.7% 0.237 25.331)) 14%,
+    transparent
+  );
+}
+.dark .cm-var-resolved {
+  color: var(--color-emerald-400, oklch(76.5% 0.177 163.223));
+}
+.dark .cm-var-secret {
+  color: var(--color-amber-400, oklch(82.8% 0.189 84.429));
+}
+.dark .cm-var-unresolved {
+  color: var(--color-red-400, oklch(70.4% 0.191 22.216));
+}

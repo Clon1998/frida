@@ -12,7 +12,10 @@
   (`asserts.rs`); environments with secrets (no values) listed for filling in; warnings for everything Frida can't do.
 - **UI**: "Import Bruno collection…" next to "Import OpenAPI…", using the same preview/import/summary dialog.
 - Also in this round (feedback): duplicating environments (secrets copied inside Rust), Ctrl/Cmd+S in the environment
-  editor, editors remembering their sub-tab and the selected environment.
+  editor, editors remembering their sub-tab and the selected environment, the environment editor's unsaved dot (its
+  edits now survive tab switches), `{{` autocompletion and green/red variable highlighting (also `:pathParams` and
+  key/value cells in the request editor), and a fix for the active collection environment being cleared whenever
+  tabs changed (which also broke OAuth2 token requests using environment variables).
 
 ### Rust things worth understanding in this milestone
 1. **A hand-written line parser** (`bru.rs`). Instead of a parser library, a `while i < lines.len()` loop with an
