@@ -105,10 +105,11 @@ pub async fn preview_openapi(file: String) -> ApiResult<ImportSummary> {
     blocking(move || Ok(import::preview_openapi_file(Path::new(&file))?)).await
 }
 
-/// The result of an import: the updated workspace, the new collection's folder and the summary.
+/// The result of an import (OpenAPI or Bruno): the updated workspace, the new collection's
+/// folder and the summary.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct OpenApiImported {
+pub struct CollectionImported {
     pub overview: WorkspaceOverview,
     pub dir: String,
     pub summary: ImportSummary,
@@ -122,7 +123,7 @@ pub async fn import_openapi(
     state: State<'_, AppState>,
     file: String,
     target: Option<String>,
-) -> ApiResult<OpenApiImported> {
+) -> ApiResult<CollectionImported> {
     let ws = state.workspace_dir()?;
     let ws_for_import = ws.clone();
     let (dir, summary) = blocking(move || {
@@ -134,12 +135,52 @@ pub async fn import_openapi(
         )?)
     })
     .await?;
-    let overview = state.refresh_workspace(&ws)?;
+    imported(&state, &ws, dir, summary)
+}
+
+fn imported(
+    state: &AppState,
+    ws: &Path,
+    dir: PathBuf,
+    summary: ImportSummary,
+) -> ApiResult<CollectionImported> {
+    let overview = state.refresh_workspace(ws)?;
     // The overview lists canonical folders, so return the same form for the UI to select it.
     let dir = dir.canonicalize().unwrap_or(dir);
-    Ok(OpenApiImported {
+    Ok(CollectionImported {
         overview,
         dir: dir.to_string_lossy().to_string(),
         summary,
     })
+}
+
+/// What importing the Bruno collection in `dir` (`.bru` or YAML format) would create.
+#[tauri::command]
+#[specta::specta]
+pub async fn preview_bruno(dir: String) -> ApiResult<ImportSummary> {
+    blocking(move || Ok(import::preview_bruno_dir(Path::new(&dir))?)).await
+}
+
+/// Imports the Bruno collection in `source` as a new collection, in `target` or by default in
+/// `<workspace>/collections/<name>`, and adds it to the workspace. The Bruno files are not
+/// changed.
+#[tauri::command]
+#[specta::specta]
+pub async fn import_bruno(
+    state: State<'_, AppState>,
+    source: String,
+    target: Option<String>,
+) -> ApiResult<CollectionImported> {
+    let ws = state.workspace_dir()?;
+    let ws_for_import = ws.clone();
+    let (dir, summary) = blocking(move || {
+        let target = target.map(PathBuf::from);
+        Ok(import::import_bruno_dir(
+            &ws_for_import,
+            Path::new(&source),
+            target.as_deref(),
+        )?)
+    })
+    .await?;
+    imported(&state, &ws, dir, summary)
 }

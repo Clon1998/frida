@@ -13,11 +13,11 @@ import {
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { useTabs } from "@/stores/tabs";
-import { useActiveCollection, useWorkspace } from "@/stores/workspace";
+import { type ImportKind, useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { HistoryPanel } from "@/components/history/HistoryPanel";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollectionTree } from "./CollectionTree";
-import { OpenApiImportDialog } from "./OpenApiImportDialog";
+import { ImportCollectionDialog } from "./ImportCollectionDialog";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export function Sidebar() {
@@ -28,7 +28,7 @@ export function Sidebar() {
   const createCollection = useWorkspace((s) => s.createCollection);
   const removeCollection = useWorkspace((s) => s.removeCollection);
   const [creating, setCreating] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState<ImportKind | null>(null);
   const [view, setView] = useState<"tree" | "history">("tree");
   const [removing, setRemoving] = useState(false);
   const openTab = useTabs((s) => s.openTab);
@@ -75,8 +75,11 @@ export function Sidebar() {
             <DropdownMenuItem onSelect={() => void pickExistingCollection()}>
               <FolderPlus /> Add existing collection…
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setImporting(true)}>
+            <DropdownMenuItem onSelect={() => setImporting("openapi")}>
               <FileUp /> Import OpenAPI…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setImporting("bruno")}>
+              <FileUp /> Import Bruno collection…
             </DropdownMenuItem>
             {active && (
               <DropdownMenuItem onSelect={() => void openTab(active.dir, "")}>
@@ -131,13 +134,16 @@ export function Sidebar() {
           <Button size="sm" variant="outline" onClick={() => void pickExistingCollection()}>
             Add existing…
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
+          <Button size="sm" variant="outline" onClick={() => setImporting("openapi")}>
             Import OpenAPI…
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setImporting("bruno")}>
+            Import Bruno…
           </Button>
         </div>
       )}
 
-      <OpenApiImportDialog open={importing} onOpenChange={setImporting} />
+      <ImportCollectionDialog kind={importing} onOpenChange={(o) => !o && setImporting(null)} />
       <NameDialog
         open={creating}
         title="New collection"

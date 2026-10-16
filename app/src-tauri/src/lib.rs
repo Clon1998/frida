@@ -67,6 +67,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             workspace::remove_collection,
             workspace::preview_openapi,
             workspace::import_openapi,
+            workspace::preview_bruno,
+            workspace::import_bruno,
             collection::read_collection,
             collection::save_collection,
             collection::get_tree,

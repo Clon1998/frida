@@ -12,50 +12,74 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toApiError, unwrap } from "@/lib/api";
-import { useWorkspace } from "@/stores/workspace";
+import { type ImportKind, useWorkspace } from "@/stores/workspace";
 
 type Step =
   | { kind: "pick" }
   | { kind: "preview"; file: string; summary: ImportSummary }
   | { kind: "done"; summary: ImportSummary };
 
+const TEXTS: Record<ImportKind, { title: string; intro: string; choose: string }> = {
+  openapi: {
+    title: "Import OpenAPI",
+    intro: "Creates a new collection from an OpenAPI 3.0 or 3.1 file (YAML or JSON).",
+    choose: "Choose file…",
+  },
+  bruno: {
+    title: "Import Bruno collection",
+    intro:
+      "Creates a new collection from a Bruno collection folder (.bru files or the YAML format). The Bruno files are not changed.",
+    choose: "Choose folder…",
+  },
+};
+
 /**
- * "Import OpenAPI…": choose a spec file, see what it will create, choose where, import,
- * then see the summary (counts, secrets to fill in, warnings). PLAN.md §11.1.
+ * "Import OpenAPI…" / "Import Bruno collection…": choose the source, see what it will create,
+ * choose where, import, then see the summary (counts, secrets to fill in, warnings).
+ * PLAN.md §11.1 and §11.2.
  */
-export function OpenApiImportDialog({
-  open: isOpen,
+export function ImportCollectionDialog({
+  kind,
   onOpenChange,
 }: {
-  open: boolean;
+  /** `null` when closed. */
+  kind: ImportKind | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const isOpen = kind !== null;
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         {/* Mounted only while open, so every import starts fresh. */}
-        {isOpen && <ImportFlow onClose={() => onOpenChange(false)} />}
+        {kind && <ImportFlow kind={kind} onClose={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function ImportFlow({ onClose }: { onClose: () => void }) {
-  const importOpenApi = useWorkspace((s) => s.importOpenApi);
+function ImportFlow({ kind, onClose }: { kind: ImportKind; onClose: () => void }) {
+  const importCollection = useWorkspace((s) => s.importCollection);
+  const texts = TEXTS[kind];
   const [step, setStep] = useState<Step>({ kind: "pick" });
   const [target, setTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const pickFile = async () => {
-    const file = await open({
-      title: "Choose an OpenAPI file",
-      filters: [{ name: "OpenAPI", extensions: ["yaml", "yml", "json"] }],
-    });
+    const file =
+      kind === "openapi"
+        ? await open({
+            title: "Choose an OpenAPI file",
+            filters: [{ name: "OpenAPI", extensions: ["yaml", "yml", "json"] }],
+          })
+        : await open({ directory: true, title: "Choose the Bruno collection folder" });
     if (typeof file !== "string") return;
     setError(null);
     try {
-      setStep({ kind: "preview", file, summary: await unwrap(commands.previewOpenapi(file)) });
+      const summary = await unwrap(
+        kind === "openapi" ? commands.previewOpenapi(file) : commands.previewBruno(file),
+      );
+      setStep({ kind: "preview", file, summary });
     } catch (e) {
       setError(toApiError(e).message);
     }
@@ -70,7 +94,7 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      setStep({ kind: "done", summary: await importOpenApi(file, target) });
+      setStep({ kind: "done", summary: await importCollection(kind, file, target) });
     } catch (e) {
       setError(toApiError(e).message);
     } finally {
@@ -81,10 +105,9 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{step.kind === "done" ? "OpenAPI imported" : "Import OpenAPI"}</DialogTitle>
+        <DialogTitle>{step.kind === "done" ? "Imported" : texts.title}</DialogTitle>
         <DialogDescription>
-          {step.kind === "pick" &&
-            "Creates a new collection from an OpenAPI 3.0 or 3.1 file (YAML or JSON)."}
+          {step.kind === "pick" && texts.intro}
           {step.kind === "preview" && step.file}
           {step.kind === "done" && `“${step.summary.collectionName}” was added to the workspace.`}
         </DialogDescription>
@@ -92,7 +115,7 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
 
       {step.kind === "pick" && (
         <Button variant="outline" className="w-full" onClick={() => void pickFile()}>
-          <FileUp /> Choose file…
+          <FileUp /> {texts.choose}
         </Button>
       )}
 
@@ -144,14 +167,21 @@ function SummaryView({ summary, done }: { summary: ImportSummary; done: boolean 
     <div className="space-y-3 text-sm">
       <p>
         <span className="font-medium">{summary.collectionName}</span>: {summary.requests} requests
-        {summary.folders > 0 && ` in ${summary.folders} folders`}, base URL{" "}
-        <code className="text-xs">{summary.baseUrl}</code> in a <code>default</code> environment.
+        {summary.folders > 0 && ` in ${summary.folders} folders`}
+        {summary.environments > 0 && `, ${summary.environments} environment(s)`}
+        {summary.baseUrl && (
+          <>
+            , base URL <code className="text-xs">{summary.baseUrl}</code> in a <code>default</code>{" "}
+            environment
+          </>
+        )}
+        .
       </p>
       {summary.secretsToFill.length > 0 && (
         <p className="flex gap-2">
           <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <span>
-            {done ? "Fill in" : "Will need"} these secrets in the <code>default</code> environment:{" "}
+            {done ? "Fill in" : "Will need"} these secrets in the environment editor:{" "}
             {summary.secretsToFill.map((s) => (
               <code key={s} className="mr-1 text-xs">
                 {s}

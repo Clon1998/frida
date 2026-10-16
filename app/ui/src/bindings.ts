@@ -34,7 +34,15 @@ export const commands = {
 	 *  Imports the OpenAPI spec at `file` as a new collection, in `target` or by default in
 	 *  `<workspace>/collections/<title>`, and adds it to the workspace.
 	 */
-	importOpenapi: (file: string, target: string | null) => typedError<OpenApiImported, ApiError>(__TAURI_INVOKE("import_openapi", { file, target })),
+	importOpenapi: (file: string, target: string | null) => typedError<CollectionImported, ApiError>(__TAURI_INVOKE("import_openapi", { file, target })),
+	/**  What importing the Bruno collection in `dir` (`.bru` or YAML format) would create. */
+	previewBruno: (dir: string) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_bruno", { dir })),
+	/**
+	 *  Imports the Bruno collection in `source` as a new collection, in `target` or by default in
+	 *  `<workspace>/collections/<name>`, and adds it to the workspace. The Bruno files are not
+	 *  changed.
+	 */
+	importBruno: (source: string, target: string | null) => typedError<CollectionImported, ApiError>(__TAURI_INVOKE("import_bruno", { source, target })),
 	/**  The collection's own settings file (`collection.yaml`). */
 	readCollection: (dir: string) => typedError<Collection, ApiError>(__TAURI_INVOKE("read_collection", { dir })),
 	saveCollection: (dir: string, collection: Collection) => typedError<null, ApiError>(__TAURI_INVOKE("save_collection", { dir, collection })),
@@ -270,6 +278,16 @@ export type Collection = {
 	docs?: string,
 };
 
+/**
+ *  The result of an import (OpenAPI or Bruno): the updated workspace, the new collection's
+ *  folder and the summary.
+ */
+export type CollectionImported = {
+	overview: WorkspaceOverview,
+	dir: string,
+	summary: ImportSummary,
+};
+
 /**  Collection-level settings: the root of the settings inheritance chain. */
 export type CollectionSettings = {
 	timeoutMs?: number | null,
@@ -486,7 +504,8 @@ export type ImportSummary = {
 	collectionName: string,
 	requests: number,
 	folders: number,
-	/**  The `baseUrl` of the created `default` environment. */
+	environments: number,
+	/**  The `baseUrl` of the created `default` environment (empty when not applicable). */
 	baseUrl: string,
 	/**  Secret variables created without a value, for the user to fill in. */
 	secretsToFill: string[],
@@ -533,13 +552,6 @@ export type OAuth2Config = {
 };
 
 export type OAuth2Grant = "client_credentials" | "authorization_code" | "password";
-
-/**  The result of an import: the updated workspace, the new collection's folder and the summary. */
-export type OpenApiImported = {
-	overview: WorkspaceOverview,
-	dir: string,
-	summary: ImportSummary,
-};
 
 export type Params = {
 	/**  Kept in sync with the query string of `url` by the UI. */

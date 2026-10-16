@@ -8,6 +8,9 @@ import {
 } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
 
+/** What can be imported as a new collection. */
+export type ImportKind = "openapi" | "bruno";
+
 interface WorkspaceState {
   settings: AppSettings | null;
   workspace: WorkspaceOverview | null;
@@ -24,10 +27,15 @@ interface WorkspaceState {
   createCollection: (name: string) => Promise<void>;
   addCollection: (dir: string) => Promise<void>;
   /**
-   * Imports an OpenAPI file as a new collection (in `target`, or the workspace's
-   * `collections/` folder) and selects it. Throws on failure, so the dialog can show it.
+   * Imports an OpenAPI file or a Bruno collection folder as a new collection (in `target`, or
+   * the workspace's `collections/` folder) and selects it. Throws on failure, so the dialog
+   * can show it.
    */
-  importOpenApi: (file: string, target: string | null) => Promise<ImportSummary>;
+  importCollection: (
+    kind: ImportKind,
+    source: string,
+    target: string | null,
+  ) => Promise<ImportSummary>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
   reloadTree: (dir: string) => Promise<void>;
@@ -103,8 +111,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       }
     },
 
-    importOpenApi: async (file, target) => {
-      const result = await unwrap(commands.importOpenapi(file, target));
+    importCollection: async (kind, source, target) => {
+      const result = await unwrap(
+        kind === "openapi"
+          ? commands.importOpenapi(source, target)
+          : commands.importBruno(source, target),
+      );
       set({ activeCollectionDir: result.dir });
       await applyOverview(result.overview);
       return result.summary;
