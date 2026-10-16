@@ -1,5 +1,31 @@
 # Changelog
 
+## M9: Bruno import (2026-10-16, done before M7)
+
+### What was built
+- **Readers** (`crates/frida-core/src/import/bruno/`): `bru.rs` parses Bruno's block format (dictionary, text and
+  list blocks, `~disabled` rows, multi-line `'''` values, annotations), `read_bru.rs` walks a `.bru` collection
+  (`bruno.json`, `collection.bru`, `folder.bru`, environments), `read_yml.rs` reads the YAML OpenCollection format.
+  Both produce one in-between model (`model.rs`), so the mapping to Frida is written once (`mod.rs`).
+- **Mapping**: headers, params, all body modes, auth (basic, bearer, API key, OAuth2), variables, scripts and docs
+  at collection, folder and request level; post-response variables as script lines; assertions converted to tests
+  (`asserts.rs`); environments with secrets (no values) listed for filling in; warnings for everything Frida can't do.
+- **UI**: "Import Bruno collection…" next to "Import OpenAPI…", using the same preview/import/summary dialog.
+- Also in this round (feedback): duplicating environments (secrets copied inside Rust), Ctrl/Cmd+S in the environment
+  editor, editors remembering their sub-tab and the selected environment.
+
+### Rust things worth understanding in this milestone
+1. **A hand-written line parser** (`bru.rs`). Instead of a parser library, a `while i < lines.len()` loop with an
+   index you advance yourself handles blocks and multi-line values; `&lines[start..i]` is a *slice* (a borrowed view,
+   like `List.subList` without copying).
+2. **One in-between model for two inputs** (`model.rs`). Two readers convert into the same plain structs, so the
+   mapper doesn't care which format it came from: the same idea as a DTO layer in Spring.
+3. **`Box` in enums** (`PlannedItem`, `model::Auth::OAuth2`). An enum value is as big as its largest variant; boxing
+   the large ones keeps every value small (clippy's `large_enum_variant` lint points this out).
+4. **Iterator chaining** (`unsupported_calls`). `SUPPORTED.iter().copied().chain(once(...))` reuses the `bru` list
+   for `fri` without building a new array.
+
+
 ## M6: OpenAPI import (2026-10-16)
 
 ### What was built

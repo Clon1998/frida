@@ -554,9 +554,13 @@ variables, bearer/basic/OAuth2 and per-operation security), checks the tricky ma
 **Acceptance:** unit tests run with a mocked SDK client (or a localstack-style test if feasible), and the UI flow prompts for a profile on first use.
 
 ### M9: Bruno import
-- [ ] §11.2.
+- [x] §11.2. (Done before M7, see the decisions log.)
 
 **Acceptance:** sample Bruno collections in `testdata/` import with an expected snapshot output and a warnings list.
+*Status 2026-10-16: done (automated): `crates/frida-core/tests/bruno.rs` snapshots a hand-written `.bru` collection
+(`testdata/bruno/shop`) and Bruno's own YAML test collection, imports Bruno's full `.bru` testbench (227 requests)
+with a snapshot of its warnings, and runs an imported collection end to end (login → post-response variable →
+inherited bearer auth, converted assertions passing).*
 
 ### M10: Release polish
 - [ ] Tauri bundler output: .dmg, .msi/.exe (NSIS), AppImage and .deb, plus an app icon.
@@ -695,6 +699,19 @@ Deviations from and clarifications of this plan, newest last.
 - **2026-10-16 `fri` scripting object (requested by Patrick).** The scripting object is `fri` (Frida's own name);
   `bru` is the same object under Bruno's name, so Bruno scripts and imported Bruno collections run unchanged. Docs,
   samples and error messages use `fri`. §10's `bru.*` list applies to `fri.*`.
+
+- **2026-10-16 Milestone order (requested by Patrick).** M9 (Bruno import) was done right after M6, before M7;
+  then the original order continues (M7, M8, M10).
+- **2026-10-16 Bruno import (M9).** Both formats: `.bru` (own block parser following Bruno's grammar) and the YAML
+  OpenCollection format (default since Bruno 3.1). Folders and requests keep Bruno's order (folders first, by `seq`).
+  Deviation from §11.2: `assert` rows are **converted to tests** (`res.status: eq 200` →
+  `test(..., () => expect(res.status).to.eql(200))`, all of Bruno's operators); only rows that can't be converted
+  stay as comments with a warning. `vars:post-response` become `fri.setVar(...)` lines at the start of the
+  post-response script. GraphQL requests become JSON POST bodies; SPARQL a text body with its content type. Relative
+  file paths (multipart, file bodies) become absolute paths into the Bruno collection. Unsupported auth (digest,
+  NTLM, AWS SigV4, OAuth1, WSSE, Akamai) and the implicit OAuth2 grant become "none" with a warning; gRPC/WebSocket
+  requests are skipped with a warning. Script calls Frida lacks are listed per script; disabled environment
+  variables are left out with a warning. The Bruno folder is only read, never changed.
 
 ## 17. Testing strategy
 
