@@ -39,6 +39,13 @@ export const commands = {
 	addCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("add_collection", { dir })),
 	/**  Removes a collection from the workspace list. Its files are not deleted. */
 	removeCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("remove_collection", { dir })),
+	/**
+	 *  "Remove from list": takes `dir` off the recent and pinned workspaces. Returns the new
+	 *  settings.
+	 */
+	forgetWorkspace: (dir: string) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("forget_workspace", { dir })),
+	/**  Pins or unpins the workspace `dir` in the workspace menu. Returns the new settings. */
+	pinWorkspace: (dir: string, pinned: boolean) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("pin_workspace", { dir, pinned })),
 	/**  What importing the OpenAPI spec at `file` would create (counts, base URL, warnings). */
 	previewOpenapi: (file: string, grouping: OpenApiGrouping) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file, grouping })),
 	/**
@@ -299,6 +306,11 @@ export type ApiKeyLocation = "header" | "query";
 export type AppSettings = {
 	/**  Absolute workspace folders, most recent first. */
 	recentWorkspaces?: string[],
+	/**
+	 *  Workspaces the user pinned, in the order they were pinned. They stay in the menu and on
+	 *  the start screen however many others are opened.
+	 */
+	pinnedWorkspaces?: string[],
 	/**  The active global environment per workspace folder. */
 	activeGlobalEnvironments?: { [key in string]: string },
 	/**  The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`. */

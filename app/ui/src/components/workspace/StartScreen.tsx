@@ -1,17 +1,21 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, Plus, Settings } from "lucide-react";
+import { FolderOpen, Pin, PinOff, Plus, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { folderName, workspaceLists } from "@/lib/workspaces";
 import { useUi } from "@/stores/ui";
 import { useWorkspace } from "@/stores/workspace";
 import { NameDialog } from "./NameDialog";
 
-/** Stable empty value: a selector returning a fresh `[]` each time would re-render forever. */
-const NO_RECENT: string[] = [];
-
 /** Shown when no workspace is open: create one, open one, or pick a recent one. */
 export function StartScreen() {
-  const recent = useWorkspace((s) => s.settings?.recentWorkspaces) ?? NO_RECENT;
+  const { pinned, recent } = workspaceLists(useWorkspace((s) => s.settings));
   const openWorkspace = useWorkspace((s) => s.openWorkspace);
   const createWorkspace = useWorkspace((s) => s.createWorkspace);
   const [newDir, setNewDir] = useState<string | null>(null);
@@ -67,24 +71,8 @@ export function StartScreen() {
           collection menu once a workspace is open.
         </li>
       </ul>
-      {recent.length > 0 && (
-        <div className="w-full max-w-md">
-          <h2 className="mb-1 text-xs font-medium text-muted-foreground">Recent</h2>
-          <ul className="rounded-md border">
-            {recent.map((dir) => (
-              <li key={dir}>
-                <button
-                  type="button"
-                  className="w-full truncate px-3 py-2 text-left font-mono text-xs hover:bg-accent"
-                  onClick={() => void openWorkspace(dir)}
-                >
-                  {dir}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <WorkspaceList title="Pinned" dirs={pinned} pinned />
+      <WorkspaceList title="Recent" dirs={recent} pinned={false} />
       <NameDialog
         open={newDir !== null}
         title="New workspace"
@@ -95,5 +83,63 @@ export function StartScreen() {
         }}
       />
     </main>
+  );
+}
+
+/** Pinned or recent workspaces. Right-click an entry to pin/unpin it or remove it. */
+function WorkspaceList({
+  title,
+  dirs,
+  pinned,
+}: {
+  title: string;
+  dirs: string[];
+  pinned: boolean;
+}) {
+  const openWorkspace = useWorkspace((s) => s.openWorkspace);
+  const pinWorkspace = useWorkspace((s) => s.pinWorkspace);
+  const forgetWorkspace = useWorkspace((s) => s.forgetWorkspace);
+  if (dirs.length === 0) return null;
+  return (
+    <div className="w-full max-w-md">
+      <h2 className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+        {pinned && <Pin className="size-3" />} {title}
+      </h2>
+      <ul className="rounded-md border">
+        {dirs.map((dir) => (
+          <li key={dir}>
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  title={`${dir}\nRight-click to pin or remove`}
+                  className="flex w-full items-baseline gap-2 px-3 py-2 text-left hover:bg-accent"
+                  onClick={() => void openWorkspace(dir)}
+                >
+                  <span className="shrink-0 text-sm text-foreground">{folderName(dir)}</span>
+                  <span className="truncate font-mono text-xs text-muted-foreground">{dir}</span>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => void pinWorkspace(dir, !pinned)}>
+                  {pinned ? (
+                    <>
+                      <PinOff /> Unpin
+                    </>
+                  ) : (
+                    <>
+                      <Pin /> Pin
+                    </>
+                  )}
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => void forgetWorkspace(dir)}>
+                  <X /> Remove from list
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

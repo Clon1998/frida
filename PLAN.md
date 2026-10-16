@@ -803,6 +803,11 @@ Deviations from and clarifications of this plan, newest last.
   The importer also orders a combined requirement so the primary scheme (e.g. OAuth2) comes first and API keys follow,
   as the auth editor expects (§4.5).
 
+- **2026-10-16 Pinned workspaces (requested by Patrick).** The workspace menu and the start screen show pinned
+  workspaces first, then at most 5 recent ones (10 are still remembered). Entries can be pinned/unpinned and removed
+  from the list: on hover in the menu (a right-click menu inside an open dropdown fights Radix for focus), by
+  right-click on the start screen. `pinnedWorkspaces` is new in the local `settings.json` (§4.6); no repo format change.
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.

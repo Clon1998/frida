@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use frida_core::import::{self, ImportSummary, OpenApiGrouping};
+use frida_core::local_state::AppSettings;
 use frida_core::storage::{self, WorkspaceOverview};
 use tauri::State;
 
@@ -32,6 +33,31 @@ pub fn open_workspace(state: State<'_, AppState>, dir: String) -> ApiResult<Work
     state.local.save_settings(&settings)?;
     tracing::info!(workspace = %dir, "workspace opened");
     Ok(overview)
+}
+
+/// "Remove from list": takes `dir` off the recent and pinned workspaces. Returns the new
+/// settings.
+#[tauri::command]
+#[specta::specta]
+pub fn forget_workspace(state: State<'_, AppState>, dir: String) -> ApiResult<AppSettings> {
+    let mut settings = state.local.load_settings();
+    settings.forget_workspace(&dir);
+    state.local.save_settings(&settings)?;
+    Ok(settings)
+}
+
+/// Pins or unpins the workspace `dir` in the workspace menu. Returns the new settings.
+#[tauri::command]
+#[specta::specta]
+pub fn pin_workspace(
+    state: State<'_, AppState>,
+    dir: String,
+    pinned: bool,
+) -> ApiResult<AppSettings> {
+    let mut settings = state.local.load_settings();
+    settings.pin_workspace(&dir, pinned);
+    state.local.save_settings(&settings)?;
+    Ok(settings)
 }
 
 /// Reloads the open workspace, e.g. after `frida-workspace.yaml` changed on disk.

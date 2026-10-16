@@ -18,6 +18,9 @@ pub const MAX_RECENT_WORKSPACES: usize = 10;
 pub struct AppSettings {
     /// Absolute workspace folders, most recent first.
     pub recent_workspaces: Vec<String>,
+    /// Workspaces the user pinned, in the order they were pinned. They stay in the menu and on
+    /// the start screen however many others are opened.
+    pub pinned_workspaces: Vec<String>,
     /// The active global environment per workspace folder.
     pub active_global_environments: std::collections::BTreeMap<String, String>,
     /// The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`.
@@ -136,6 +139,21 @@ impl AppSettings {
         self.recent_workspaces.retain(|w| w != workspace);
         self.recent_workspaces.insert(0, workspace.to_string());
         self.recent_workspaces.truncate(MAX_RECENT_WORKSPACES);
+    }
+
+    /// Takes `workspace` off the recent and pinned lists ("Remove from list"). The folder
+    /// itself is not touched.
+    pub fn forget_workspace(&mut self, workspace: &str) {
+        self.recent_workspaces.retain(|w| w != workspace);
+        self.pinned_workspaces.retain(|w| w != workspace);
+    }
+
+    /// Pins or unpins `workspace`.
+    pub fn pin_workspace(&mut self, workspace: &str, pinned: bool) {
+        self.pinned_workspaces.retain(|w| w != workspace);
+        if pinned {
+            self.pinned_workspaces.push(workspace.to_string());
+        }
     }
 }
 
@@ -322,6 +340,22 @@ mod tests {
         };
         store.save_collection_state(id, &state).unwrap();
         assert_eq!(store.load_collection_state(id).unwrap(), state);
+    }
+
+    #[test]
+    fn pinned_workspaces_can_be_pinned_unpinned_and_forgotten() {
+        let mut settings = AppSettings::default();
+        settings.remember_workspace("/a");
+        settings.remember_workspace("/b");
+        settings.pin_workspace("/a", true);
+        settings.pin_workspace("/a", true);
+        settings.pin_workspace("/c", true);
+        assert_eq!(settings.pinned_workspaces, ["/a", "/c"]);
+        settings.pin_workspace("/c", false);
+        assert_eq!(settings.pinned_workspaces, ["/a"]);
+        settings.forget_workspace("/a");
+        assert!(settings.pinned_workspaces.is_empty());
+        assert_eq!(settings.recent_workspaces, ["/b"]);
     }
 
     #[test]

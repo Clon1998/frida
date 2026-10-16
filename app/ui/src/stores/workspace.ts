@@ -21,6 +21,9 @@ interface WorkspaceState {
   trees: Record<string, TreeNode[]>;
 
   loadSettings: () => Promise<void>;
+  /** "Remove from list": takes a workspace off the recent and pinned lists. */
+  forgetWorkspace: (dir: string) => Promise<void>;
+  pinWorkspace: (dir: string, pinned: boolean) => Promise<void>;
   /**
    * Saves the Settings dialog. Shown right away; Rust corrects values out of range and applies
    * what isn't UI (git program, AWS).
@@ -68,6 +71,22 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
 
     loadSettings: async () => {
       set({ settings: await commands.getSettings() });
+    },
+
+    forgetWorkspace: async (dir) => {
+      try {
+        set({ settings: await unwrap(commands.forgetWorkspace(dir)) });
+      } catch (e) {
+        showError(e);
+      }
+    },
+
+    pinWorkspace: async (dir, pinned) => {
+      try {
+        set({ settings: await unwrap(commands.pinWorkspace(dir, pinned)) });
+      } catch (e) {
+        showError(e);
+      }
     },
 
     savePreferences: async (preferences) => {
