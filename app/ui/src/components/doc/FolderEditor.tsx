@@ -66,6 +66,7 @@ export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
             <TextSection
               value={folder.tests}
               note={<TestsNote />}
+              examples="tests"
               language="javascript"
               onChange={(tests) => update((f) => ({ ...f, tests }))}
             />

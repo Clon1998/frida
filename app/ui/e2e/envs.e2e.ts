@@ -11,7 +11,8 @@ async function openEnvironments(page: Page) {
 const entry = (page: Page, name: string) =>
   page.getByTitle(/Drag to reorder/).filter({ hasText: new RegExp(`^${name}`) });
 
-test("copy an environment to the clipboard and paste it", async ({ app }) => {
+test("copy an environment to the clipboard and paste it", async ({ app, browserName }) => {
+  test.skip(browserName === "webkit", "Playwright's WebKit can't grant clipboard permissions");
   await app.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await openWorkspace(app);
   await openEnvironments(app);

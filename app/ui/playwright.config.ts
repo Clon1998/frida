@@ -18,7 +18,13 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
   },
+  // WebKit is what the app runs on (WKWebView on macOS, WebKitGTK on Linux); Chromium is
+  // close to Windows' WebView2.
   projects: [
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"], viewport: { width: 1400, height: 900 } },
+    },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1400, height: 900 } },

@@ -2066,6 +2066,7 @@ dependencies = [
  "anyhow",
  "frida-core",
  "frida-git",
+ "frida-script",
  "frida-secrets",
  "serde",
  "serde_json",

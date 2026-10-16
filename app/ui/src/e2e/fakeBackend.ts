@@ -438,6 +438,22 @@ const archiveSummary = {
 /** One handler per command; `args` are the command's arguments by name. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handlers: Record<string, (args: any) => unknown> = {
+  list_snippets: () => [
+    {
+      id: "pre.set-header",
+      kind: "preRequest",
+      title: "Set a header",
+      description: "Adds a header to the request.",
+      code: 'req.setHeader("X-Request-Id", crypto.randomUUID());',
+    },
+    {
+      id: "tests.status-200",
+      kind: "tests",
+      title: "Status is 200",
+      description: "The most common check.",
+      code: 'test("status is 200", () => {\n  expect(res.status).to.equal(200);\n});',
+    },
+  ],
   get_about_info: () => ({ productName: "Frida", coreVersion: "e2e" }),
   get_settings: () => state.settings,
   save_preferences: ({ preferences }) => (state.settings.preferences = preferences),

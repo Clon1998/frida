@@ -9,6 +9,11 @@ export const commands = {
 	getAboutInfo: () => __TAURI_INVOKE<AboutInfo>("get_about_info"),
 	getSettings: () => __TAURI_INVOKE<AppSettings>("get_settings"),
 	/**
+	 *  The script and test examples for the editors' "Examples" menu (`frida_script::snippets`;
+	 *  each one is run against the test server by `crates/frida-core/tests/snippets.rs`).
+	 */
+	listSnippets: () => __TAURI_INVOKE<Snippet[]>("list_snippets"),
+	/**
 	 *  Saves the Settings dialog and applies it right away (git program, AWS). Values out of range
 	 *  are corrected; returns what was saved.
 	 */
@@ -1097,6 +1102,20 @@ export type Shell =
  *  PowerShell, `curl` is an alias for `Invoke-WebRequest`).
  */
 "powershell";
+
+/**  One example. */
+export type Snippet = {
+	/**  Stable, for tests (e.g. `pre.set-header`). */
+	id: string,
+	kind: SnippetKind,
+	title: string,
+	/**  One sentence for the menu. */
+	description: string,
+	code: string,
+};
+
+/**  Where a snippet goes. */
+export type SnippetKind = "preRequest" | "postResponse" | "tests";
 
 export type Status = {
 	/**  `None` when HEAD is detached. */

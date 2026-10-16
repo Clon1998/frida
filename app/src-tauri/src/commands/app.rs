@@ -7,6 +7,14 @@ use tauri::State;
 use crate::error::{ApiResult, blocking};
 use crate::state::AppState;
 
+/// The script and test examples for the editors' "Examples" menu (`frida_script::snippets`;
+/// each one is run against the test server by `crates/frida-core/tests/snippets.rs`).
+#[tauri::command]
+#[specta::specta]
+pub fn list_snippets() -> Vec<frida_script::snippets::Snippet> {
+    frida_script::snippets::snippets()
+}
+
 /// Returns the product name and core library version.
 #[tauri::command]
 #[specta::specta]

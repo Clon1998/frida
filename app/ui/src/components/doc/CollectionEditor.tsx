@@ -109,6 +109,7 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
             <TextSection
               value={collection.tests}
               note={<TestsNote />}
+              examples="tests"
               language="javascript"
               onChange={(tests) => update((c) => ({ ...c, tests }))}
             />

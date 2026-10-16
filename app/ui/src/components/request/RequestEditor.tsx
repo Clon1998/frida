@@ -223,6 +223,7 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
               <TextSection
                 value={request.tests}
                 note={<TestsNote />}
+                examples="tests"
                 language="javascript"
                 onChange={(tests) => update((r) => ({ ...r, tests }))}
               />

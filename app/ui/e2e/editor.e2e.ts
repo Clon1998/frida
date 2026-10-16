@@ -79,6 +79,9 @@ test("variables are highlighted, explained on hover and completed with Tab", asy
   // Feedback #8: Tab accepts the highlighted suggestion.
   await setUrl(app, "{{bas");
   await expect(app.locator(".cm-tooltip-autocomplete")).toContainText("baseUrl");
+  // CodeMirror ignores accepting within 75 ms of the list appearing (`interactionDelay`), so a
+  // fast keypress can't pick a suggestion by accident; a test is faster than that.
+  await app.waitForTimeout(150);
   await app.keyboard.press("Tab");
   await expect(urlBar(app)).toHaveText("{{baseUrl}}");
 });
@@ -138,4 +141,44 @@ test("a secret's value goes to the keychain, never into the environment file", a
       .locator("tr", { has: app.locator('input[value="apiToken"]') })
       .locator('input[type="text"]'),
   ).toHaveValue("s3cr3t");
+});
+
+test("examples are added to scripts and tests", async ({ app }) => {
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+
+  await app.getByRole("tab", { name: "Script" }).click();
+  await app.getByRole("button", { name: "Pre-request examples" }).click();
+  await app.getByRole("menuitem", { name: /Set a header/ }).click();
+  await expect(app.getByRole("tabpanel").locator(".cm-content").first()).toHaveText(
+    'req.setHeader("X-Request-Id", crypto.randomUUID());',
+  );
+
+  await app.getByRole("tab", { name: "Tests" }).click();
+  await app.getByRole("button", { name: "Test examples" }).click();
+  await app.getByRole("menuitem", { name: /Status is 200/ }).click();
+  await save(app);
+  expect((await backend(app)).requests["health.yaml"]).toMatchObject({
+    scripts: { pre: 'req.setHeader("X-Request-Id", crypto.randomUUID());\n' },
+    tests: 'test("status is 200", () => {\n  expect(res.status).to.equal(200);\n});\n',
+  });
+});
+
+test("an open find bar stays under dialogs", async ({ app }) => {
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+  await app.getByRole("tab", { name: "Script" }).click();
+  // Open the find bar of the pre-request editor, then a dialog on top of the page.
+  await app.getByRole("tabpanel").getByRole("button", { name: "Find" }).first().click();
+  const findBar = app.locator("main .cm-frida-search").first();
+  await expect(findBar).toBeVisible();
+  await app.getByRole("button", { name: "Copy as curl" }).click();
+  await expect(app.getByRole("dialog")).toBeVisible();
+
+  // WebKit (the app's engine) painted the find bar (CodeMirror panels have z-index 300) over
+  // the dialog, although hit-testing said otherwise, so check the cause: every editor must be
+  // its own stacking context.
+  const isolated = await app.evaluate(`[...document.querySelectorAll(".cm-editor")].every(
+    (e) => getComputedStyle(e.parentElement).isolation === "isolate")`);
+  expect(isolated).toBe(true);
 });
