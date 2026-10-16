@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { ChevronsUpDown, FileUp, FolderPlus, Plus, Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +20,7 @@ import { CollectionTree } from "./CollectionTree";
 import { ImportCollectionDialog } from "./ImportCollectionDialog";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { GitPanel } from "@/components/git/GitPanel";
+import { useHistory } from "@/stores/history";
 import { useUi } from "@/stores/ui";
 
 export function Sidebar() {
@@ -35,6 +36,14 @@ export function Sidebar() {
   const setView = useUi((s) => s.setSidebarView);
   const [removing, setRemoving] = useState(false);
   const openTab = useTabs((s) => s.openTab);
+
+  // Load the history in the background as soon as a collection is active, so the history tab
+  // has its list ready when it is opened.
+  const activeDir = active?.dir;
+  useEffect(() => {
+    if (activeDir && useHistory.getState().entries[activeDir] === undefined)
+      void useHistory.getState().load(activeDir, "");
+  }, [activeDir]);
 
   if (!workspace) return null;
 

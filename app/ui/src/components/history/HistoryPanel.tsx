@@ -1,6 +1,6 @@
-import { Search, Trash2 } from "lucide-react";
+import { Loader2, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { commands, type HistorySummary } from "@/bindings";
+import { commands } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
@@ -8,32 +8,30 @@ import { showError, unwrap } from "@/lib/api";
 import { methodColor } from "@/lib/methods";
 import { timeAgo } from "@/lib/time";
 import { useDialogs } from "@/stores/dialogs";
+import { useHistory } from "@/stores/history";
 import { HISTORY_TAB_PREFIX, useTabs } from "@/stores/tabs";
 import { cn } from "cn";
 
 /** The history sidebar tab (PLAN.md §13): this collection's sends, newest first. */
 export function HistoryPanel({ dir }: { dir: string }) {
-  const [search, setSearch] = useState("");
-  const [entries, setEntries] = useState<HistorySummary[]>([]);
+  // Starts with the search of the cached list, so coming back to this tab shows it unchanged.
+  const [search, setSearch] = useState(() => useHistory.getState().searches[dir] ?? "");
+  const cached = useHistory((s) => s.entries[dir]);
+  const loading = useHistory((s) => s.loading[dir] ?? false);
+  const load = useHistory((s) => s.load);
   const [clearing, setClearing] = useState(false);
   const version = useDialogs((s) => s.historyVersion);
   const openTab = useTabs((s) => s.openTab);
   const [reload, setReload] = useState(0);
+  const entries = cached ?? [];
 
   useEffect(() => {
-    let cancelled = false;
-    // Debounced, so typing in the search box doesn't query on every key.
-    const timer = setTimeout(() => {
-      void unwrap(commands.listHistory(dir, search)).then(
-        (list) => !cancelled && setEntries(list),
-        showError,
-      );
-    }, 150);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [dir, search, version, reload]);
+    // Debounced, so typing in the search box doesn't query on every key. Without a cached list
+    // there is nothing to wait for, so the first load starts right away.
+    const first = useHistory.getState().entries[dir] === undefined;
+    const timer = setTimeout(() => void load(dir, search), first ? 0 : 150);
+    return () => clearTimeout(timer);
+  }, [dir, search, version, reload, load]);
 
   const clear = async () => {
     try {
@@ -48,7 +46,14 @@ export function HistoryPanel({ dir }: { dir: string }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-1 px-2 pb-2">
         <div className="relative flex-1">
-          <Search className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
+          {loading ? (
+            <Loader2
+              className="absolute top-2 left-2 size-3.5 animate-spin text-muted-foreground"
+              aria-label="Loading history"
+            />
+          ) : (
+            <Search className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
+          )}
           <Input
             className="h-7 pl-7 text-xs"
             placeholder="Search history"
@@ -69,7 +74,12 @@ export function HistoryPanel({ dir }: { dir: string }) {
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto text-sm">
-        {entries.length === 0 && (
+        {cached === undefined && (
+          <p className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" /> Loading history…
+          </p>
+        )}
+        {cached !== undefined && entries.length === 0 && (
           <p className="px-3 py-2 text-xs text-muted-foreground">
             {search ? "No matches." : "Sent requests show up here."}
           </p>
