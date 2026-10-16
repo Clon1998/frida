@@ -1,5 +1,32 @@
 # Changelog
 
+## M11: Collection runner (2026-10-16)
+
+### What was built
+- **`frida_core::runner`** (`crates/frida-core/src/runner.rs`): `plan_run` lists the saved requests of a collection or
+  folder in tree order; `run` sends them one after another in runner mode, with one shared session and cookie jar,
+  an optional delay, and reports a `RunResult` per request (passed, failed, not sent, skipped) and a `RunSummary`.
+- **Script control** like Bruno: `fri.runner.skipRequest()`, `fri.setNextRequest(name)`, `setNextRequest(null)` and
+  `fri.runner.stopExecution()`; `req.getExecutionMode()` is `"runner"`. A loop guard ends endless jumps.
+- **App**: `run_collection` streams a `RunProgress` event per request (with the response, which also goes to the
+  response cache and the console; not to history), `plan_run` lists the requests, `cancel_request` stops a run.
+- **UI**: "Run collection…" / "Run folder…" in the sidebar menus and a Run button on collection and folder tabs open a
+  Runner tab: delay, Run/Stop, live results with status, time and tests, the selected result's response, a summary,
+  and a warning when open requests in the run have unsaved changes.
+- Also in this round: the **JSONPath filter** and the first release tag, `v0.1.0`.
+
+### Things worth understanding in this milestone
+1. **Callbacks as trait objects** (`runner::run`, `on_step: &mut (dyn FnMut(RunStep) + Send)`): `FnMut` because the
+   app's callback changes state (it stores responses), `dyn` so callers pass any closure without generics, and
+   `Send` because the async function's future (which holds the reference across `.await`s) moves between threads.
+2. **Cancelling a wait** (`runner::run`, `tokio::select!`): waits for whichever finishes first, the delay or the
+   cancellation, and drops the other. `cancel.child_token()` gives each send a token that is cancelled with the run.
+3. **Passing extra outputs through a pipeline** (`http::RunnerFlow`, `Executed::flow`, `CoreError::Skipped`): what
+   scripts ask of a run travels as data next to the response; a skipped request is its own error variant, so the
+   runner can `match` on it instead of comparing messages.
+4. **Numbers across the IPC boundary** (`RunResult::time_ms: Option<u32>`): specta refuses `u64` in TypeScript
+   types because JavaScript numbers lose precision above 2^53, so durations are `u32` milliseconds.
+
 ## After M10: feedback round (2026-10-16)
 
 ### What was built

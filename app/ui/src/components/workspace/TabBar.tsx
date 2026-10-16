@@ -1,4 +1,4 @@
-import { Folder, History, Layers, Settings, X } from "lucide-react";
+import { Folder, History, Layers, Play, Settings, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   ContextMenu,
@@ -217,5 +217,7 @@ function TabIcon({ tab }: { tab: Tab }) {
       return <Layers className="size-3.5 shrink-0" />;
     case "history":
       return <History className="size-3.5 shrink-0" />;
+    case "runner":
+      return <Play className="size-3.5 shrink-0" />;
   }
 }

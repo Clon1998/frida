@@ -26,6 +26,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { useEnvs } from "@/stores/envs";
 import { isDirty, showsResponse, tabTitle, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
+import { RunnerView } from "@/components/runner/RunnerView";
+import { listenToRunProgress } from "@/stores/runner";
 import { RequestHeader } from "./RequestHeader";
 import { TabBar } from "./TabBar";
 
@@ -47,6 +49,7 @@ export function AppShell() {
 
   useRestoreTabs();
   useConsoleEvents();
+  useEffect(listenToRunProgress, []);
   useLoadEnvs();
   usePersistTabs();
   useFileWatcher();
@@ -96,6 +99,11 @@ export function AppShell() {
                 {dir && tab?.kind === "environments" && (
                   <div className="min-h-0 flex-1">
                     <EnvironmentsEditor dir={dir} />
+                  </div>
+                )}
+                {dir && tab?.kind === "runner" && (
+                  <div className="min-h-0 flex-1">
+                    <RunnerView key={tab.path} dir={dir} tab={tab} />
                   </div>
                 )}
                 {dir && tab?.kind === "history" && (

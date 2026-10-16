@@ -1,4 +1,4 @@
-import { Braces, ChevronRight, Save } from "lucide-react";
+import { Braces, ChevronRight, Play, Save } from "lucide-react";
 import { EnvironmentPicker } from "@/components/env/EnvironmentPicker";
 import { Button } from "@/components/ui/button";
 import { envColor } from "@/lib/envColors";
@@ -7,7 +7,7 @@ import { useEnvs } from "@/stores/envs";
 import { useUi } from "@/stores/ui";
 import { cn } from "cn";
 import * as actions from "@/stores/actions";
-import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
+import { isDirty, runnerTabPath, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { EditableCrumb } from "./EditableCrumb";
 
@@ -54,7 +54,7 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
       {tab && tab.kind !== "collection" && (
         <span className="flex min-w-0 items-center gap-0.5">
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-          {tab.kind === "environments" || tab.kind === "history" ? (
+          {tab.kind === "environments" || tab.kind === "history" || tab.kind === "runner" ? (
             <span className="px-1 font-medium">{tabTitle(tab)}</span>
           ) : (
             <EditableCrumb
@@ -79,6 +79,17 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
         </Button>
       )}
       <div className="flex-1" />
+      {(tab?.kind === "folder" || tab?.kind === "collection") && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7"
+          title={`Run every request in this ${tab.kind}`}
+          onClick={() => void useTabs.getState().openTab(dir, runnerTabPath(tab.path))}
+        >
+          <Play /> Run
+        </Button>
+      )}
       {tab?.kind === "request" && <InspectorButton />}
       <EnvironmentPicker dir={dir} />
     </div>

@@ -39,7 +39,7 @@ import { methodColor } from "@/lib/methods";
 import { type DropPosition, dropPosition, moveTarget } from "@/lib/tree";
 import * as actions from "@/stores/actions";
 import { useDialogs } from "@/stores/dialogs";
-import { useTabs } from "@/stores/tabs";
+import { runnerTabPath, useTabs } from "@/stores/tabs";
 import { useWorkspace } from "@/stores/workspace";
 import { cn } from "cn";
 
@@ -97,6 +97,7 @@ export function CollectionTree({ dir }: { dir: string }) {
     folderSettings: (path: string) => void openTab(dir, path),
     fromCurl: (parent: string) => useDialogs.getState().openCurlImport(dir, parent),
     copyCurl: (path: string) => useDialogs.getState().openCurlExport(dir, path),
+    run: (folder: string) => void openTab(dir, runnerTabPath(folder)),
   };
 
   return (
@@ -150,6 +151,8 @@ export function CollectionTree({ dir }: { dir: string }) {
           <ContextMenuItem onSelect={() => menu.fromCurl("")}>
             New request from curl…
           </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => menu.run("")}>Run collection…</ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => void actions.revealItem(dir, "")}>
             Reveal in file manager
@@ -212,6 +215,8 @@ interface TreeRowProps {
     folderSettings: (path: string) => void;
     fromCurl: (parent: string) => void;
     copyCurl: (path: string) => void;
+    /** Opens the collection runner for a folder. */
+    run: (folder: string) => void;
   };
 }
 
@@ -337,6 +342,7 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
               <ContextMenuItem onSelect={() => menu.folderSettings(node.path)}>
                 Settings…
               </ContextMenuItem>
+              <ContextMenuItem onSelect={() => menu.run(node.path)}>Run folder…</ContextMenuItem>
               <ContextMenuSeparator />
             </>
           )}

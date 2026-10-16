@@ -57,11 +57,29 @@ export interface HistoryTab {
 
 export const HISTORY_TAB_PREFIX = "@history/";
 
+/**
+ * The collection runner (PLAN.md M11) for a folder: `@runner/<folder path>`, and `@runner/`
+ * for the whole collection.
+ */
+export interface RunnerTab {
+  kind: "runner";
+  path: string;
+  /** The folder that is run (`""`: the whole collection). */
+  folder: string;
+  /** e.g. "Run Orders", shown on the tab. */
+  title: string;
+}
+
+export const RUNNER_TAB_PREFIX = "@runner/";
+
+/** The runner tab path for `folder` (`""`: the whole collection). */
+export const runnerTabPath = (folder: string) => `${RUNNER_TAB_PREFIX}${folder}`;
+
 /** A tab backed by one file, with a saved and an edited version. */
 export type DocumentTab = RequestTab | FolderTab | CollectionTab;
 
 /** A tab shows a request, a folder's or the collection's settings, or the environments. */
-export type Tab = DocumentTab | EnvironmentsTab | HistoryTab;
+export type Tab = DocumentTab | EnvironmentsTab | HistoryTab | RunnerTab;
 export type TabKind = Tab["kind"];
 type DocKind = DocumentTab["kind"];
 
@@ -145,12 +163,13 @@ function activate(c: CollectionTabs, path: string | null): CollectionTabs {
 export function kindOf(path: string): TabKind {
   if (path === ENVIRONMENTS_TAB) return "environments";
   if (path.startsWith(HISTORY_TAB_PREFIX)) return "history";
+  if (path.startsWith(RUNNER_TAB_PREFIX)) return "runner";
   if (path === "") return "collection";
   return path.endsWith(".yaml") ? "request" : "folder";
 }
 
 export const isDocument = (tab: Tab): tab is DocumentTab =>
-  tab.kind !== "environments" && tab.kind !== "history";
+  tab.kind !== "environments" && tab.kind !== "history" && tab.kind !== "runner";
 
 /** Unsaved changes: a document's draft differs, or the environment editor has edits. */
 export const isDirty = (tab: Tab) =>
@@ -164,6 +183,7 @@ export const tabTitle = (tab: Tab) => {
     case "environments":
       return "Environments";
     case "history":
+    case "runner":
       return tab.title;
     default:
       return tab.draft.name;
@@ -263,6 +283,14 @@ export const useTabs = create<TabsState>((set, get) => {
       const id = Number(path.slice(HISTORY_TAB_PREFIX.length));
       const entry = await unwrap(commands.getHistoryEntry(id));
       return { kind, path, title: `${entry.summary.method} ${entry.summary.requestName}` };
+    }
+    if (kind === "runner") {
+      const folder = path.slice(RUNNER_TAB_PREFIX.length);
+      const name = folder
+        ? (await unwrap(commands.readFolder(dir, folder))).name
+        : (useWorkspace.getState().workspace?.collections.find((c) => c.dir === dir)?.name ??
+          "collection");
+      return { kind, path, folder, title: `Run ${name}` };
     }
     return newTab(kind, path, await readDoc(dir, kind, path));
   };
