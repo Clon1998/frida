@@ -583,8 +583,25 @@ Shortcuts: Cmd/Ctrl+Enter, S, W, T (new request), K (quick open), E (environment
 Cmd on macOS only, so Ctrl+E/K keep their text-editing meaning there. Code signing is not set up (README explains
 the first-start step).*
 
+### M11: Collection runner
+- [ ] `frida_core::runner`: run the saved requests of a collection or folder in tree order (folders depth-first by
+  `seq`), sequentially, with the active environments, one shared session (runtime vars, env overrides) and the
+  collection's cookie jar. Optional delay between requests. Cancellable.
+- [ ] Script control like Bruno: `fri.runner.skipRequest()` (pre) marks the request *skipped*;
+  `fri.setNextRequest(name)` jumps to the request with that name; `setNextRequest(null)` and
+  `fri.runner.stopExecution()` end the run; `req.getExecutionMode()` is `"runner"`. A loop guard ends runs that
+  revisit requests too often (max. 10 × the number of requests).
+- [ ] Results per request (method, name, status, time, tests, script errors, error, outcome
+  passed/failed/error/skipped) streamed to the UI as each one finishes, plus a summary. Responses go to the response
+  cache so a result can be opened. The console logs every send; history does not (a run would flood it).
+- [ ] UI: "Run" in the collection/folder context menu and on their tabs opens a Runner tab (`@runner/<folder>`):
+  options, Run/Stop, progress, the results list and the selected result's response. A warning when tabs in the run
+  have unsaved changes (the runner uses the saved files).
+
+**Acceptance:** an integration test runs `testdata/scripting` (login → setVar → authenticated request) as a run and
+checks the results; unit tests cover the order, skip, setNextRequest jumps, stop, the loop guard and cancel.
+
 ### Later (backlog, not scheduled)
-- Collection/folder runner with a pass/fail summary (`bru.setNextRequest`).
 - `frida-cli` headless runner (`frida run <collection> --env dev`).
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.

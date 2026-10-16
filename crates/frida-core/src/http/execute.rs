@@ -5,12 +5,14 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use frida_script::ExecutionMode;
 use tokio_util::sync::CancellationToken;
 
 use super::cookies::CookieJar;
 use super::prepare::{PreparedRequest, RequestContext, prepare};
 use super::scripting::{
-    EnvOverrides, Pipeline, RuntimeVars, ScriptContext, ScriptLog, ScriptOutcome, runtime_strings,
+    EnvOverrides, Pipeline, RunnerFlow, RuntimeVars, ScriptContext, ScriptLog, ScriptOutcome,
+    runtime_strings,
 };
 use super::send::{HttpResponse, SendError, build_client, send};
 use crate::auth::{OAuth2Manager, TokenInfo, apply_auth, effective_auth};
@@ -91,6 +93,8 @@ pub struct Executed {
     pub sensitive: Vec<String>,
     /// Test results and post-response script errors.
     pub scripts: ScriptOutcome,
+    /// What the scripts asked of a collection run (next request, stop).
+    pub flow: RunnerFlow,
 }
 
 /// Resolves variables in the request without sending it, for the inspector.
@@ -105,6 +109,17 @@ pub async fn execute(
     cancel: CancellationToken,
     on_log: &(dyn Fn(ScriptLog) + Send + Sync),
 ) -> Result<Executed> {
+    execute_as(input, ExecutionMode::Standalone, cancel, on_log).await
+}
+
+/// Like [`execute`], with the execution mode scripts see (`req.getExecutionMode()`); the
+/// collection runner uses [`ExecutionMode::Runner`].
+pub async fn execute_as(
+    input: ExecuteInput<'_>,
+    mode: ExecutionMode,
+    cancel: CancellationToken,
+    on_log: &(dyn Fn(ScriptLog) + Send + Sync),
+) -> Result<Executed> {
     let session = input.session;
     let script_ctx = ScriptContext {
         runtime: session.runtime,
@@ -113,6 +128,7 @@ pub async fn execute(
         workspace_dir: session.workspace_dir,
         on_log,
         limits: frida_script::ScriptLimits::default(),
+        mode,
     };
     let mut pipeline = Pipeline {
         collection_dir: input.collection_dir,
@@ -128,9 +144,9 @@ pub async fn execute(
 
     let pre = pipeline.run_pre().await.map_err(CoreError::Script)?;
     if pre.skip {
-        return Err(CoreError::InvalidInput(
-            "the pre-request script skipped this request (fri.runner.skipRequest())".into(),
-        ));
+        return Err(CoreError::Skipped {
+            stop: pre.flow.stop,
+        });
     }
 
     let runtime = runtime_strings(&session.runtime.lock().expect("runtime lock poisoned"));
@@ -171,13 +187,20 @@ pub async fn execute(
     // The URL may contain secrets, so it is only logged at debug level (CLAUDE.md).
     tracing::debug!(method = %prepared.method, "sending request");
     let response = send(&prepared, input.cookies.clone(), cancel).await?;
-    let scripts = pipeline.run_post(&prepared, &response).await;
+    let (scripts, post_flow) = pipeline.run_post(&prepared, &response).await;
+    // Pre-request scripts may have asked too; the post-response scripts have the last word.
+    let mut flow = pre.flow;
+    if post_flow.next_request.is_some() {
+        flow.next_request = post_flow.next_request;
+    }
+    flow.stop |= post_flow.stop;
     Ok(Executed {
         response,
         report: resolved.report,
         sent: prepared,
         sensitive,
         scripts,
+        flow,
     })
 }
 

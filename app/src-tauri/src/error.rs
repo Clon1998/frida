@@ -135,6 +135,8 @@ impl From<CoreError> for ApiError {
             CoreError::Script(_) => ApiError::new(ErrorCode::Script, message).with_hint(
                 "Fix the script at the line shown; its console.log output is in the console.",
             ),
+            CoreError::Skipped { .. } => ApiError::new(ErrorCode::Script, message)
+                .with_hint("Only skipped in a collection run? Check the script's conditions."),
             CoreError::Secret(secret) => secret.into(),
             CoreError::Auth(auth) => match auth {
                 OAuth2Error::Cancelled => ApiError::new(ErrorCode::Cancelled, message),

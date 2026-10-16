@@ -49,6 +49,7 @@ impl ScriptHost for FakeHost {
 fn state(phase: ScriptPhase) -> ScriptState {
     ScriptState {
         phase,
+        execution_mode: Default::default(),
         collection_name: "Shop".into(),
         req: ScriptRequest {
             name: "Login".into(),
@@ -85,7 +86,37 @@ fn state(phase: ScriptPhase) -> ScriptState {
         tests: vec![],
         next_request: None,
         skip_request: false,
+        stop_execution: false,
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn runner_controls_are_recorded() {
+    let mut input = state(ScriptPhase::Post);
+    input.execution_mode = frida_script::ExecutionMode::Runner;
+    let (out, error) = run(
+        r#"
+        test("mode", () => expect(req.getExecutionMode()).to.equal("runner"));
+        fri.setNextRequest("Get order");
+        "#,
+        input,
+    )
+    .await;
+    assert!(error.is_none(), "{error:?}");
+    assert!(out.tests[0].passed, "{:?}", out.tests);
+    assert_eq!(out.next_request.as_deref(), Some("Get order"));
+    assert!(!out.stop_execution);
+
+    let (out, _) = run("bru.setNextRequest(null);", state(ScriptPhase::Post)).await;
+    assert!(out.stop_execution);
+    let (out, _) = run("bru.runner.stopExecution();", state(ScriptPhase::Post)).await;
+    assert!(out.stop_execution);
+    let (out, _) = run(
+        r#"test("mode", () => expect(req.getExecutionMode()).to.equal("standalone"));"#,
+        state(ScriptPhase::Post),
+    )
+    .await;
+    assert!(out.tests[0].passed, "{:?}", out.tests);
 }
 
 async fn run(source: &str, state: ScriptState) -> (ScriptState, Option<frida_script::ScriptError>) {

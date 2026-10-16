@@ -150,7 +150,7 @@
     setTimeout: (ms) => {
       r.timeoutMs = Number(ms);
     },
-    getExecutionMode: () => "standalone",
+    getExecutionMode: () => state.executionMode ?? "standalone",
     setMaxRedirects: unsupported("req.setMaxRedirects"),
     onFail: unsupported("req.onFail"),
     getTags: () => [],
@@ -290,15 +290,22 @@
       return promise;
     },
 
+    // Like Bruno: `null` ends the run instead of naming the next request.
     setNextRequest: (name) => {
-      state.nextRequest = name === null ? null : String(name);
+      if (name === null) {
+        state.stopExecution = true;
+      } else {
+        state.nextRequest = String(name);
+      }
     },
     runner: {
       setNextRequest: (name) => fri.setNextRequest(name),
       skipRequest: () => {
         state.skipRequest = true;
       },
-      stopExecution: () => {},
+      stopExecution: () => {
+        state.stopExecution = true;
+      },
     },
 
     setCollectionVar: unsupported("fri.setCollectionVar"),

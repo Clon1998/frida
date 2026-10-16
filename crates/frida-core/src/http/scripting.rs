@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use frida_script::{
-    BoxFuture, EnvWrite, HttpCall, HttpReply, LogLevel, Script, ScriptError, ScriptHeader,
-    ScriptHost, ScriptLimits, ScriptPhase, ScriptRequest, ScriptResponse, ScriptState, ScriptVars,
-    TestResult, run_script,
+    BoxFuture, EnvWrite, ExecutionMode, HttpCall, HttpReply, LogLevel, Script, ScriptError,
+    ScriptHeader, ScriptHost, ScriptLimits, ScriptPhase, ScriptRequest, ScriptResponse,
+    ScriptState, ScriptVars, TestResult, run_script,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -109,6 +109,27 @@ pub struct ScriptContext<'a> {
     /// Receives every `console.log` (already masked).
     pub on_log: &'a (dyn Fn(ScriptLog) + Send + Sync),
     pub limits: ScriptLimits,
+    /// A single send or part of a run (`req.getExecutionMode()`).
+    pub mode: ExecutionMode,
+}
+
+/// What the scripts asked of a collection run (PLAN.md M11). A single send ignores it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RunnerFlow {
+    /// `fri.setNextRequest(name)`: continue with the request called `name`.
+    pub next_request: Option<String>,
+    /// `fri.runner.stopExecution()` or `fri.setNextRequest(null)`: end the run.
+    pub stop: bool,
+}
+
+impl RunnerFlow {
+    /// Takes over what one phase's scripts asked for (a later `setNextRequest` wins).
+    fn add(&mut self, out: &ScriptState) {
+        if let Some(next) = &out.next_request {
+            self.next_request = Some(next.clone());
+        }
+        self.stop |= out.stop_execution;
+    }
 }
 
 /// What the scripts work on: the loaded (not yet resolved) collection, folders and request,
@@ -309,6 +330,7 @@ impl Pipeline<'_> {
         let before = self.script_request();
         let state = new_state(
             ScriptPhase::Pre,
+            self.ctx.mode,
             &self.collection.name,
             before.clone(),
             None,
@@ -319,8 +341,11 @@ impl Pipeline<'_> {
             return Err(error);
         }
         self.apply_request_changes(&before, &out.req);
+        let mut flow = RunnerFlow::default();
+        flow.add(&out);
         Ok(PreOutcome {
             skip: out.skip_request,
+            flow,
         })
     }
 
@@ -329,7 +354,8 @@ impl Pipeline<'_> {
         &mut self,
         sent: &PreparedRequest,
         response: &HttpResponse,
-    ) -> ScriptOutcome {
+    ) -> (ScriptOutcome, RunnerFlow) {
+        let mut flow = RunnerFlow::default();
         let req = sent_request(&self.request, sent);
         let res = script_response(response);
         let mut outcome = ScriptOutcome::default();
@@ -338,12 +364,14 @@ impl Pipeline<'_> {
         if !post.is_empty() {
             let state = new_state(
                 ScriptPhase::Post,
+                self.ctx.mode,
                 &self.collection.name,
                 req.clone(),
                 Some(res.clone()),
                 self.vars(),
             );
-            let (_, mut tests, errors) = self.run_chain(post, state, false).await;
+            let (out, mut tests, errors) = self.run_chain(post, state, false).await;
+            flow.add(&out);
             outcome.tests.append(&mut tests);
             outcome.errors.extend(errors);
         }
@@ -351,16 +379,18 @@ impl Pipeline<'_> {
         if !tests.is_empty() {
             let state = new_state(
                 ScriptPhase::Tests,
+                self.ctx.mode,
                 &self.collection.name,
                 req,
                 Some(res),
                 self.vars(),
             );
-            let (_, mut results, errors) = self.run_chain(tests, state, false).await;
+            let (out, mut results, errors) = self.run_chain(tests, state, false).await;
+            flow.add(&out);
             outcome.tests.append(&mut results);
             outcome.errors.extend(errors);
         }
-        outcome
+        (outcome, flow)
     }
 
     /// The request as pre-request scripts see it: unresolved, with inherited headers merged.
@@ -421,10 +451,13 @@ impl Pipeline<'_> {
 pub(crate) struct PreOutcome {
     /// `fri.runner.skipRequest()` was called.
     pub skip: bool,
+    /// `setNextRequest` / `stopExecution` in a pre-request script.
+    pub flow: RunnerFlow,
 }
 
 fn new_state(
     phase: ScriptPhase,
+    execution_mode: ExecutionMode,
     collection_name: &str,
     req: ScriptRequest,
     res: Option<ScriptResponse>,
@@ -432,6 +465,7 @@ fn new_state(
 ) -> ScriptState {
     ScriptState {
         phase,
+        execution_mode,
         collection_name: collection_name.to_string(),
         req,
         res,
@@ -441,6 +475,7 @@ fn new_state(
         tests: Vec::new(),
         next_request: None,
         skip_request: false,
+        stop_execution: false,
     }
 }
 

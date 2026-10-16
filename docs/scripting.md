@@ -54,7 +54,7 @@ Scripts run in QuickJS (ES2023, `async`/`await` and top-level `await` included):
 | `req.getTimeout()`, `req.setTimeout(ms)` | |
 | `req.getName()`, `req.getAuthMode()` | Auth mode: `inherit`, `none`, `basic`, `bearer`, `apikey`, `oauth2`. |
 | `req.getHost()`, `req.getPath()`, `req.getQueryString()` | |
-| `req.getExecutionMode()` | Always `"standalone"` until the collection runner exists. |
+| `req.getExecutionMode()` | `"runner"` in a collection run, otherwise `"standalone"`. |
 | `req.url`, `req.method`, `req.headers`, `req.body`, `req.timeout` | Property forms of the above. |
 
 In post-response scripts and tests, `req` is the request **as sent** (variables resolved).
@@ -103,8 +103,9 @@ The same for the global environment: `fri.getGlobalEnvName()`, `fri.getGlobalEnv
 | `await fri.sendRequest(options)` or `fri.sendRequest(options, (err, res) => ...)` | axios-style options: `method`, `url`, `headers`, `data` (objects are sent as JSON, `URLSearchParams` as a form), `timeout`. The response has `status`, `statusText`, `headers`, `data` (parsed JSON when possible) and `duration`. Like axios, statuses outside 2xx reject, with `error.response`. Uses the collection's TLS settings and cookie jar. |
 | `await fri.sleep(ms)` | |
 | `fri.interpolate(text)` | Resolves `{{variables}}` (and `{{$dynamic}}` ones) with the current values. Objects are interpolated as JSON. |
-| `fri.setNextRequest(name)`, `fri.runner.setNextRequest(name)`, `fri.runner.stopExecution()` | Recorded for the collection runner (later); no effect on a single send. |
-| `fri.runner.skipRequest()` | In a pre-request script: the request is not sent. |
+| `fri.setNextRequest(name)`, `fri.runner.setNextRequest(name)` | In a collection run: continue with the request called `name` (`null` ends the run). No effect on a single send. |
+| `fri.runner.stopExecution()` | In a collection run: end the run after this request. |
+| `fri.runner.skipRequest()` | In a pre-request script: the request is not sent (shown as *skipped* in a run). |
 | `fri.getTestResults()` | The tests so far in this script. |
 | `fri.isSafeMode()` | Always `true`: Frida scripts are always sandboxed. |
 

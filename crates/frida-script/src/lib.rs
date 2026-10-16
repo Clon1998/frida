@@ -24,8 +24,8 @@ use std::time::Duration;
 
 pub use engine::run_script;
 pub use model::{
-    EnvWrite, HttpCall, HttpReply, LogLevel, LogLine, ScriptError, ScriptHeader, ScriptPhase,
-    ScriptRequest, ScriptResponse, ScriptState, ScriptVars, TestResult,
+    EnvWrite, ExecutionMode, HttpCall, HttpReply, LogLevel, LogLine, ScriptError, ScriptHeader,
+    ScriptPhase, ScriptRequest, ScriptResponse, ScriptState, ScriptVars, TestResult,
 };
 
 /// A boxed future that can move between threads. `async fn` in a trait object (`dyn`) is not

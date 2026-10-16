@@ -8,6 +8,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use specta::Type;
 
+/// How the request is being sent, for `req.getExecutionMode()`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ExecutionMode {
+    /// One request, sent from its tab.
+    #[default]
+    Standalone,
+    /// Part of a collection or folder run (PLAN.md M11).
+    Runner,
+}
+
 /// When a script runs. Decides which objects exist (`res` only after the response).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -134,6 +145,8 @@ pub struct TestResult {
 #[serde(rename_all = "camelCase")]
 pub struct ScriptState {
     pub phase: ScriptPhase,
+    #[serde(default)]
+    pub execution_mode: ExecutionMode,
     pub collection_name: String,
     pub req: ScriptRequest,
     pub res: Option<ScriptResponse>,
@@ -145,12 +158,15 @@ pub struct ScriptState {
     pub logs: Vec<LogLine>,
     #[serde(default)]
     pub tests: Vec<TestResult>,
-    /// `fri.setNextRequest(name)`, for the collection runner (later).
+    /// `fri.setNextRequest(name)`: in a run, continue with the request called `name`.
     #[serde(default)]
     pub next_request: Option<String>,
     /// `fri.runner.skipRequest()` in a pre-request script: don't send.
     #[serde(default)]
     pub skip_request: bool,
+    /// `fri.runner.stopExecution()` or `fri.setNextRequest(null)`: end the run after this request.
+    #[serde(default)]
+    pub stop_execution: bool,
 }
 
 /// A request made by `fri.sendRequest` (axios-style options, like Bruno).

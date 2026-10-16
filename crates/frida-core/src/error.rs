@@ -64,6 +64,11 @@ pub enum CoreError {
     /// A pre-request script failed, so the request was not sent.
     #[error("{0}")]
     Script(frida_script::ScriptError),
+
+    /// A pre-request script called `fri.runner.skipRequest()`, so the request was not sent.
+    /// `stop`: it also asked to end the run.
+    #[error("the pre-request script skipped this request (fri.runner.skipRequest())")]
+    Skipped { stop: bool },
 }
 
 impl CoreError {
