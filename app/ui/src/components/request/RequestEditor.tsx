@@ -1,4 +1,4 @@
-import { Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { Loader2, Send, SquareTerminal } from "lucide-react";
 import { useSubTab } from "@/stores/subTabs";
 import { toast } from "sonner";
 import { commands } from "@/bindings";
@@ -129,7 +129,6 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
             >
               <Loader2 className="animate-spin" />
               <span className="hidden @md:inline">Cancel</span>
-              <X />
             </Button>
           ) : (
             <Button
