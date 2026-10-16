@@ -85,3 +85,8 @@ unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# Dependencies (the AWS SDK alone is large) are built without debug info in dev/test builds:
+# much smaller target folders and faster linking. Our own crates keep full debug info.
+[profile.dev.package."*"]
+debug = false
