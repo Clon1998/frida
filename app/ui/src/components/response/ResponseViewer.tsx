@@ -1,6 +1,6 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { useSubTab } from "@/stores/subTabs";
-import { AlertCircle, CheckCircle2, Copy, Download, Loader2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Copy, Download, Loader2, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { commands, type ResponseView, type ScriptOutcome } from "@/bindings";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showError, unwrap } from "@/lib/api";
 import { bodyKind, formatBytes, formatDuration, prettyJson } from "@/lib/format";
-import type { RequestTab } from "@/stores/tabs";
+import { type RequestTab, useTabs } from "@/stores/tabs";
 import { cn } from "cn";
 
 function statusColor(status: number) {
@@ -20,42 +20,59 @@ function statusColor(status: number) {
   return "bg-destructive/15 text-destructive";
 }
 
+/** The response pane of a request tab. Only shown once there is something to show. */
 export function ResponseViewer({ tab, dir }: { tab: RequestTab; dir: string }) {
-  if (tab.requestId) {
-    return (
-      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Waiting for response…
-      </div>
-    );
+  const close = () => useTabs.getState().setResponseHidden(dir, tab.path, true);
+  if (tab.response && !tab.requestId && !tab.error) {
+    return <ResponsePanel response={tab.response} viewKey={`${dir}:${tab.path}`} onClose={close} />;
   }
-  if (tab.error) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <AlertCircle className="size-6 text-destructive" />
-        <p className="text-sm font-medium">{tab.error.message}</p>
-        {tab.error.hint && <p className="text-xs text-muted-foreground">{tab.error.hint}</p>}
-        {tab.error.aws?.fixCommand && <FixCommand command={tab.error.aws.fixCommand} />}
-      </div>
-    );
-  }
-  if (!tab.response) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Send the request to see the response.
-      </div>
-    );
-  }
-  return <ResponsePanel response={tab.response} viewKey={`${dir}:${tab.path}`} />;
+  return (
+    <div className="relative h-full">
+      <CloseButton className="absolute top-2 right-2" onClick={close} />
+      {tab.requestId ? (
+        <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Waiting for response…
+        </div>
+      ) : (
+        tab.error && (
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+            <AlertCircle className="size-6 text-destructive" />
+            <p className="text-sm font-medium">{tab.error.message}</p>
+            {tab.error.hint && <p className="text-xs text-muted-foreground">{tab.error.hint}</p>}
+            {tab.error.aws?.fixCommand && <FixCommand command={tab.error.aws.fixCommand} />}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function CloseButton({ className, onClick }: { className?: string; onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn("size-7", className)}
+      title="Close the response (it opens again on the next send)"
+      aria-label="Close response"
+      onClick={onClick}
+    >
+      <X />
+    </Button>
+  );
 }
 
 /** A response: status chips, body (pretty/raw/preview), headers, copy and save. */
 export function ResponsePanel({
   response,
   viewKey,
+  onClose,
 }: {
   response: ResponseView;
   /** Remembers the open sub-tab under this key (e.g. per request tab). */
   viewKey: string;
+  /** Shows a close button (request tabs; not the read-only history view). */
+  onClose?: () => void;
 }) {
   const [pretty, setPretty] = useState(true);
   const kind = bodyKind(response.contentType, response.bodyText);
@@ -110,6 +127,7 @@ export function ResponsePanel({
           <Button variant="ghost" size="sm" onClick={() => void saveToFile()}>
             <Download /> Save
           </Button>
+          {onClose && <CloseButton onClick={onClose} />}
         </div>
       </div>
 

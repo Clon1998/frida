@@ -8,6 +8,8 @@ import {
   type FolderTab,
   isDirty,
   kindOf,
+  type RequestTab,
+  showsResponse,
   useTabs,
 } from "./tabs";
 
@@ -190,5 +192,74 @@ describe("unsaved indicators", () => {
     });
     useTabs.getState().closeTabs("/col", [ENVIRONMENTS_TAB]);
     expect(isDirty(envTab)).toBe(false);
+  });
+});
+
+describe("response pane", () => {
+  const request = {
+    version: 1,
+    name: "Get",
+    seq: 1,
+    method: "GET",
+    url: "http://x",
+    params: { query: [], path: [] },
+    headers: [],
+    body: {
+      mode: "none",
+      json: "",
+      xml: "",
+      text: "",
+      formUrlEncoded: [],
+      multipart: [],
+      binaryPath: "",
+    },
+    auth: { mode: "inherit" },
+    vars: [],
+    scripts: { pre: "", post: "" },
+    tests: "",
+    settings: { timeoutMs: null },
+    docs: "",
+  };
+  const response = {
+    id: "r",
+    status: 200,
+    statusText: "OK",
+    headers: [],
+    contentType: null,
+    sizeBytes: 0,
+    timeMs: 1,
+    finalUrl: "http://x",
+    bodyText: "",
+    bodyBase64: null,
+    truncated: false,
+    scripts: { tests: [], errors: [] },
+  };
+  const tab = () => useTabs.getState().byCollection["/col"]?.tabs[0] as RequestTab;
+
+  beforeEach(async () => {
+    useTabs.setState({ byCollection: {} });
+    mockIPC((cmd) => {
+      if (cmd === "read_request") return request;
+      if (cmd === "send_request") return response;
+      return null;
+    });
+    await useTabs.getState().openTab("/col", "get.yaml");
+  });
+  afterEach(() => clearMocks());
+
+  it("is hidden until the first send, then shown", async () => {
+    expect(showsResponse(tab())).toBe(false);
+    await useTabs.getState().send("/col", "get.yaml");
+    expect(tab().response?.status).toBe(200);
+    expect(showsResponse(tab())).toBe(true);
+  });
+
+  it("stays closed when closed, and the next send opens it again", async () => {
+    await useTabs.getState().send("/col", "get.yaml");
+    useTabs.getState().setResponseHidden("/col", "get.yaml", true);
+    expect(showsResponse(tab())).toBe(false);
+
+    await useTabs.getState().send("/col", "get.yaml");
+    expect(showsResponse(tab())).toBe(true);
   });
 });

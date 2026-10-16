@@ -1,5 +1,5 @@
 import { ask } from "@tauri-apps/plugin-dialog";
-import { Columns2, Keyboard, Rows2, Settings, SquareChevronUp } from "lucide-react";
+import { Columns2, Keyboard, PanelRight, Rows2, Settings, SquareChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
 import { CurlExportDialog } from "@/components/curl/CurlExportDialog";
@@ -24,7 +24,7 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useEnvs } from "@/stores/envs";
-import { isDirty, tabTitle, useTabs } from "@/stores/tabs";
+import { isDirty, showsResponse, tabTitle, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { RequestHeader } from "./RequestHeader";
 import { TabBar } from "./TabBar";
@@ -67,14 +67,20 @@ export function AppShell() {
                 {dir && <TabBar dir={dir} />}
                 {dir && <RequestHeader dir={dir} tab={tab} />}
                 {dir && tab?.kind === "request" && (
+                  // The response panel is added and removed inside the same group, so the
+                  // request editor isn't remounted (it keeps cursor, focus and undo history).
                   <ResizablePanelGroup key={split} orientation={split} className="min-h-0 flex-1">
-                    <ResizablePanel defaultSize="50" minSize={200}>
+                    <ResizablePanel id="request" defaultSize="50" minSize={200}>
                       <RequestEditor dir={dir} tab={tab} />
                     </ResizablePanel>
-                    <ResizableHandle />
-                    <ResizablePanel defaultSize="50" minSize={150}>
-                      <ResponseViewer dir={dir} tab={tab} />
-                    </ResizablePanel>
+                    {showsResponse(tab) && (
+                      <>
+                        <ResizableHandle />
+                        <ResizablePanel id="response" defaultSize="50" minSize={150}>
+                          <ResponseViewer dir={dir} tab={tab} />
+                        </ResizablePanel>
+                      </>
+                    )}
                   </ResizablePanelGroup>
                 )}
                 {dir && tab?.kind === "folder" && (
@@ -150,6 +156,17 @@ export function AppShell() {
         >
           <Settings />
         </Button>
+        {dir && tab?.kind === "request" && (tab.response || tab.error) && (
+          <Button
+            variant={showsResponse(tab) ? "secondary" : "ghost"}
+            size="sm"
+            className="h-5 gap-1 px-1.5 text-xs"
+            title="Show or hide the response"
+            onClick={() => useTabs.getState().setResponseHidden(dir, tab.path, showsResponse(tab))}
+          >
+            <PanelRight className="size-3.5" /> Response
+          </Button>
+        )}
         <Button
           variant={consoleOpen ? "secondary" : "ghost"}
           size="sm"

@@ -25,7 +25,16 @@ export interface RequestTab extends DocTab<"request", RequestModel> {
   error: ApiError | null;
   /** Set while a send is in flight; used to cancel it. */
   requestId: string | null;
+  /** The user closed the response pane. The next send opens it again. */
+  responseHidden?: boolean;
 }
+
+/**
+ * Whether the response pane is shown: only once there is something to show (a send in
+ * flight, a response or an error), and not after the user closed it.
+ */
+export const showsResponse = (tab: RequestTab) =>
+  !tab.responseHidden && (tab.requestId !== null || tab.response !== null || tab.error !== null);
 export type FolderTab = DocTab<"folder", FolderModel>;
 export type CollectionTab = DocTab<"collection", CollectionModel>;
 
@@ -100,6 +109,8 @@ interface TabsState {
   save: (dir: string, path: string) => Promise<void>;
   send: (dir: string, path: string) => Promise<void>;
   cancel: (dir: string, path: string) => Promise<void>;
+  /** Closes or reopens the response pane of a request tab. */
+  setResponseHidden: (dir: string, path: string, hidden: boolean) => void;
   /** Restores the open tabs of a collection from local state. */
   restore: (dir: string, collectionId: string) => Promise<void>;
   /** A request or folder moved from `from` to `to`: update matching tab paths. */
@@ -375,7 +386,8 @@ export const useTabs = create<TabsState>((set, get) => {
       const tab = findTab(dir, path);
       if (tab?.kind !== "request" || tab.requestId) return;
       const requestId = crypto.randomUUID();
-      updateRequestTab(dir, path, (t) => ({ ...t, requestId, error: null }));
+      // Sending always shows the response pane, also after it was closed.
+      updateRequestTab(dir, path, (t) => ({ ...t, requestId, error: null, responseHidden: false }));
       try {
         const response = await unwrap(commands.sendRequest(requestId, dir, path, tab.draft));
         updateRequestTab(dir, path, (t) => ({ ...t, response, error: null, requestId: null }));
@@ -400,6 +412,9 @@ export const useTabs = create<TabsState>((set, get) => {
       const tab = findTab(dir, path);
       if (tab?.kind === "request" && tab.requestId) await commands.cancelRequest(tab.requestId);
     },
+
+    setResponseHidden: (dir, path, hidden) =>
+      updateRequestTab(dir, path, (t) => ({ ...t, responseHidden: hidden })),
 
     restore: async (dir, collectionId) => {
       if (get().byCollection[dir]) return; // already open in this session

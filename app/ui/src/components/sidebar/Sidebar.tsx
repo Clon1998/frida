@@ -118,13 +118,13 @@ export function Sidebar() {
         >
           {/* One row even in a narrow sidebar: labels shrink (and cut off) instead of wrapping. */}
           <TabsList className="w-full flex-nowrap [&>button]:text-xs">
-            <TabsTrigger value="tree" className="min-w-0 px-1">
+            <TabsTrigger value="tree" className="min-w-0 flex-1 px-1">
               <span className="truncate">Requests</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="min-w-0 px-1">
+            <TabsTrigger value="history" className="min-w-0 flex-1 px-1">
               <span className="truncate">History</span>
             </TabsTrigger>
-            <TabsTrigger value="git" className="min-w-0 px-1">
+            <TabsTrigger value="git" className="min-w-0 flex-1 px-1">
               <span className="truncate">Git</span>
             </TabsTrigger>
           </TabsList>
