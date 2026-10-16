@@ -1,5 +1,37 @@
 # Changelog
 
+## M12: Search, git diffs in tabs, Frida archives, UI flow tests (2026-10-16)
+
+### What was built
+- **Find bar** in every multi-line editor (response body, request body, scripts): Cmd/Ctrl+F or the search button
+  in the editor's corner, with "3 of 17", previous/next, match case and regex. Read-only editors are focusable now,
+  so Cmd/Ctrl+F also works in the response. The JSONPath filter folds behind a "Filter" button.
+- **Changes tab** for git: the changed files on the left, the selected file's diff on the right (unified or side by
+  side, YAML highlighting, unchanged stretches folded), stage/unstage from both lists. Built on `@codemirror/merge`;
+  the backend returns both versions of a file (`git show`, read-only) instead of a raw `git diff`.
+- **Frida archives**: export a workspace, collection, folder or request as `.zip` (the on-disk YAML plus
+  `frida-export.yaml`), import it via "Import Frida archive…" (collection menu, tree, start screen). No secret
+  values inside; imports reject unsafe paths, symlinks and oversized archives and extract via a staging folder.
+- **Playwright UI flow tests** (`pnpm e2e`): eight core flows in Chromium against an in-memory fake backend
+  (`src/e2e/fakeBackend.ts`, only bundled with `VITE_E2E=1`), also as a CI job. They found the find bar's missing
+  focus on the first run.
+- **Keychain prompts**: secrets are read from the keychain once per run and concurrent reads wait for the first
+  (`frida_secrets::CachedStore`). The proper fix, the data protection keychain with a signed app, is planned as M13.
+
+### Rust things worth understanding in this milestone
+1. **Single-flight with two mutexes** (`frida-secrets/src/cached.rs`). The cache map's lock is only held for a lookup;
+   a second `reading` lock serialises slow keychain reads, and the cache is checked again after getting it
+   ("double-checked locking", as in Java). The `MutexGuard` in `_reading` unlocks when it goes out of scope.
+2. **Bytes vs strings** (`frida-git/src/run.rs` `run_program_bytes`, `lib.rs` `file_versions`). `String` must be valid
+   UTF-8, so git output that may be a binary file stays a `Vec<u8>`; `String::from_utf8(bytes).ok()` turns it into
+   text only if it is. `Option<Option<String>>` then means "side missing" vs "side exists but isn't text".
+3. **Defensive paths** (`frida-core/src/archive.rs` `safe_name`). `Path::components()` splits a path into typed
+   parts (`Normal`, `ParentDir`, `RootDir`, `Prefix` for `C:`); accepting only `Normal` rules out traversal on every
+   OS. `std::io::Read::take` caps how much is read, whatever size the zip claims.
+4. **`tempfile` for atomic results** (`archive.rs` `write_zip`, `extract_to_new_dir`). Write to a temp file or
+   folder next to the target, then `persist`/`rename` it into place; if anything fails first, the `TempDir`/
+   `NamedTempFile` is dropped and deletes itself (RAII), so no half-written archive or import is left behind.
+
 ## After M11: feedback round 2 (2026-10-16)
 
 ### What was built
