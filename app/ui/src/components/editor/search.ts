@@ -149,6 +149,10 @@ function createPanel(view: EditorView): Panel {
   return {
     dom,
     top: true,
+    // Focus the field when the bar opens (Cmd/Ctrl+F or the search button), so typing searches.
+    mount() {
+      input.select();
+    },
     update(update: ViewUpdate) {
       const latest = getSearchQuery(update.state);
       if (!latest.eq(query)) {
