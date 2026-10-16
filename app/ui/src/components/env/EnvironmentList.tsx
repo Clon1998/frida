@@ -14,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Copy } from "lucide-react";
+import { Check, CircleOff, Copy } from "lucide-react";
 import { commands, type EnvScope } from "@/bindings";
 import {
   ContextMenu,
@@ -112,6 +112,10 @@ function SortableEnvironment({
 }) {
   const env = entry.environment;
   const unsaved = useEnvs((s) => s.editorDrafts[envDraftKey(scope, env.name)] !== undefined);
+  const active = useEnvs(
+    (s) => (scope.kind === "global" ? s.activeGlobal : s.activeCollection) === env.name,
+  );
+  const setActive = useEnvs((s) => s.select);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: env.name,
   });
@@ -123,7 +127,7 @@ function SortableEnvironment({
           ref={setNodeRef}
           style={{ transform: CSS.Translate.toString(transform), transition }}
           onClick={onSelect}
-          title="Drag to reorder"
+          title={active ? "Active environment. Drag to reorder" : "Drag to reorder"}
           className={cn(
             "truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent",
             selected && "bg-accent font-medium",
@@ -140,16 +144,32 @@ function SortableEnvironment({
               )}
             />
             <span className="truncate">{env.name}</span>
-            {unsaved && (
-              <span
-                className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground"
-                title="Unsaved changes"
-              />
-            )}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              {unsaved && (
+                <span className="size-1.5 rounded-full bg-foreground" title="Unsaved changes" />
+              )}
+              {active && (
+                <span
+                  className="flex items-center gap-0.5 text-[10px] font-medium text-success"
+                  aria-label="Active"
+                >
+                  <Check className="size-3" /> active
+                </span>
+              )}
+            </span>
           </span>
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent>
+        {active ? (
+          <ContextMenuItem onSelect={() => void setActive(scope, null)}>
+            <CircleOff /> Deactivate
+          </ContextMenuItem>
+        ) : (
+          <ContextMenuItem onSelect={() => void setActive(scope, env.name)}>
+            <Check /> Set as active
+          </ContextMenuItem>
+        )}
         <ContextMenuItem onSelect={onDuplicate}>
           <Copy /> Duplicate
         </ContextMenuItem>
