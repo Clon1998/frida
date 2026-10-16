@@ -255,10 +255,15 @@ export function CodeEditor({
 
   // CodeMirror appends its editor to `host` after React's children (the button), so the two
   // don't get in each other's way.
+  //
+  // `isolate` gives every editor its own stacking context. CodeMirror's panels (the find bar)
+  // have `z-index: 300`; without it, an open find bar was painted over dialogs (z-50) in
+  // WebKit, the engine the app runs on.
   return (
     <div
       ref={host}
       className={cn(
+        "isolate",
         searchButton && "group/editor relative [&:has(.cm-panels-top)>button]:hidden",
         className,
       )}

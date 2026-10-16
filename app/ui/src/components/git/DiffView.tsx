@@ -118,7 +118,8 @@ export function DiffView({
   return (
     <div
       ref={host}
-      className="h-full overflow-auto [&_.cm-editor]:min-h-full [&>.cm-editor]:h-full"
+      // `isolate`: see CodeEditor (CodeMirror's find bar must not paint over dialogs).
+      className="isolate h-full overflow-auto [&_.cm-editor]:min-h-full [&>.cm-editor]:h-full"
       data-testid="diff-view"
     />
   );
