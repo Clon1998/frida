@@ -7,6 +7,8 @@
 //! - `/status/{code}`  responds with that status code
 //! - `/cookies/set?k=v` sets each query pair as a cookie (`Set-Cookie`)
 //! - `/gzip`           echoes like `/echo`, gzip-compressed (`Content-Encoding: gzip`)
+//! - `/sample`         a sample JSON resource (a pet with items, a token and a date) plus the
+//!   request under `"echo"`; what the script and test snippets are written against
 //! - anything else     echoes the request back as JSON: method, path, query, headers, body
 //!
 //! - `/oauth/*`        a mock OAuth2 provider, see the `oauth` module
@@ -49,6 +51,7 @@ pub fn router() -> Router {
         .route("/status/{code}", any(status))
         .route("/cookies/set", get(set_cookies))
         .route("/gzip", any(gzip))
+        .route("/sample", any(sample))
         .merge(oauth::router())
         .fallback(echo)
 }
@@ -86,6 +89,36 @@ async fn echo(method: Method, uri: Uri, headers: HeaderMap, body: Bytes) -> Resp
     });
     (
         [(header::CONTENT_TYPE, "application/json")],
+        payload.to_string(),
+    )
+        .into_response()
+}
+
+/// A typical JSON API response, for the script/test snippets (`frida_script::snippets`).
+/// `echo` holds the request as received, so tests can see what pre-request scripts changed.
+async fn sample(method: Method, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
+    let echoed = echo(method, uri, headers, body).await;
+    let request: Value = serde_json::from_slice(
+        &axum::body::to_bytes(echoed.into_body(), usize::MAX)
+            .await
+            .unwrap_or_default(),
+    )
+    .unwrap_or(Value::Null);
+    let payload = json!({
+        "id": 42,
+        "name": "Rex",
+        "status": "available",
+        "tags": ["friendly", "small"],
+        "items": [{ "id": 1, "price": 9.5 }, { "id": 2, "price": 3 }],
+        "token": "sample-token-123",
+        "createdAt": "2026-10-16T10:00:00Z",
+        "echo": request,
+    });
+    (
+        [
+            (header::CONTENT_TYPE, "application/json; charset=utf-8"),
+            (header::HeaderName::from_static("x-request-id"), "req-42"),
+        ],
         payload.to_string(),
     )
         .into_response()

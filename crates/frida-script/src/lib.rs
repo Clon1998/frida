@@ -17,6 +17,7 @@
 mod engine;
 mod model;
 mod native;
+pub mod snippets;
 
 use std::future::Future;
 use std::pin::Pin;
