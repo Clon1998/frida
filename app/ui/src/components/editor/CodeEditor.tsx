@@ -3,7 +3,12 @@ import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { Annotation, Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
 import { autocompletion, completionStatus } from "@codemirror/autocomplete";
-import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
+import {
+  EditorView,
+  keymap,
+  placeholder as placeholderExtension,
+  tooltips,
+} from "@codemirror/view";
 import { basicSetup, minimalSetup } from "codemirror";
 import { useContext, useEffect, useRef } from "react";
 import { diffHighlight } from "./diff";
@@ -186,6 +191,9 @@ export function CodeEditor({
         extensions: [
           lineMode,
           theme,
+          // Popups (autocompletion, variable tooltips) go into <body>, so containers that clip
+          // their content (table cells, the floating URL bar) can't cut them off.
+          tooltips({ parent: document.body }),
           variablesExtension({ pathParams }),
           placeholder ? placeholderExtension(placeholder) : [],
           languageSlot.current.of(languageExtension(language)),

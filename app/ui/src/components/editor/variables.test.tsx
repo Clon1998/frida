@@ -1,6 +1,7 @@
-import { CompletionContext } from "@codemirror/autocomplete";
+import { CompletionContext, startCompletion } from "@codemirror/autocomplete";
+import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AvailableVar } from "@/bindings";
 import { CodeEditor } from "./CodeEditor";
@@ -81,5 +82,28 @@ describe("highlighting in the editor", () => {
     const missing = [...document.querySelectorAll(".cm-var-unresolved")].map((e) => e.textContent);
     expect(resolved).toEqual(["{{baseUrl}}", ":id"]);
     expect(missing).toEqual([":empty", "{{nope}}"]);
+  });
+});
+
+describe("autocompletion popup", () => {
+  afterEach(cleanup);
+
+  it("renders outside of clipping containers", async () => {
+    const { container } = render(
+      <div style={{ overflow: "hidden", height: 32 }}>
+        <VariablesContext.Provider value={ctx}>
+          <CodeEditor singleLine compact value="" />
+        </VariablesContext.Provider>
+      </div>,
+    );
+    const view = EditorView.findFromDOM(container.querySelector(".cm-editor") as HTMLElement);
+    if (!view) throw new Error("no editor");
+    view.dispatch({ changes: { from: 0, insert: "{{ba" }, selection: { anchor: 4 } });
+    startCompletion(view);
+    await waitFor(() => expect(document.querySelector(".cm-tooltip-autocomplete")).not.toBeNull());
+    const popup = document.querySelector(".cm-tooltip-autocomplete") as HTMLElement;
+    // Not inside the clipped container, and it lists the variable.
+    expect(container.contains(popup)).toBe(false);
+    expect(popup.textContent).toContain("baseUrl");
   });
 });
