@@ -1,0 +1,184 @@
+---
+source: crates/frida-core/tests/openapi.rs
+expression: to_yaml_string(&plan).unwrap()
+---
+collection:
+  version: 1
+  id: <generated>
+  name: Tic Tac Toe
+  vars: []
+  headers: []
+  auth:
+    mode: none
+  scripts:
+    pre: ""
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: 30000
+    tls:
+      verify: true
+      caCertPaths: []
+  docs: |
+    This API allows writing down marks on a Tic Tac Toe board
+    and requesting the state of the board or of individual squares.
+environment:
+  version: 1
+  name: default
+  variables:
+  - name: baseUrl
+    value: http://localhost
+  - name: defaultApiKey
+    secret: true
+  - name: token
+    secret: true
+folders:
+- folder:
+    version: 1
+    name: Gameplay
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+  requests:
+  - version: 1
+    name: Get the whole board
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/board"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: custom
+      schemes:
+      - type: apikey
+        in: header
+        name: api-key
+        value: "{{defaultApiKey}}"
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Retrieves the current state of the board and the winner.
+      
+      Operation id: `get-board`
+  - version: 1
+    name: Get a single board square
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/board/:row/:column"
+    params:
+      query: []
+      path:
+      - name: row
+        value: "1"
+      - name: column
+        value: "1"
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: custom
+      schemes:
+      - type: bearer
+        token: "{{token}}"
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Retrieves the requested square.
+      
+      Operation id: `get-square`
+  - version: 1
+    name: Set a single board square
+    seq: 0
+    method: PUT
+    url: "{{baseUrl}}/board/:row/:column"
+    params:
+      query: []
+      path:
+      - name: row
+        value: "1"
+      - name: column
+        value: "1"
+    headers:
+    - name: progressUrl
+      value: ""
+      enabled: false
+    body:
+      mode: json
+      json: "\".\""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: custom
+      schemes:
+      - type: bearer
+        token: "{{token}}"
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Places a mark on the board and retrieves the whole board and the winner (if any).
+      
+      Operation id: `put-square`
+requests: []
+summary:
+  collectionName: Tic Tac Toe
+  requests: 3
+  folders: 1
+  baseUrl: http://localhost
+  secretsToFill:
+  - defaultApiKey
+  - token
+  warnings:
+  - >-
+    The spec defines 5 security schemes but no default; set the collection's auth
+    by hand if needed.
+  - The spec has no servers; set baseUrl in the default environment.
+  - GET /board allows several security alternatives; the first one was used.
+  - >-
+    GET /board/{row}/{column} allows several security alternatives; the first one
+    was used.
+  - >-
+    PUT /board/{row}/{column} allows several security alternatives; the first one
+    was used.

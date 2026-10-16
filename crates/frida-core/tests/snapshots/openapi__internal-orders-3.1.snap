@@ -1,0 +1,408 @@
+---
+source: crates/frida-core/tests/openapi.rs
+expression: to_yaml_string(&plan).unwrap()
+---
+collection:
+  version: 1
+  id: <generated>
+  name: Orders Service
+  vars: []
+  headers: []
+  auth:
+    mode: custom
+    schemes:
+    - type: bearer
+      token: "{{token}}"
+  scripts:
+    pre: ""
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: 30000
+    tls:
+      verify: true
+      caCertPaths: []
+  docs: "Internal-style spec used to test the importer: server variables, bearer and OAuth2 client credentials, per-operation security, `$ref`s, `allOf`/`oneOf`, enums, formats, readOnly fields, form and multipart bodies, cookie and header parameters, a recursive schema and an external reference."
+environment:
+  version: 1
+  name: default
+  variables:
+  - name: baseUrl
+    value: https://eu.orders.example.com/v2
+  - name: token
+    secret: true
+  - name: clientId
+    value: ""
+  - name: clientSecret
+    secret: true
+  - name: username
+    value: ""
+  - name: password
+    secret: true
+folders:
+- folder:
+    version: 1
+    name: orders
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: Order management
+  requests:
+  - version: 1
+    name: List orders
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/orders?limit=20"
+    params:
+      query:
+      - name: status
+        value: placed
+        enabled: false
+      - name: limit
+        value: "20"
+        enabled: true
+      path: []
+    headers:
+    - name: X-Tenant-Id
+      value: acme
+      enabled: true
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: Returns a page of orders.
+  - version: 1
+    name: Create order
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/orders"
+    params:
+      query: []
+      path: []
+    headers:
+    - name: X-Tenant-Id
+      value: acme
+      enabled: true
+    body:
+      mode: json
+      json: |-
+        {
+          "createdAt": "2026-01-01T12:00:00Z",
+          "items": [
+            {
+              "sku": "string",
+              "quantity": 1,
+              "price": {
+                "amount": 19.99,
+                "currency": "EUR"
+              }
+            }
+          ],
+          "delivery": {
+            "kind": "pickup",
+            "store": "string"
+          },
+          "note": "string",
+          "category": {
+            "name": "string"
+          }
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+  - version: 1
+    name: getOrder
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/orders/:orderId"
+    params:
+      query:
+      - name: expand
+        value: items
+        enabled: false
+      path:
+      - name: orderId
+        value: 3f6c1a52-0d5e-4b8e-9b7a-0c2f6d1e8a11
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: custom
+      schemes:
+      - type: oauth2
+        grant: client_credentials
+        tokenUrl: https://auth.example.com/oauth2/token
+        authUrl: ""
+        redirectUri: ""
+        clientId: "{{clientId}}"
+        clientSecret: "{{clientSecret}}"
+        scope: orders:read
+        usePkce: true
+        username: ""
+        password: ""
+        clientAuth: basic_header
+        tokenPlacement:
+          in: header
+          name: Authorization
+          prefix: Bearer
+        preset: null
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      **Deprecated.**
+      
+      Operation id: `getOrder`
+  - version: 1
+    name: Update status
+    seq: 0
+    method: PATCH
+    url: "{{baseUrl}}/orders/:orderId"
+    params:
+      query: []
+      path:
+      - name: orderId
+        value: ""
+    headers:
+    - name: Content-Type
+      value: application/merge-patch+json
+      enabled: true
+    body:
+      mode: json
+      json: |-
+        {
+          "status": "placed"
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+- folder:
+    version: 1
+    name: files
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+  requests:
+  - version: 1
+    name: Upload attachment
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/files"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: multipart
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart:
+      - name: file
+        type: file
+        value: ""
+        enabled: true
+      - name: comment
+        type: text
+        value: invoice
+        enabled: true
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+- folder:
+    version: 1
+    name: reports
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+  requests:
+  - version: 1
+    name: Yearly report
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/reports/:year"
+    params:
+      query: []
+      path:
+      - name: year
+        value: ""
+    headers: []
+    body:
+      mode: json
+      json: "null"
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: ""
+requests:
+- version: 1
+  name: getHealth
+  seq: 0
+  method: GET
+  url: "{{baseUrl}}/health"
+  params:
+    query: []
+    path: []
+  headers: []
+  body:
+    mode: none
+    json: ""
+    xml: ""
+    text: ""
+    formUrlEncoded: []
+    multipart: []
+    binaryPath: ""
+  auth:
+    mode: none
+  vars: []
+  scripts:
+    pre: ""
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: null
+  docs: "Operation id: `getHealth`"
+- version: 1
+  name: Login form
+  seq: 0
+  method: POST
+  url: "{{baseUrl}}/login"
+  params:
+    query: []
+    path: []
+  headers: []
+  body:
+    mode: form-urlencoded
+    json: ""
+    xml: ""
+    text: ""
+    formUrlEncoded:
+    - name: username
+      value: user@example.com
+      enabled: true
+    - name: remember
+      value: "true"
+      enabled: true
+    multipart: []
+    binaryPath: ""
+  auth:
+    mode: custom
+    schemes:
+    - type: basic
+      username: "{{username}}"
+      password: "{{password}}"
+  vars: []
+  scripts:
+    pre: ""
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: null
+  docs: ""
+summary:
+  collectionName: Orders Service
+  requests: 8
+  folders: 3
+  baseUrl: https://eu.orders.example.com/v2
+  secretsToFill:
+  - token
+  - clientSecret
+  - password
+  warnings:
+  - "GET /orders: cookie parameter \"session\" was skipped (set it as a Cookie header if needed)."
+  - >-
+    External reference "other-file.yaml#/components/schemas/Filter" was not
+    followed (only references inside the file are).

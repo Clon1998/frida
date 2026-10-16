@@ -748,7 +748,8 @@ mod tests {
         r.body.mode = BodyMode::FormUrlencoded;
         set_body(&mut r, &serde_json::json!({ "x": "1", "n": 2 }));
         assert_eq!(r.body.form_url_encoded.len(), 2);
-        assert_eq!(r.body.form_url_encoded[0].value, "2");
+        let n = r.body.form_url_encoded.iter().find(|f| f.name == "n").unwrap();
+        assert_eq!(n.value, "2");
 
         r.body.mode = BodyMode::None;
         set_body(&mut r, &Value::String("hi".into()));

@@ -1,0 +1,230 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Orders Service",
+    "version": "2.4.0",
+    "description": "Internal-style spec used to test the importer: server variables, bearer and OAuth2 client credentials, per-operation security, `$ref`s, `allOf`/`oneOf`, enums, formats, readOnly fields, form and multipart bodies, cookie and header parameters, a recursive schema and an external reference."
+  },
+  "servers": [
+    {
+      "url": "https://{region}.orders.example.com/{basePath}",
+      "variables": {
+        "region": { "default": "eu", "enum": ["eu", "us"] },
+        "basePath": { "default": "v2" }
+      }
+    },
+    { "url": "http://localhost:8080/v2" }
+  ],
+  "security": [{ "serviceAuth": [] }],
+  "tags": [
+    { "name": "orders", "description": "Order management" },
+    { "name": "files" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "security": [],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/orders": {
+      "parameters": [
+        { "$ref": "#/components/parameters/TenantHeader" }
+      ],
+      "get": {
+        "tags": ["orders"],
+        "summary": "List orders",
+        "description": "Returns a page of orders.",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/OrderStatus" } },
+          { "name": "limit", "in": "query", "required": true, "schema": { "type": "integer", "default": 20 } },
+          { "name": "session", "in": "cookie", "schema": { "type": "string" } },
+          { "name": "Accept", "in": "header", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "A page of orders" } }
+      },
+      "post": {
+        "tags": ["orders", "files"],
+        "summary": "Create order",
+        "requestBody": { "$ref": "#/components/requestBodies/NewOrder" },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "tags": ["orders"],
+        "operationId": "getOrder",
+        "deprecated": true,
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" }, "example": "3f6c1a52-0d5e-4b8e-9b7a-0c2f6d1e8a11" },
+          { "name": "expand", "in": "query", "schema": { "type": "array", "items": { "type": "string", "enum": ["items", "customer"] } } }
+        ],
+        "security": [{ "partnerOAuth": ["orders:read"] }],
+        "responses": { "200": { "description": "The order" } }
+      },
+      "patch": {
+        "tags": ["orders"],
+        "summary": "Update status",
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "type": "object",
+                "properties": { "status": { "$ref": "#/components/schemas/OrderStatus" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/files": {
+      "post": {
+        "tags": ["files"],
+        "summary": "Upload attachment",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "comment": { "type": "string", "example": "invoice" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Uploaded" } }
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "Login form",
+        "security": [{ "basicAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["username"],
+                "properties": {
+                  "username": { "type": "string", "format": "email" },
+                  "remember": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "204": { "description": "Logged in" } }
+      }
+    },
+    "/reports/{year}": {
+      "get": {
+        "tags": ["reports"],
+        "summary": "Yearly report",
+        "parameters": [
+          { "name": "year", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 2000 } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "other-file.yaml#/components/schemas/Filter" } }
+          }
+        },
+        "responses": { "200": { "description": "Report" } }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "TenantHeader": {
+        "name": "X-Tenant-Id",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "example": "acme" }
+      }
+    },
+    "requestBodies": {
+      "NewOrder": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/NewOrder" }
+          },
+          "application/xml": {
+            "schema": { "$ref": "#/components/schemas/NewOrder" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "OrderStatus": { "type": "string", "enum": ["placed", "paid", "shipped"] },
+      "Money": {
+        "type": "object",
+        "required": ["amount", "currency"],
+        "properties": {
+          "amount": { "type": "number", "format": "double", "example": 19.99 },
+          "currency": { "type": "string", "default": "EUR" }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "sku": { "type": "string" },
+          "quantity": { "type": "integer", "format": "int32", "minimum": 1 },
+          "price": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "parent": { "$ref": "#/components/schemas/Category" }
+        }
+      },
+      "NewOrder": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid", "readOnly": true },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "items": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "delivery": {
+                "oneOf": [
+                  { "type": "object", "properties": { "kind": { "const": "pickup" }, "store": { "type": "string" } } },
+                  { "type": "object", "properties": { "kind": { "const": "ship" }, "address": { "type": "string" } } }
+                ]
+              },
+              "note": { "type": ["string", "null"] },
+              "category": { "$ref": "#/components/schemas/Category" }
+            }
+          }
+        ]
+      }
+    },
+    "securitySchemes": {
+      "serviceAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "basicAuth": { "type": "http", "scheme": "basic" },
+      "partnerOAuth": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.example.com/oauth2/token",
+            "scopes": { "orders:read": "Read orders", "orders:write": "Write orders" }
+          }
+        }
+      },
+      "legacyKey": { "type": "apiKey", "in": "query", "name": "api_key" }
+    }
+  }
+}

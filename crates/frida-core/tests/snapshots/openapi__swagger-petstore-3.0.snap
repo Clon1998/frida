@@ -1,0 +1,805 @@
+---
+source: crates/frida-core/tests/openapi.rs
+expression: to_yaml_string(&plan).unwrap()
+---
+collection:
+  version: 1
+  id: <generated>
+  name: Swagger Petstore - OpenAPI 3.0
+  vars: []
+  headers: []
+  auth:
+    mode: none
+  scripts:
+    pre: ""
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: 30000
+    tls:
+      verify: true
+      caCertPaths: []
+  docs: |-
+    This is a sample Pet Store Server based on the OpenAPI 3.0 specification.  You can find out more about
+    Swagger at [https://swagger.io](https://swagger.io). In the third iteration of the pet store, we've switched to the design first approach!
+    You can now help us improve the API whether it's by making changes to the definition itself or to the code.
+    That way, with time, we can improve the API in general, and expose some of the new features in OAS3.
+    
+    Some useful links:
+    - [The Pet Store repository](https://github.com/swagger-api/swagger-petstore)
+    - [The source API definition for the Pet Store](https://github.com/swagger-api/swagger-petstore/blob/master/src/main/resources/openapi.yaml)
+environment:
+  version: 1
+  name: default
+  variables:
+  - name: baseUrl
+    value: /api/v3
+  - name: api_key
+    secret: true
+folders:
+- folder:
+    version: 1
+    name: pet
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: Everything about your Pets
+  requests:
+  - version: 1
+    name: Add a new pet to the store.
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/pet"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: json
+      json: |-
+        {
+          "id": 10,
+          "name": "doggie",
+          "category": {
+            "id": 1,
+            "name": "Dogs"
+          },
+          "photoUrls": [
+            "string"
+          ],
+          "tags": [
+            {
+              "id": 0,
+              "name": "string"
+            }
+          ],
+          "status": "available"
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Add a new pet to the store.
+      
+      Operation id: `addPet`
+  - version: 1
+    name: Update an existing pet.
+    seq: 0
+    method: PUT
+    url: "{{baseUrl}}/pet"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: json
+      json: |-
+        {
+          "id": 10,
+          "name": "doggie",
+          "category": {
+            "id": 1,
+            "name": "Dogs"
+          },
+          "photoUrls": [
+            "string"
+          ],
+          "tags": [
+            {
+              "id": 0,
+              "name": "string"
+            }
+          ],
+          "status": "available"
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Update an existing pet by Id.
+      
+      Operation id: `updatePet`
+  - version: 1
+    name: Finds Pets by status.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/pet/findByStatus?status=available"
+    params:
+      query:
+      - name: status
+        value: available
+        enabled: true
+      path: []
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Multiple status values can be provided with comma separated strings.
+      
+      Operation id: `findPetsByStatus`
+  - version: 1
+    name: Finds Pets by tags.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/pet/findByTags?tags="
+    params:
+      query:
+      - name: tags
+        value: ""
+        enabled: true
+      path: []
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing.
+      
+      Operation id: `findPetsByTags`
+  - version: 1
+    name: Find pet by ID.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/pet/:petId"
+    params:
+      query: []
+      path:
+      - name: petId
+        value: ""
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: custom
+      schemes:
+      - type: apikey
+        in: header
+        name: api_key
+        value: "{{api_key}}"
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Returns a single pet.
+      
+      Operation id: `getPetById`
+  - version: 1
+    name: Updates a pet in the store with form data.
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/pet/:petId"
+    params:
+      query:
+      - name: name
+        value: ""
+        enabled: false
+      - name: status
+        value: ""
+        enabled: false
+      path:
+      - name: petId
+        value: ""
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Updates a pet resource based on the form data.
+      
+      Operation id: `updatePetWithForm`
+  - version: 1
+    name: Deletes a pet.
+    seq: 0
+    method: DELETE
+    url: "{{baseUrl}}/pet/:petId"
+    params:
+      query: []
+      path:
+      - name: petId
+        value: ""
+    headers:
+    - name: api_key
+      value: ""
+      enabled: false
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Delete a pet.
+      
+      Operation id: `deletePet`
+  - version: 1
+    name: Uploads an image.
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/pet/:petId/uploadImage"
+    params:
+      query:
+      - name: additionalMetadata
+        value: ""
+        enabled: false
+      path:
+      - name: petId
+        value: ""
+    headers: []
+    body:
+      mode: binary
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: none
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Upload image of the pet.
+      
+      Operation id: `uploadFile`
+- folder:
+    version: 1
+    name: store
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: Access to Petstore orders
+  requests:
+  - version: 1
+    name: Returns pet inventories by status.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/store/inventory"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: custom
+      schemes:
+      - type: apikey
+        in: header
+        name: api_key
+        value: "{{api_key}}"
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Returns a map of status codes to quantities.
+      
+      Operation id: `getInventory`
+  - version: 1
+    name: Place an order for a pet.
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/store/order"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: json
+      json: |-
+        {
+          "id": 10,
+          "petId": 198772,
+          "quantity": 7,
+          "shipDate": "2026-01-01T12:00:00Z",
+          "status": "approved",
+          "complete": true
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Place a new order in the store.
+      
+      Operation id: `placeOrder`
+  - version: 1
+    name: Find purchase order by ID.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/store/order/:orderId"
+    params:
+      query: []
+      path:
+      - name: orderId
+        value: ""
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      For valid response try integer IDs with value <= 5 or > 10. Other values will generate exceptions.
+      
+      Operation id: `getOrderById`
+  - version: 1
+    name: Delete purchase order by identifier.
+    seq: 0
+    method: DELETE
+    url: "{{baseUrl}}/store/order/:orderId"
+    params:
+      query: []
+      path:
+      - name: orderId
+        value: ""
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      For valid response try integer IDs with value < 1000. Anything above 1000 or non-integers will generate API errors.
+      
+      Operation id: `deleteOrder`
+- folder:
+    version: 1
+    name: user
+    seq: 0
+    vars: []
+    headers: []
+    auth:
+      mode: inherit
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: Operations about user
+  requests:
+  - version: 1
+    name: Create user.
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/user"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: json
+      json: |-
+        {
+          "id": 10,
+          "username": "theUser",
+          "firstName": "John",
+          "lastName": "James",
+          "email": "john@email.com",
+          "password": "12345",
+          "phone": "12345",
+          "userStatus": 1
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      This can only be done by the logged in user.
+      
+      Operation id: `createUser`
+  - version: 1
+    name: Creates list of users with given input array.
+    seq: 0
+    method: POST
+    url: "{{baseUrl}}/user/createWithList"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: json
+      json: |-
+        [
+          {
+            "id": 10,
+            "username": "theUser",
+            "firstName": "John",
+            "lastName": "James",
+            "email": "john@email.com",
+            "password": "12345",
+            "phone": "12345",
+            "userStatus": 1
+          }
+        ]
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Creates list of users with given input array.
+      
+      Operation id: `createUsersWithListInput`
+  - version: 1
+    name: Logs user into the system.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/user/login"
+    params:
+      query:
+      - name: username
+        value: ""
+        enabled: false
+      - name: password
+        value: ""
+        enabled: false
+      path: []
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Log into the system.
+      
+      Operation id: `loginUser`
+  - version: 1
+    name: Logs out current logged in user session.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/user/logout"
+    params:
+      query: []
+      path: []
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Log user out of the system.
+      
+      Operation id: `logoutUser`
+  - version: 1
+    name: Get user by user name.
+    seq: 0
+    method: GET
+    url: "{{baseUrl}}/user/:username"
+    params:
+      query: []
+      path:
+      - name: username
+        value: ""
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      Get user detail based on username.
+      
+      Operation id: `getUserByName`
+  - version: 1
+    name: Update user resource.
+    seq: 0
+    method: PUT
+    url: "{{baseUrl}}/user/:username"
+    params:
+      query: []
+      path:
+      - name: username
+        value: ""
+    headers: []
+    body:
+      mode: json
+      json: |-
+        {
+          "id": 10,
+          "username": "theUser",
+          "firstName": "John",
+          "lastName": "James",
+          "email": "john@email.com",
+          "password": "12345",
+          "phone": "12345",
+          "userStatus": 1
+        }
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      This can only be done by the logged in user.
+      
+      Operation id: `updateUser`
+  - version: 1
+    name: Delete user resource.
+    seq: 0
+    method: DELETE
+    url: "{{baseUrl}}/user/:username"
+    params:
+      query: []
+      path:
+      - name: username
+        value: ""
+    headers: []
+    body:
+      mode: none
+      json: ""
+      xml: ""
+      text: ""
+      formUrlEncoded: []
+      multipart: []
+      binaryPath: ""
+    auth:
+      mode: inherit
+    vars: []
+    scripts:
+      pre: ""
+      post: ""
+    tests: ""
+    settings:
+      timeoutMs: null
+    docs: |-
+      This can only be done by the logged in user.
+      
+      Operation id: `deleteUser`
+requests: []
+summary:
+  collectionName: Swagger Petstore - OpenAPI 3.0
+  requests: 19
+  folders: 3
+  baseUrl: /api/v3
+  secretsToFill:
+  - api_key
+  warnings:
+  - >-
+    The spec defines 2 security schemes but no default; set the collection's auth
+    by hand if needed.
+  - >-
+    The server URL "/api/v3" is relative; add the host to baseUrl in the default
+    environment.
+  - >-
+    Security scheme "petstore_auth" only has the implicit OAuth2 flow, which Frida
+    doesn't support; it was skipped.
+  - GET /pet/{petId} allows several security alternatives; the first one was used.
+  - "POST /pet/{petId}/uploadImage: the application/octet-stream body needs a file; choose it in the Body tab."

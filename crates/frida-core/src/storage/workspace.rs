@@ -126,11 +126,16 @@ pub const COLLECTIONS_DIR: &str = "collections";
 /// Creates a new collection at `<workspace>/collections/<slug>` (with a unique slug) and adds it
 /// to the workspace. Returns the new collection's folder.
 pub fn create_named_collection(workspace_dir: &Path, name: &str) -> Result<PathBuf> {
-    let parent = workspace_dir.join(COLLECTIONS_DIR);
-    std::fs::create_dir_all(&parent).map_err(|e| CoreError::io(&parent, e))?;
-    let dir = parent.join(unique_name(&parent, name, EntryKind::Folder, None));
+    let dir = new_collection_dir(workspace_dir, name)?;
     create_collection_in_workspace(workspace_dir, &dir, name)?;
     Ok(dir)
+}
+
+/// A free folder for a new collection called `name`: `<workspace>/collections/<unique slug>`.
+pub fn new_collection_dir(workspace_dir: &Path, name: &str) -> Result<PathBuf> {
+    let parent = workspace_dir.join(COLLECTIONS_DIR);
+    std::fs::create_dir_all(&parent).map_err(|e| CoreError::io(&parent, e))?;
+    Ok(parent.join(unique_name(&parent, name, EntryKind::Folder, None)))
 }
 
 /// Removes a collection from the workspace list. The files on disk are left untouched.
