@@ -65,7 +65,8 @@ const languageExtension = (language: CodeLanguage): Extension => {
 const theme = EditorView.theme({
   "&": {
     height: "100%",
-    fontSize: "13px",
+    // Settings → Appearance → Editor font size (see lib/theme.ts).
+    fontSize: "var(--editor-font-size, 13px)",
     backgroundColor: "var(--background)",
     color: "var(--foreground)",
   },
@@ -106,6 +107,29 @@ const singleLineTheme = EditorView.theme({
 });
 
 /**
+ * One zero-size element for the popups (autocompletion, variable tooltips) of every editor.
+ *
+ * Popups go outside the editors so containers that clip their content (table cells, the
+ * floating URL bar) can't cut them off. CodeMirror wraps them in a container per editor that
+ * carries the editor's style classes, including `height: 100%` from {@link theme}. Placed
+ * directly in `<body>`, each of those containers was a full window height below the app, so
+ * the page could be scrolled past the footer. In this zero-size, fixed host they take no space.
+ * (The popups themselves are `position: fixed`, so they still show up next to the cursor.)
+ */
+function tooltipHost(): HTMLElement {
+  const id = "cm-tooltip-host";
+  let host = document.getElementById(id);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = id;
+    // Above dialogs (z-50), so suggestions also show for editors inside a dialog.
+    host.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:60";
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+/**
  * Marks text replaced from outside (switching tabs, reload from disk). Such changes are not user
  * edits, so they must not call `onChange`: that would mark tabs as edited (and pin preview tabs).
  */
@@ -113,7 +137,7 @@ const externalChange = Annotation.define<boolean>();
 
 /** Single-line editors in table cells: the height and padding of a plain cell input. */
 const compactTheme = EditorView.theme({
-  "&": { fontSize: "12px" },
+  "&": { fontSize: "calc(var(--editor-font-size, 13px) - 1px)" },
   ".cm-scroller": { lineHeight: "2rem" },
   ".cm-content, .cm-line": { padding: "0 4px" },
 });
@@ -194,9 +218,7 @@ export function CodeEditor({
         extensions: [
           lineMode,
           theme,
-          // Popups (autocompletion, variable tooltips) go into <body>, so containers that clip
-          // their content (table cells, the floating URL bar) can't cut them off.
-          tooltips({ parent: document.body }),
+          tooltips({ parent: tooltipHost() }),
           variablesExtension({ pathParams }),
           placeholder ? placeholderExtension(placeholder) : [],
           languageSlot.current.of(languageExtension(language)),
