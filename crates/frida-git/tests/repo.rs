@@ -82,16 +82,10 @@ fn status_stage_commit_and_push() {
             ("new request.yaml", None, Some('?'), true),
         ]
     );
-    assert!(
-        repo.diff("collection.yaml", false)
-            .unwrap()
-            .contains("+name: Changed")
-    );
-    assert!(
-        repo.diff("new request.yaml", false)
-            .unwrap()
-            .contains("+name: New")
-    );
+    let changed = repo.file_versions("collection.yaml", false).unwrap();
+    assert_eq!(changed.new.as_deref(), Some("name: Changed\n"));
+    let new = repo.file_versions("new request.yaml", false).unwrap();
+    assert_eq!((new.old, new.new.as_deref()), (None, Some("name: New\n")));
 
     repo.stage(&["new request.yaml".into()]).unwrap();
     repo.stage_all().unwrap();
@@ -99,10 +93,10 @@ fn status_stage_commit_and_push() {
     let status = repo.status().unwrap();
     assert_eq!(status.files[0].staged, None);
     assert_eq!(status.files[1].staged, Some('A'));
-    assert!(
-        repo.diff("new request.yaml", true)
-            .unwrap()
-            .contains("+name: New")
+    let staged_new = repo.file_versions("new request.yaml", true).unwrap();
+    assert_eq!(
+        (staged_new.old, staged_new.new.as_deref()),
+        (None, Some("name: New\n"))
     );
 
     assert!(matches!(repo.commit("  "), Err(GitError::Blocked(_))));
@@ -224,4 +218,65 @@ fn folders_without_a_repo_can_be_initialized() {
     repo.unstage_all().unwrap();
     assert!(repo.status().unwrap().files[0].untracked);
     assert!(dir.path().join("a.yaml").exists());
+}
+
+#[test]
+fn file_versions_for_staged_unstaged_new_deleted_renamed_and_binary_files() {
+    let s = setup();
+    let repo = Repo::open(&s.a).unwrap();
+    std::fs::write(s.a.join("gone.yaml"), "name: Gone\n").unwrap();
+    std::fs::write(s.a.join("old name.yaml"), "name: Moved\n").unwrap();
+    git(&s.a, &["add", "."]);
+    git(&s.a, &["commit", "-m", "more"]);
+
+    // Staged edit, then a further unstaged edit of the same file.
+    std::fs::write(s.a.join("collection.yaml"), "name: Staged\n").unwrap();
+    git(&s.a, &["add", "collection.yaml"]);
+    std::fs::write(s.a.join("collection.yaml"), "name: Working\n").unwrap();
+    let staged = repo.file_versions("collection.yaml", true).unwrap();
+    assert_eq!(staged.old.as_deref(), Some("name: Test\n"));
+    assert_eq!(staged.new.as_deref(), Some("name: Staged\n"));
+    let unstaged = repo.file_versions("collection.yaml", false).unwrap();
+    assert_eq!(unstaged.old.as_deref(), Some("name: Staged\n"));
+    assert_eq!(unstaged.new.as_deref(), Some("name: Working\n"));
+
+    // New (untracked) and deleted files have one side only.
+    std::fs::write(s.a.join("new.yaml"), "name: New\n").unwrap();
+    let new = repo.file_versions("new.yaml", false).unwrap();
+    assert_eq!((new.old, new.new.as_deref()), (None, Some("name: New\n")));
+    std::fs::remove_file(s.a.join("gone.yaml")).unwrap();
+    let gone = repo.file_versions("gone.yaml", false).unwrap();
+    assert_eq!(
+        (gone.old.as_deref(), gone.new),
+        (Some("name: Gone\n"), None)
+    );
+
+    // A staged rename compares with the old path in HEAD.
+    git(&s.a, &["mv", "old name.yaml", "new name.yaml"]);
+    let renamed = repo.file_versions("new name.yaml", true).unwrap();
+    assert_eq!(renamed.old_path.as_deref(), Some("old name.yaml"));
+    assert_eq!(renamed.old.as_deref(), Some("name: Moved\n"));
+    assert_eq!(renamed.new.as_deref(), Some("name: Moved\n"));
+
+    // Binary files are flagged and their content isn't sent.
+    std::fs::write(s.a.join("logo.png"), [0x89, b'P', b'N', b'G', 0, 1, 2]).unwrap();
+    let binary = repo.file_versions("logo.png", false).unwrap();
+    assert!(binary.binary);
+    assert_eq!((binary.old, binary.new), (None, None));
+}
+
+#[test]
+fn file_versions_inside_a_bigger_repo_use_collection_relative_paths() {
+    let s = setup();
+    let sub = s.a.join("collections").join("api");
+    std::fs::create_dir_all(&sub).unwrap();
+    std::fs::write(sub.join("req.yaml"), "url: /a\n").unwrap();
+    git(&s.a, &["add", "."]);
+    git(&s.a, &["commit", "-m", "sub"]);
+    std::fs::write(sub.join("req.yaml"), "url: /b\n").unwrap();
+
+    let repo = Repo::open(&sub).unwrap();
+    let versions = repo.file_versions("req.yaml", false).unwrap();
+    assert_eq!(versions.old.as_deref(), Some("url: /a\n"));
+    assert_eq!(versions.new.as_deref(), Some("url: /b\n"));
 }

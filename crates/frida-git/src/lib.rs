@@ -86,6 +86,27 @@ impl Status {
     }
 }
 
+/// Files bigger than this aren't loaded into the diff viewer.
+pub const MAX_DIFF_FILE_BYTES: usize = 2 * 1024 * 1024;
+
+/// The two sides of one file's change, for a side-by-side or unified diff viewer.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FileVersions {
+    /// Before the change: `HEAD` for a staged change, the index for an unstaged one. `None` for
+    /// a new file (and when `binary` or `too_large`).
+    pub old: Option<String>,
+    /// After the change: the index for a staged change, the working tree for an unstaged one.
+    /// `None` for a deleted file (and when `binary` or `too_large`).
+    pub new: Option<String>,
+    /// The old path of a renamed file.
+    pub old_path: Option<String>,
+    /// One side isn't text; no content is sent.
+    pub binary: bool,
+    /// One side is bigger than [`MAX_DIFF_FILE_BYTES`]; no content is sent.
+    pub too_large: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Branch {
@@ -218,36 +239,68 @@ impl Repo {
         self.unstage(&[".".to_string()])
     }
 
-    /// A unified diff of one file: the staged change, or the working tree change (for new,
-    /// untracked files the whole file as added).
-    pub fn diff(&self, path: &str, staged: bool) -> Result<String> {
-        let untracked = !staged
-            && self
-                .status()?
-                .files
-                .iter()
-                .any(|f| f.path == path && f.untracked);
-        if untracked {
-            // `--no-index` compares two files outside the repo's index; it exits with 1 when
-            // they differ, which is the normal case here.
-            return self.run_allowing(
-                &[
-                    "diff",
-                    "--no-color",
-                    "--no-index",
-                    "--",
-                    null_device(),
-                    path,
-                ],
-                &[1],
-            );
+    /// The old and new content of `path` for the staged change (`HEAD` → index) or the working
+    /// tree change (index → file on disk). Read-only: uses `git show <rev>:./<path>`, where
+    /// `./` makes the path relative to the collection folder instead of the repository root.
+    pub fn file_versions(&self, path: &str, staged: bool) -> Result<FileVersions> {
+        let status = self.status()?;
+        let file = status.files.iter().find(|f| f.path == path);
+        let old_path = file.and_then(|f| f.orig_path.clone());
+        let (old, new) = if staged {
+            let letter = file.and_then(|f| f.staged);
+            let old = if letter == Some('A') || status.no_commits {
+                None
+            } else {
+                let from = old_path.as_deref().unwrap_or(path);
+                Some(self.show(&format!("HEAD:./{from}"))?)
+            };
+            let new = if letter == Some('D') {
+                None
+            } else {
+                Some(self.show(&format!(":./{path}"))?)
+            };
+            (old, new)
+        } else {
+            let old = if file.is_some_and(|f| f.untracked) {
+                None
+            } else {
+                Some(self.show(&format!(":./{path}"))?)
+            };
+            let new = if file.and_then(|f| f.unstaged) == Some('D') {
+                None
+            } else {
+                let full = self.dir.join(path);
+                Some(std::fs::read(&full)?)
+            };
+            (old, new)
+        };
+
+        let mut versions = FileVersions {
+            old_path,
+            ..FileVersions::default()
+        };
+        // `Option::iter().chain(..)` walks both sides that exist, without cloning them.
+        let sides = old.iter().chain(new.iter());
+        if sides.clone().any(|b| b.len() > MAX_DIFF_FILE_BYTES) {
+            versions.too_large = true;
+            return Ok(versions);
         }
-        let mut args = vec!["diff", "--no-color"];
-        if staged {
-            args.push("--cached");
+        let text = |bytes: Vec<u8>| String::from_utf8(bytes).ok().filter(|t| !t.contains('\0'));
+        let old_text = old.map(text);
+        let new_text = new.map(text);
+        // `Some(None)`: the side exists but isn't text.
+        if matches!(old_text, Some(None)) || matches!(new_text, Some(None)) {
+            versions.binary = true;
+            return Ok(versions);
         }
-        args.extend(["--", path]);
-        self.run(&args)
+        versions.old = old_text.flatten();
+        versions.new = new_text.flatten();
+        Ok(versions)
+    }
+
+    /// The raw bytes of `git show <object>` (`HEAD:./file`, `:./file` for the index).
+    fn show(&self, object: &str) -> Result<Vec<u8>> {
+        run::git_bytes(&self.dir, &["show", object], run::LOCAL_TIMEOUT)
     }
 
     pub fn commit(&self, message: &str) -> Result<()> {
@@ -362,15 +415,7 @@ impl Repo {
         run::git(&self.dir, args, run::LOCAL_TIMEOUT)
     }
 
-    fn run_allowing(&self, args: &[&str], ok_codes: &[i32]) -> Result<String> {
-        run::git_allowing(&self.dir, args, run::LOCAL_TIMEOUT, ok_codes)
-    }
-
     fn run_network(&self, args: &[&str]) -> Result<String> {
         run::git(&self.dir, args, run::NETWORK_TIMEOUT)
     }
-}
-
-fn null_device() -> &'static str {
-    if cfg!(windows) { "NUL" } else { "/dev/null" }
 }

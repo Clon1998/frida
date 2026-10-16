@@ -60,7 +60,11 @@ export const commands = {
 	gitStage: (dir: string, paths: string[]) => typedError<null, ApiError>(__TAURI_INVOKE("git_stage", { dir, paths })),
 	/**  Unstages `paths`, or everything when `paths` is empty. Files on disk are not touched. */
 	gitUnstage: (dir: string, paths: string[]) => typedError<null, ApiError>(__TAURI_INVOKE("git_unstage", { dir, paths })),
-	gitDiff: (dir: string, path: string, staged: boolean) => typedError<string, ApiError>(__TAURI_INVOKE("git_diff", { dir, path, staged })),
+	/**
+	 *  The old and new content of one changed file, for the diff tab: the staged change (`HEAD` →
+	 *  index) or the working tree change (index → file).
+	 */
+	gitFileVersions: (dir: string, path: string, staged: boolean) => typedError<FileVersions, ApiError>(__TAURI_INVOKE("git_file_versions", { dir, path, staged })),
 	gitCommit: (dir: string, message: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_commit", { dir, message })),
 	gitFetch: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_fetch", { dir })),
 	gitPull: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_pull", { dir })),
@@ -635,6 +639,26 @@ export type FileChange = {
 	untracked: boolean,
 	/**  Has merge conflicts. */
 	conflicted: boolean,
+};
+
+/**  The two sides of one file's change, for a side-by-side or unified diff viewer. */
+export type FileVersions = {
+	/**
+	 *  Before the change: `HEAD` for a staged change, the index for an unstaged one. `None` for
+	 *  a new file (and when `binary` or `too_large`).
+	 */
+	old: string | null,
+	/**
+	 *  After the change: the index for a staged change, the working tree for an unstaged one.
+	 *  `None` for a deleted file (and when `binary` or `too_large`).
+	 */
+	new: string | null,
+	/**  The old path of a renamed file. */
+	oldPath: string | null,
+	/**  One side isn't text; no content is sent. */
+	binary: boolean,
+	/**  One side is bigger than [`MAX_DIFF_FILE_BYTES`]; no content is sent. */
+	tooLarge: boolean,
 };
 
 /**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */

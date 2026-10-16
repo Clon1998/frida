@@ -11,8 +11,17 @@ interface CollectionGit {
   busy: string | null;
 }
 
+/** A changed file chosen in the git panel or the changes tab: its staged or unstaged change. */
+export interface DiffSelection {
+  path: string;
+  staged: boolean;
+}
+
 interface GitState {
   byCollection: Record<string, CollectionGit>;
+  /** The file shown in each collection's changes tab. */
+  selected: Record<string, DiffSelection | null>;
+  select: (dir: string, selection: DiffSelection | null) => void;
   /** Re-reads the status (and branch list) of a collection. Quiet on errors. */
   refresh: (dir: string) => Promise<void>;
   /** Runs a git operation, then refreshes. Shows git's message on failure. */
@@ -73,6 +82,9 @@ export const useGit = create<GitState>((set, get) => {
 
   return {
     byCollection: {},
+    selected: {},
+
+    select: (dir, selection) => set((s) => ({ selected: { ...s.selected, [dir]: selection } })),
 
     refresh: async (dir) => {
       try {

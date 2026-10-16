@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use frida_git::{Branch, Repo, Status};
+use frida_git::{Branch, FileVersions, Repo, Status};
 use serde::Serialize;
 use specta::Type;
 use tauri::State;
@@ -101,15 +101,17 @@ pub async fn git_unstage(
     .await
 }
 
+/// The old and new content of one changed file, for the diff tab: the staged change (`HEAD` →
+/// index) or the working tree change (index → file).
 #[tauri::command]
 #[specta::specta]
-pub async fn git_diff(
+pub async fn git_file_versions(
     state: State<'_, AppState>,
     dir: String,
     path: String,
     staged: bool,
-) -> ApiResult<String> {
-    with_repo(&state, &dir, move |repo| repo.diff(&path, staged)).await
+) -> ApiResult<FileVersions> {
+    with_repo(&state, &dir, move |repo| repo.file_versions(&path, staged)).await
 }
 
 #[tauri::command]

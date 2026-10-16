@@ -2,7 +2,6 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { GitInfo } from "@/bindings";
-import { diffLineKind } from "@/components/editor/diff";
 import { useGit } from "@/stores/git";
 import { GitPanel } from "./GitPanel";
 
@@ -59,13 +58,5 @@ describe("git panel", () => {
     await waitFor(() =>
       expect(calls).toContainEqual(["git_stage", { dir: "/col", paths: ["new.yaml"] }]),
     );
-  });
-
-  it("colors diff lines", () => {
-    expect(diffLineKind("+added")).toBe("added");
-    expect(diffLineKind("-removed")).toBe("removed");
-    expect(diffLineKind("+++ b/file")).toBe("meta");
-    expect(diffLineKind("@@ -1 +1 @@")).toBe("hunk");
-    expect(diffLineKind(" context")).toBeNull();
   });
 });

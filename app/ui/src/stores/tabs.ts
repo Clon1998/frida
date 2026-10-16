@@ -75,11 +75,20 @@ export const RUNNER_TAB_PREFIX = "@runner/";
 /** The runner tab path for `folder` (`""`: the whole collection). */
 export const runnerTabPath = (folder: string) => `${RUNNER_TAB_PREFIX}${folder}`;
 
+/** Path of the git changes tab (one per collection): changed files and the selected diff. */
+export const GIT_TAB = "@git";
+
+/** The git changes tab (PLAN.md M12). The selected file lives in the git store. */
+export interface GitTab {
+  kind: "git";
+  path: typeof GIT_TAB;
+}
+
 /** A tab backed by one file, with a saved and an edited version. */
 export type DocumentTab = RequestTab | FolderTab | CollectionTab;
 
 /** A tab shows a request, a folder's or the collection's settings, or the environments. */
-export type Tab = DocumentTab | EnvironmentsTab | HistoryTab | RunnerTab;
+export type Tab = DocumentTab | EnvironmentsTab | HistoryTab | RunnerTab | GitTab;
 export type TabKind = Tab["kind"];
 type DocKind = DocumentTab["kind"];
 
@@ -162,6 +171,7 @@ function activate(c: CollectionTabs, path: string | null): CollectionTabs {
  */
 export function kindOf(path: string): TabKind {
   if (path === ENVIRONMENTS_TAB) return "environments";
+  if (path === GIT_TAB) return "git";
   if (path.startsWith(HISTORY_TAB_PREFIX)) return "history";
   if (path.startsWith(RUNNER_TAB_PREFIX)) return "runner";
   if (path === "") return "collection";
@@ -169,7 +179,10 @@ export function kindOf(path: string): TabKind {
 }
 
 export const isDocument = (tab: Tab): tab is DocumentTab =>
-  tab.kind !== "environments" && tab.kind !== "history" && tab.kind !== "runner";
+  tab.kind !== "environments" &&
+  tab.kind !== "history" &&
+  tab.kind !== "runner" &&
+  tab.kind !== "git";
 
 /** Unsaved changes: a document's draft differs, or the environment editor has edits. */
 export const isDirty = (tab: Tab) =>
@@ -182,6 +195,8 @@ export const tabTitle = (tab: Tab) => {
   switch (tab.kind) {
     case "environments":
       return "Environments";
+    case "git":
+      return "Changes";
     case "history":
     case "runner":
       return tab.title;
@@ -279,6 +294,7 @@ export const useTabs = create<TabsState>((set, get) => {
   const loadTab = async (dir: string, path: string): Promise<Tab> => {
     const kind = kindOf(path);
     if (kind === "environments") return { kind, path: ENVIRONMENTS_TAB };
+    if (kind === "git") return { kind, path: GIT_TAB };
     if (kind === "history") {
       const id = Number(path.slice(HISTORY_TAB_PREFIX.length));
       const entry = await unwrap(commands.getHistoryEntry(id));

@@ -612,12 +612,14 @@ Decided with Patrick on 2026-10-16 (see the decisions log).
   script editors (CodeMirror's search panel, already part of `basicSetup`; styled to the theme), with match count and
   next/previous. The JSONPath filter becomes less prominent: a filter icon next to Pretty/Raw that expands the field;
   it stays open while a filter is set.
-- [ ] **Git diffs in tabs** (feedback #14/#15): instead of a dialog, "Changes" opens a git tab (`@git/<collection>`)
+- [x] **Git diffs in tabs** (feedback #14/#15): instead of a dialog, "Changes" opens a git tab (`@git/<collection>`)
   with the changed-files list (staged/unstaged) on the left and the selected file's diff on the right; selecting a file
   only swaps the diff. Rendered with **`@codemirror/merge`** (6.12.x, official CodeMirror package, unified view with
   a side-by-side toggle, syntax highlighting for YAML), which needs the old and new text: new read-only commands return
   `HEAD:<path>` / index (`:<path>`) / worktree content via `git show` (read-only, add it to the §12 command list).
   Added/deleted/binary files get a clear placeholder. The raw `git diff` text view is dropped.
+  *Done 2026-10-16:* `Repo::file_versions` + `git_file_versions` (replaces `git_diff`; `diff` left the allow-list,
+  `show` joined it), `ChangesView`/`DiffView` with `@codemirror/merge` 6.12.2 and `@codemirror/lang-yaml` 6.1.3.
 - [ ] **Frida archive export/import** (feedback #13): export a workspace, a collection, a folder or a single request
   as a `.zip` that contains the on-disk files in their §4 layout plus `frida-export.yaml`
   (`format: 1`, `kind: workspace|collection|folder|request`, Frida version, export time). Secret values are never

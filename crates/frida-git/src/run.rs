@@ -22,7 +22,8 @@ const ALLOWED: &[&str] = &[
     "add",
     "restore",
     "rm",
-    "diff",
+    // Read-only: file contents at HEAD or in the index, for the diff viewer.
+    "show",
     "commit",
     "fetch",
     "push",
@@ -64,6 +65,11 @@ pub(crate) fn git(dir: &Path, args: &[&str], timeout: Duration) -> Result<String
     git_allowing(dir, args, timeout, &[])
 }
 
+/// Like [`git`], but returns stdout as raw bytes (file contents may not be UTF-8).
+pub(crate) fn git_bytes(dir: &Path, args: &[&str], timeout: Duration) -> Result<Vec<u8>> {
+    run_program_bytes(&executable(), dir, args, timeout, &[])
+}
+
 /// Like [`git`], but exit codes in `ok_codes` count as success too.
 pub(crate) fn git_allowing(
     dir: &Path,
@@ -74,7 +80,7 @@ pub(crate) fn git_allowing(
     run_program(&executable(), dir, args, timeout, ok_codes)
 }
 
-/// Runs `program` (a git executable) with `args` after checking they are allowed.
+/// Runs `program` and returns stdout as text (invalid UTF-8 is replaced).
 pub(crate) fn run_program(
     program: &Path,
     dir: &Path,
@@ -82,6 +88,18 @@ pub(crate) fn run_program(
     timeout: Duration,
     ok_codes: &[i32],
 ) -> Result<String> {
+    run_program_bytes(program, dir, args, timeout, ok_codes)
+        .map(|out| String::from_utf8_lossy(&out).into_owned())
+}
+
+/// Runs `program` (a git executable) with `args` after checking they are allowed.
+pub(crate) fn run_program_bytes(
+    program: &Path,
+    dir: &Path,
+    args: &[&str],
+    timeout: Duration,
+    ok_codes: &[i32],
+) -> Result<Vec<u8>> {
     let subcommand = args.first().copied().unwrap_or_default();
     // Only flags before `--` matter; after it come file names.
     let flags = args.iter().take_while(|a| **a != "--");
@@ -150,7 +168,7 @@ pub(crate) fn run_program(
         }
         std::thread::sleep(Duration::from_millis(20));
     };
-    let stdout = String::from_utf8_lossy(&out_reader.join().unwrap_or_default()).to_string();
+    let stdout = out_reader.join().unwrap_or_default();
     let stderr = String::from_utf8_lossy(&err_reader.join().unwrap_or_default()).to_string();
 
     let code = status.code().unwrap_or(-1);
@@ -158,7 +176,7 @@ pub(crate) fn run_program(
         Ok(stdout)
     } else {
         let message = if stderr.trim().is_empty() {
-            stdout.trim().to_string()
+            String::from_utf8_lossy(&stdout).trim().to_string()
         } else {
             stderr.trim().to_string()
         };

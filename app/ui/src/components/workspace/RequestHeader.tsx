@@ -7,7 +7,7 @@ import { useEnvs } from "@/stores/envs";
 import { useUi } from "@/stores/ui";
 import { cn } from "cn";
 import * as actions from "@/stores/actions";
-import { isDirty, runnerTabPath, type Tab, tabTitle, useTabs } from "@/stores/tabs";
+import { isDirty, isDocument, runnerTabPath, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { EditableCrumb } from "./EditableCrumb";
 
@@ -54,7 +54,7 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
       {tab && tab.kind !== "collection" && (
         <span className="flex min-w-0 items-center gap-0.5">
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-          {tab.kind === "environments" || tab.kind === "history" || tab.kind === "runner" ? (
+          {!isDocument(tab) ? (
             <span className="px-1 font-medium">{tabTitle(tab)}</span>
           ) : (
             <EditableCrumb

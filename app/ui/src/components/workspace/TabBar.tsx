@@ -1,4 +1,4 @@
-import { Folder, History, Layers, Play, Settings, X } from "lucide-react";
+import { Folder, GitCompare, History, Layers, Play, Settings, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import {
   ContextMenu,
@@ -190,5 +190,7 @@ function TabIcon({ tab }: { tab: Tab }) {
       return <History className="size-3.5 shrink-0" />;
     case "runner":
       return <Play className="size-3.5 shrink-0" />;
+    case "git":
+      return <GitCompare className="size-3.5 shrink-0" />;
   }
 }

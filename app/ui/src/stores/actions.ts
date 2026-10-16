@@ -1,7 +1,8 @@
 import { commands } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
 import { useDialogs } from "./dialogs";
-import { isDirty, useTabs } from "./tabs";
+import { type DiffSelection, useGit } from "./git";
+import { GIT_TAB, isDirty, useTabs } from "./tabs";
 import { useWorkspace } from "./workspace";
 
 /**
@@ -89,4 +90,10 @@ export function closeTabsAsking(dir: string, paths: string[]) {
   if (open.some((t) => paths.includes(t.path) && isDirty(t)))
     useDialogs.getState().openCloseTabs(dir, paths);
   else tabs().closeTabs(dir, paths);
+}
+
+/** Opens the changes tab of `dir`, showing `selection` if given (else what it showed last). */
+export function openChanges(dir: string, selection?: DiffSelection) {
+  if (selection) useGit.getState().select(dir, selection);
+  void tabs().openTab(dir, GIT_TAB);
 }

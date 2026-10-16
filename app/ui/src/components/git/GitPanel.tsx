@@ -6,19 +6,12 @@ import {
   Loader2,
   Minus,
   Plus,
+  GitCompare,
   RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { commands, type FileChange, type Status } from "@/bindings";
-import { CodeEditor } from "@/components/editor/CodeEditor";
+import type { FileChange, Status } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { NameDialog } from "@/components/workspace/NameDialog";
-import { showError, unwrap } from "@/lib/api";
+import { openChanges } from "@/stores/actions";
 import { useGit } from "@/stores/git";
 import { cn } from "cn";
 
@@ -79,20 +72,14 @@ function RepoView({ dir, status, busy }: { dir: string; status: Status; busy: st
   const run = useGit((s) => s.run);
   const branches = useGit((s) => s.byCollection[dir]?.branches ?? []);
   const [message, setMessage] = useState("");
-  const [diff, setDiff] = useState<{ path: string; staged: boolean; text: string } | null>(null);
   const [creatingBranch, setCreatingBranch] = useState(false);
 
   const staged = status.files.filter((f) => f.staged !== null);
   const unstaged = status.files.filter((f) => f.unstaged !== null);
 
-  const showDiff = async (file: FileChange, isStaged: boolean) => {
-    try {
-      const text = await unwrap(commands.gitDiff(dir, file.path, isStaged));
-      setDiff({ path: file.path, staged: isStaged, text: text || "(no textual changes)" });
-    } catch (e) {
-      showError(e);
-    }
-  };
+  const selected = useGit((s) => s.selected[dir] ?? null);
+  const showDiff = (file: FileChange, isStaged: boolean) =>
+    openChanges(dir, { path: file.path, staged: isStaged });
 
   const commit = async () => {
     if (await run(dir, { kind: "commit", message })) setMessage("");
@@ -130,6 +117,16 @@ function RepoView({ dir, status, busy }: { dir: string; status: Status; busy: st
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="flex-1" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          title="Open the changes tab"
+          aria-label="Open changes"
+          onClick={() => openChanges(dir)}
+        >
+          <GitCompare />
+        </Button>
         <span
           className="text-xs text-muted-foreground tabular-nums"
           title={status.upstream ? `Compared with ${status.upstream} (as of the last fetch)` : ""}
@@ -201,7 +198,8 @@ function RepoView({ dir, status, busy }: { dir: string; status: Status; busy: st
           letter={(f) => f.staged ?? ""}
           action={{ label: "Unstage", icon: <Minus /> }}
           onAction={(paths) => void run(dir, { kind: "unstage", paths })}
-          onOpen={(f) => void showDiff(f, true)}
+          onOpen={(f) => showDiff(f, true)}
+          selected={selected?.staged ? selected.path : null}
         />
         <FileSection
           title="Changes"
@@ -209,29 +207,14 @@ function RepoView({ dir, status, busy }: { dir: string; status: Status; busy: st
           letter={(f) => (f.untracked ? "U" : (f.unstaged ?? ""))}
           action={{ label: "Stage", icon: <Plus /> }}
           onAction={(paths) => void run(dir, { kind: "stage", paths })}
-          onOpen={(f) => void showDiff(f, false)}
+          onOpen={(f) => showDiff(f, false)}
+          selected={selected && !selected.staged ? selected.path : null}
         />
         {status.files.length === 0 && (
           <p className="px-3 py-2 text-xs text-muted-foreground">No changes.</p>
         )}
       </div>
 
-      <Dialog open={diff !== null} onOpenChange={(o) => !o && setDiff(null)}>
-        <DialogContent className="flex h-[80vh] max-w-[90vw] flex-col sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="truncate font-mono text-sm">{diff?.path}</DialogTitle>
-            <DialogDescription>{diff?.staged ? "Staged changes" : "Changes"}</DialogDescription>
-          </DialogHeader>
-          {diff && (
-            <CodeEditor
-              className="min-h-0 flex-1 overflow-hidden rounded-md border"
-              language="diff"
-              readOnly
-              value={diff.text}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
       <NameDialog
         open={creatingBranch}
         title="New branch"
@@ -252,13 +235,14 @@ const LETTER_COLORS: Record<string, string> = {
   R: "text-info",
 };
 
-function FileSection({
+export function FileSection({
   title,
   files,
   letter,
   action,
   onAction,
   onOpen,
+  selected = null,
 }: {
   title: string;
   files: FileChange[];
@@ -267,6 +251,8 @@ function FileSection({
   /** Called with the files to act on; `[]` means all. */
   onAction: (paths: string[]) => void;
   onOpen: (f: FileChange) => void;
+  /** The path shown in the changes tab, highlighted. */
+  selected?: string | null;
 }) {
   if (files.length === 0) return null;
   return (
@@ -292,7 +278,11 @@ function FileSection({
         return (
           <div
             key={f.path}
-            className="group flex cursor-default items-center gap-2 px-3 py-0.5 hover:bg-accent"
+            className={cn(
+              "group flex cursor-default items-center gap-2 px-3 py-0.5 hover:bg-accent",
+              f.path === selected && "bg-accent",
+            )}
+            aria-selected={f.path === selected}
             onClick={() => onOpen(f)}
             title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
           >

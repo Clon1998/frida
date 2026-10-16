@@ -13,6 +13,7 @@ import { ShortcutsDialog } from "./ShortcutsDialog";
 import { formatKeys, isMac } from "@/lib/shortcuts";
 import * as actions from "@/stores/actions";
 import { AwsProfileDialog } from "@/components/env/AwsProfileDialog";
+import { ChangesView } from "@/components/git/ChangesView";
 import { GitStatusIndicator } from "@/components/git/GitStatusIndicator";
 import { HistoryView } from "@/components/history/HistoryView";
 import { useConsole } from "@/stores/console";
@@ -104,6 +105,11 @@ export function AppShell() {
                 {dir && tab?.kind === "runner" && (
                   <div className="min-h-0 flex-1">
                     <RunnerView key={tab.path} dir={dir} tab={tab} />
+                  </div>
+                )}
+                {dir && tab?.kind === "git" && (
+                  <div className="min-h-0 flex-1">
+                    <ChangesView key={dir} dir={dir} />
                   </div>
                 )}
                 {dir && tab?.kind === "history" && (

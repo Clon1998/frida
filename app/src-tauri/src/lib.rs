@@ -75,7 +75,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             git::git_init,
             git::git_stage,
             git::git_unstage,
-            git::git_diff,
+            git::git_file_versions,
             git::git_commit,
             git::git_fetch,
             git::git_pull,
