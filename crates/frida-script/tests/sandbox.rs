@@ -345,3 +345,58 @@ async fn bru_is_an_alias_for_fri() {
     assert_eq!(out.vars.runtime["b"], json!(2));
     assert_eq!(out.vars.runtime["same"], json!(true));
 }
+
+/// What a script must not be able to reach (CLAUDE.md: no file system or network except
+/// `fri.sendRequest`). Each line probes one way out; all must be missing or fail.
+#[tokio::test(flavor = "multi_thread")]
+async fn no_way_out_of_the_sandbox() {
+    let (out, error) = run(
+        r#"
+        const probes = {
+          fetch: () => typeof fetch,
+          XMLHttpRequest: () => typeof XMLHttpRequest,
+          WebSocket: () => typeof WebSocket,
+          process: () => typeof process,
+          Deno: () => typeof Deno,
+          Bun: () => typeof Bun,
+          require: () => typeof require === "function" ? require("fs") && "loaded" : "undefined",
+          std: () => typeof std,
+          os: () => typeof os,
+          scriptArgs: () => typeof scriptArgs,
+          importScripts: () => typeof importScripts,
+          setTimeout: () => typeof setTimeout,
+          setInterval: () => typeof setInterval,
+          // A dynamic import of QuickJS's own modules or a file.
+          importOs: () => import("os").then(() => "loaded", () => "failed"),
+          importFile: () => import("./secrets.js").then(() => "loaded", () => "failed"),
+          // `eval` of code that tries the same.
+          evalFetch: () => eval("typeof fetch"),
+          functionCtor: () => Function("return typeof process")(),
+        };
+        const results = {};
+        for (const [name, probe] of Object.entries(probes)) {
+          try {
+            results[name] = await probe();
+          } catch (e) {
+            results[name] = "threw";
+          }
+        }
+        fri.setVar("results", results);
+        "#,
+        state(ScriptPhase::Pre),
+    )
+    .await;
+    assert_eq!(error, None);
+    let results = &out.vars.runtime["results"];
+    let allowed =
+        |v: &serde_json::Value| matches!(v.as_str(), Some("undefined" | "failed" | "threw"));
+    let leaks: Vec<_> = results
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(_, v)| !allowed(v))
+        .collect();
+    assert!(leaks.is_empty(), "reachable from a script: {leaks:?}");
+    // Every probe ran (a missing key would mean the loop stopped early).
+    assert_eq!(results.as_object().unwrap().len(), 17);
+}
