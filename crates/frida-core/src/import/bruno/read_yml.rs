@@ -53,6 +53,7 @@ fn kvs(list: &[Value]) -> Vec<Kv> {
             name: s(v, "name"),
             value: v.get("value").map(text).unwrap_or_default(),
             enabled: enabled(v),
+            description: s(v, "description"),
         })
         .collect()
 }
@@ -181,6 +182,7 @@ fn actions(list: &[Value], c: &mut Common) {
                     .map(|v| s(v, "expression"))
                     .unwrap_or_default(),
                 enabled: enabled(action),
+                description: String::new(),
             });
         }
     }
@@ -200,6 +202,7 @@ fn assertions(list: &[Value]) -> Vec<Kv> {
                     format!("{operator} {value}")
                 },
                 enabled: enabled(a),
+                description: String::new(),
             }
         })
         .collect()
@@ -278,6 +281,7 @@ fn request(item: &Value, kind: &str, file_name: &str) -> Request {
                 name: s(p, "name"),
                 value: s(p, "value"),
                 enabled: enabled(p),
+                description: s(p, "description"),
             })
             .collect()
     };

@@ -228,6 +228,7 @@ mod tests {
             name: name.into(),
             value: value.into(),
             enabled: true,
+            description: String::new(),
         }
     }
 

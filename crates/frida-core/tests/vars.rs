@@ -317,6 +317,7 @@ fn resolves_every_part_of_a_request_and_inherited_headers() {
     request.params.path = vec![frida_core::model::PathParam {
         name: "id".into(),
         value: "{{id}}".into(),
+        description: String::new(),
     }];
     request.headers = vec![kv("X-{{h}}", "{{v}}")];
     request.body.json = r#"{"id": "{{id}}"}"#.into();

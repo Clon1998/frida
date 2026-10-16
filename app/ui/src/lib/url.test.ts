@@ -86,4 +86,23 @@ describe("query params keep their order", () => {
     ];
     expect(urlWithQueryParams("http://x/?a=1&b=2", rows)).toBe("http://x/?b=2&a=1");
   });
+
+  it("keeps descriptions when the URL is edited (they aren't part of the URL)", () => {
+    const query = queryParamsFromUrl("/pets?limit=5&tag=x", [
+      { name: "limit", value: "20", enabled: true, description: "Page size" },
+      { name: "debug", value: "1", enabled: false, description: "Off for now" },
+    ]);
+    expect(query).toEqual([
+      { name: "limit", value: "5", enabled: true, description: "Page size" },
+      { name: "debug", value: "1", enabled: false, description: "Off for now" },
+      { name: "tag", value: "x", enabled: true, description: undefined },
+    ]);
+    const path = syncPathParams("/pets/:petId/items/:itemId", [
+      { name: "petId", value: "42", description: "The pet" },
+    ]);
+    expect(path).toEqual([
+      { name: "petId", value: "42", description: "The pet" },
+      { name: "itemId", value: "", description: undefined },
+    ]);
+  });
 });

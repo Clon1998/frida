@@ -165,6 +165,7 @@ fn resolve_headers(resolver: &mut Resolver<'_>, headers: &[KeyValue]) -> Vec<Key
                 name: resolver.resolve(&header.name, location.clone()),
                 value: resolver.resolve(&header.value, location),
                 enabled: true,
+                description: header.description.clone(),
             }
         })
         .collect()

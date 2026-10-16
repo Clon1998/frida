@@ -35,6 +35,10 @@ pub struct KeyValue {
     /// Disabled rows stay in the file but are ignored when sending (PLAN.md §5.2).
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// What the row is for, e.g. from an OpenAPI parameter. Only written when set, so files
+    /// without descriptions look exactly as before.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
 }
 
 impl KeyValue {
@@ -43,6 +47,7 @@ impl KeyValue {
             name: name.into(),
             value: value.into(),
             enabled: true,
+            description: String::new(),
         }
     }
 }

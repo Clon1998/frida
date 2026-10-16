@@ -7,6 +7,8 @@ pub(crate) struct Kv {
     pub name: String,
     pub value: String,
     pub enabled: bool,
+    /// Bruno's `@description('...')` (or `description:` in its YAML format).
+    pub description: String,
 }
 
 /// One multipart field. File fields hold one or more paths.

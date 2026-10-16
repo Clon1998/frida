@@ -159,6 +159,7 @@ folders:
       - name: status
         value: available
         enabled: true
+        description: Status values that need to be considered for filter
       path: []
     headers: []
     body:
@@ -192,6 +193,7 @@ folders:
       - name: tags
         value: ""
         enabled: true
+        description: Tags to filter by
       path: []
     headers: []
     body:
@@ -225,6 +227,7 @@ folders:
       path:
       - name: petId
         value: ""
+        description: ID of pet to return
     headers: []
     body:
       mode: none
@@ -262,12 +265,15 @@ folders:
       - name: name
         value: ""
         enabled: false
+        description: Name of pet that needs to be updated
       - name: status
         value: ""
         enabled: false
+        description: Status of pet that needs to be updated
       path:
       - name: petId
         value: ""
+        description: ID of pet that needs to be updated
     headers: []
     body:
       mode: none
@@ -300,6 +306,7 @@ folders:
       path:
       - name: petId
         value: ""
+        description: Pet id to delete
     headers:
     - name: api_key
       value: ""
@@ -335,9 +342,11 @@ folders:
       - name: additionalMetadata
         value: ""
         enabled: false
+        description: Additional Metadata
       path:
       - name: petId
         value: ""
+        description: ID of pet to update
     headers: []
     body:
       mode: binary
@@ -459,6 +468,7 @@ folders:
       path:
       - name: orderId
         value: ""
+        description: ID of order that needs to be fetched
     headers: []
     body:
       mode: none
@@ -491,6 +501,7 @@ folders:
       path:
       - name: orderId
         value: ""
+        description: ID of the order that needs to be deleted
     headers: []
     body:
       mode: none
@@ -621,9 +632,11 @@ folders:
       - name: username
         value: ""
         enabled: false
+        description: The user name for login
       - name: password
         value: ""
         enabled: false
+        description: The password for login in clear text
       path: []
     headers: []
     body:
@@ -687,6 +700,7 @@ folders:
       path:
       - name: username
         value: ""
+        description: The name that needs to be fetched. Use user1 for testing
     headers: []
     body:
       mode: none
@@ -719,6 +733,7 @@ folders:
       path:
       - name: username
         value: ""
+        description: name that need to be deleted
     headers: []
     body:
       mode: json
@@ -761,6 +776,7 @@ folders:
       path:
       - name: username
         value: ""
+        description: The name that needs to be deleted
     headers: []
     body:
       mode: none

@@ -94,8 +94,10 @@ folders:
       path:
       - name: row
         value: "1"
+        description: Board row (vertical coordinate)
       - name: column
         value: "1"
+        description: Board column (horizontal coordinate)
     headers: []
     body:
       mode: none
@@ -131,12 +133,15 @@ folders:
       path:
       - name: row
         value: "1"
+        description: Board row (vertical coordinate)
       - name: column
         value: "1"
+        description: Board column (horizontal coordinate)
     headers:
     - name: progressUrl
       value: ""
       enabled: false
+      description: Progress URL that should be called if asynchronous response is returned
     body:
       mode: json
       json: "\".\""

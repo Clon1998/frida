@@ -22,6 +22,7 @@ interface KeyValueTableProps {
 /**
  * Editable `name | value` rows with an enabled checkbox, as a table. Typing into the empty last
  * row adds a new row. "Bulk edit" switches to a text area with one `name: value` per line.
+ * "Descriptions" shows a column for what each row is for (shown when any row has one).
  */
 export function KeyValueTable({
   rows,
@@ -32,6 +33,9 @@ export function KeyValueTable({
   // While bulk editing, the text is kept as typed (parsing on every key press would otherwise
   // reformat lines under the cursor). `null` means table mode.
   const [bulkText, setBulkText] = useState<string | null>(null);
+  const [showDescriptions, setShowDescriptions] = useState(() =>
+    rows.some((r) => (r.description ?? "") !== ""),
+  );
 
   const update = (index: number, patch: Partial<KeyValue>) => {
     if (index === rows.length) {
@@ -47,11 +51,22 @@ export function KeyValueTable({
   };
 
   // One extra, empty row at the end for adding.
-  const shown = [...rows, { name: "", value: "", enabled: true }];
+  const shown: KeyValue[] = [...rows, { name: "", value: "", enabled: true }];
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        {bulkText === null && (
+          <Button
+            variant="link"
+            size="sm"
+            className="h-6 px-0 text-xs"
+            aria-pressed={showDescriptions}
+            onClick={() => setShowDescriptions(!showDescriptions)}
+          >
+            {showDescriptions ? "Hide descriptions" : "Descriptions"}
+          </Button>
+        )}
         <Button
           variant="link"
           size="sm"
@@ -70,7 +85,13 @@ export function KeyValueTable({
           value={bulkText}
           onChange={(e) => {
             setBulkText(e.target.value);
-            onChange(bulkToRows(e.target.value));
+            // The text has no room for descriptions: keep them by name.
+            onChange(
+              bulkToRows(e.target.value).map((row) => ({
+                ...row,
+                description: rows.find((r) => r.name === row.name)?.description,
+              })),
+            );
           }}
         />
       ) : (
@@ -84,8 +105,9 @@ export function KeyValueTable({
           }}
           columns={[
             { label: "", width: "2.25rem" },
-            { label: namePlaceholder, width: "35%" },
+            { label: namePlaceholder, width: showDescriptions ? "28%" : "35%" },
             { label: valuePlaceholder },
+            ...(showDescriptions ? [{ label: "Description", width: "30%" }] : []),
             { label: "", width: "2.25rem" },
           ]}
         >
@@ -109,6 +131,8 @@ export function KeyValueTable({
                 <GridCell>
                   <CellInput
                     placeholder={isNew ? `Add ${namePlaceholder.toLowerCase()}` : namePlaceholder}
+                    // The description as a tooltip while its column is hidden.
+                    title={showDescriptions ? undefined : row.description || undefined}
                     value={row.name}
                     onChange={(e) => update(index, { name: e.target.value })}
                   />
@@ -120,6 +144,17 @@ export function KeyValueTable({
                     onChange={(value) => update(index, { value })}
                   />
                 </GridCell>
+                {showDescriptions && (
+                  <GridCell>
+                    <CellInput
+                      className="font-sans"
+                      placeholder="Description"
+                      aria-label="Description"
+                      value={row.description ?? ""}
+                      onChange={(e) => update(index, { description: e.target.value })}
+                    />
+                  </GridCell>
+                )}
                 <GridCell center>
                   {!isNew && (
                     <Button

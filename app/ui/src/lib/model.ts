@@ -9,8 +9,18 @@ import type { Collection, Folder, Request } from "@/bindings";
 export type Complete<T> = T extends (infer U)[]
   ? Complete<U>[]
   : T extends object
-    ? { [K in keyof T]-?: Complete<T[K]> }
+    ? // `as` filters keys while keeping the mapping "homomorphic", so `-?` also removes the
+      // `undefined` that optional fields carry (an `Exclude<keyof T, ...>` key list wouldn't).
+      { [K in keyof T as K extends SkippedWhenEmpty ? never : K]-?: Complete<T[K]> } & {
+        [K in keyof T as K extends SkippedWhenEmpty ? K : never]?: T[K];
+      }
     : T;
+
+/**
+ * Fields Rust leaves out when they are empty (`skip_serializing_if`), so they can really be
+ * missing in values from Rust: they stay optional in {@link Complete}. Read them with `?? ""`.
+ */
+type SkippedWhenEmpty = "description";
 
 /** A request as returned by Rust: every field present. */
 export type RequestModel = Complete<Request>;

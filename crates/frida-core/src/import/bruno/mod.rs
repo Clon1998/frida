@@ -315,6 +315,7 @@ impl Mapper {
             .map(|p| PathParam {
                 name: p.name.clone(),
                 value: p.value.clone(),
+                description: p.description.clone(),
             })
             .collect();
         request.headers = common.headers;
@@ -572,6 +573,7 @@ fn kv(kv: &model::Kv) -> KeyValue {
         name: kv.name.clone(),
         value: kv.value.clone(),
         enabled: kv.enabled,
+        description: kv.description.clone(),
     }
 }
 

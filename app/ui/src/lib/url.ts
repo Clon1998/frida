@@ -44,10 +44,22 @@ export function parseQuery(url: string): { name: string; value: string }[] {
 /**
  * New query rows after the user edited the URL. Enabled rows come from the URL, in its order;
  * disabled rows aren't part of the URL, so they are kept from `previous` at their position
- * (the user may have ordered them). Extra URL params are added at the end.
+ * (the user may have ordered them). Extra URL params are added at the end. Descriptions aren't
+ * in the URL either: they stay with the param of the same name.
  */
-export function queryParamsFromUrl(url: string, previous: KeyValue[]): KeyValue[] {
-  const fromUrl = parseQuery(url).map((p) => ({ ...p, enabled: true }));
+export function queryParamsFromUrl(
+  url: string,
+  previous: KeyValue[],
+  /** More rows to take descriptions from, e.g. the saved request (see `syncPathParams`). */
+  remembered: { name: string; description?: string }[] = [],
+): KeyValue[] {
+  const described = (name: string) =>
+    [...previous, ...remembered].find((p) => p.name === name && p.description)?.description;
+  const fromUrl: KeyValue[] = parseQuery(url).map((p) => ({
+    ...p,
+    enabled: true,
+    description: described(p.name),
+  }));
   const rows: KeyValue[] = [];
   let next = 0;
   for (const row of previous) {
@@ -85,10 +97,21 @@ export function pathParamNames(url: string): string[] {
     .map((segment) => segment.slice(1));
 }
 
-/** Path param rows for the current URL, keeping values the user already entered. */
-export function syncPathParams(url: string, previous: PathParam[]): PathParam[] {
-  return pathParamNames(url).map((name) => ({
-    name,
-    value: previous.find((p) => p.name === name)?.value ?? "",
-  }));
+/**
+ * Path param rows for the current URL, keeping values and descriptions already entered.
+ * `remembered` (the saved request's params) brings back the description of a param that
+ * disappeared for a moment while the URL was being typed.
+ */
+export function syncPathParams(
+  url: string,
+  previous: PathParam[],
+  remembered: { name: string; description?: string }[] = [],
+): PathParam[] {
+  return pathParamNames(url).map((name) => {
+    const known = previous.find((p) => p.name === name);
+    const description = [...previous, ...remembered].find(
+      (p) => p.name === name && p.description,
+    )?.description;
+    return { name, value: known?.value ?? "", description };
+  });
 }

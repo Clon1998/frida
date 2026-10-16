@@ -19,7 +19,13 @@ export function PathParamsTable({ params, onChange }: PathParamsTableProps) {
     );
   }
   return (
-    <GridTable columns={[{ label: "Name", width: "35%" }, { label: "Value" }]}>
+    <GridTable
+      columns={[
+        { label: "Name", width: "28%" },
+        { label: "Value" },
+        { label: "Description", width: "30%" },
+      ]}
+    >
       {params.map((param, index) => (
         <GridRow key={param.name}>
           <GridCell>
@@ -36,6 +42,19 @@ export function PathParamsTable({ params, onChange }: PathParamsTableProps) {
               value={param.value}
               onChange={(value) =>
                 onChange(params.map((p, i) => (i === index ? { ...p, value } : p)))
+              }
+            />
+          </GridCell>
+          <GridCell>
+            <CellInput
+              className="font-sans"
+              placeholder="Description"
+              aria-label="Description"
+              value={param.description ?? ""}
+              onChange={(e) =>
+                onChange(
+                  params.map((p, i) => (i === index ? { ...p, description: e.target.value } : p)),
+                )
               }
             />
           </GridCell>

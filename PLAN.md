@@ -203,6 +203,9 @@ docs: |
 ```
 - Query params and the URL are **kept in sync** in the UI. Editing either one updates the other.
 - `:name` segments in the URL define path params.
+- Query params, path params, headers, vars and form fields can have an optional `description` (what the row is
+  for). It is only written when set, so files without descriptions don't change. OpenAPI parameter descriptions and
+  Bruno `@description('...')` annotations are imported into it.
 
 ### 4.4 Environment (global and collection, same format)
 ```yaml
@@ -903,6 +906,14 @@ Deviations from and clarifications of this plan, newest last.
   file). "Paste…" in the editor adds a copied environment. A taken name gets a number (`dev 2`). Moving the active
   environment clears the selection where it was. Commands: `environment_yaml`, `paste_environment`,
   `transfer_environment`; core: `storage::add_environment`, `secrets::transfer_environment`. No on-disk change.
+
+- **2026-10-17 Param descriptions (on-disk change, approved by Patrick).** `KeyValue` and `PathParam` get an optional
+  `description` (`skip_serializing_if` empty, so existing files are unchanged byte for byte). Tables show a
+  "Descriptions" column (on automatically when a row has one; path params always). Imported from OpenAPI parameter
+  descriptions and Bruno `@description` annotations (`.bru`) / `description` (Bruno YAML). Editing the URL keeps
+  descriptions by param name, also from the saved request when a param vanishes while the URL is being typed.
+  Collection, folder and request docs already existed (Docs tab). In the UI's `Complete<T>`, `description` stays
+  optional because Rust leaves empty ones out.
 
 ## 17. Testing strategy
 

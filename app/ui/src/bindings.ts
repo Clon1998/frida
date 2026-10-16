@@ -96,21 +96,21 @@ export const commands = {
 	 */
 	importBruno: (source: string, target: string | null) => typedError<CollectionImported, ApiError>(__TAURI_INVOKE("import_bruno", { source, target })),
 	/**  The collection's own settings file (`collection.yaml`). */
-	readCollection: (dir: string) => typedError<Collection, ApiError>(__TAURI_INVOKE("read_collection", { dir })),
-	saveCollection: (dir: string, collection: Collection) => typedError<null, ApiError>(__TAURI_INVOKE("save_collection", { dir, collection })),
+	readCollection: (dir: string) => typedError<Collection_Serialize, ApiError>(__TAURI_INVOKE("read_collection", { dir })),
+	saveCollection: (dir: string, collection: Collection_Deserialize) => typedError<null, ApiError>(__TAURI_INVOKE("save_collection", { dir, collection })),
 	getTree: (dir: string) => typedError<TreeNode[], ApiError>(__TAURI_INVOKE("get_tree", { dir })),
-	readRequest: (dir: string, path: string) => typedError<Request, ApiError>(__TAURI_INVOKE("read_request", { dir, path })),
-	saveRequest: (dir: string, path: string, request: Request) => typedError<null, ApiError>(__TAURI_INVOKE("save_request", { dir, path, request })),
-	readFolder: (dir: string, path: string) => typedError<Folder, ApiError>(__TAURI_INVOKE("read_folder", { dir, path })),
+	readRequest: (dir: string, path: string) => typedError<Request_Serialize, ApiError>(__TAURI_INVOKE("read_request", { dir, path })),
+	saveRequest: (dir: string, path: string, request: Request_Deserialize) => typedError<null, ApiError>(__TAURI_INVOKE("save_request", { dir, path, request })),
+	readFolder: (dir: string, path: string) => typedError<Folder_Serialize, ApiError>(__TAURI_INVOKE("read_folder", { dir, path })),
 	/**  Saves a folder's settings (`folder.yaml`). Renaming is a separate operation. */
-	saveFolder: (dir: string, path: string, folder: Folder) => typedError<null, ApiError>(__TAURI_INVOKE("save_folder", { dir, path, folder })),
+	saveFolder: (dir: string, path: string, folder: Folder_Deserialize) => typedError<null, ApiError>(__TAURI_INVOKE("save_folder", { dir, path, folder })),
 	/**
 	 *  Creates an empty GET request named `name` in folder `parent` (`""` = root).
 	 *  Returns the new request's path.
 	 */
 	createRequest: (dir: string, parent: string, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("create_request", { dir, parent, name })),
 	/**  Creates a request from a full request object (used by "Save as new request"). */
-	createRequestFrom: (dir: string, parent: string, request: Request) => typedError<string, ApiError>(__TAURI_INVOKE("create_request_from", { dir, parent, request })),
+	createRequestFrom: (dir: string, parent: string, request: Request_Deserialize) => typedError<string, ApiError>(__TAURI_INVOKE("create_request_from", { dir, parent, request })),
 	createFolder: (dir: string, parent: string, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("create_folder", { dir, parent, name })),
 	/**  Renames a request or folder. Returns its new path. */
 	renameItem: (dir: string, path: string, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("rename_item", { dir, path, name })),
@@ -187,7 +187,7 @@ export const commands = {
 	 *  One entry with its request and response. The response body is also put in the response
 	 *  cache, so "Save to file" works for it like for a live response.
 	 */
-	getHistoryEntry: (id: number) => typedError<HistoryEntry, ApiError>(__TAURI_INVOKE("get_history_entry", { id })),
+	getHistoryEntry: (id: number) => typedError<HistoryEntry_Serialize, ApiError>(__TAURI_INVOKE("get_history_entry", { id })),
 	clearHistory: () => typedError<null, ApiError>(__TAURI_INVOKE("clear_history")),
 	/**
 	 *  "Restore as new request": creates a request in the collection root from a history entry and
@@ -195,9 +195,9 @@ export const commands = {
 	 */
 	restoreHistoryEntry: (dir: string, id: number) => typedError<string, ApiError>(__TAURI_INVOKE("restore_history_entry", { dir, id })),
 	/**  "Copy as curl" for the editor's current request at `path` in collection `dir`. */
-	exportCurl: (dir: string, path: string, request: Request, options: CurlOptions) => typedError<string, ApiError>(__TAURI_INVOKE("export_curl", { dir, path, request, options })),
+	exportCurl: (dir: string, path: string, request: Request_Deserialize, options: CurlOptions) => typedError<string, ApiError>(__TAURI_INVOKE("export_curl", { dir, path, request, options })),
 	/**  Parses a curl command into a request (not saved yet). */
-	importCurl: (command: string) => typedError<CurlImport, ApiError>(__TAURI_INVOKE("import_curl", { command })),
+	importCurl: (command: string) => typedError<CurlImport_Serialize, ApiError>(__TAURI_INVOKE("import_curl", { command })),
 	/**
 	 *  Sends `request` (the editor's current state, saved or not) as if it lived at `path` in the
 	 *  collection `dir`. `request_id` is chosen by the UI and used by [`cancel_request`].
@@ -205,7 +205,7 @@ export const commands = {
 	 *  This is an `async` command, so Tauri runs it on its tokio runtime and the UI stays
 	 *  responsive while waiting for the server.
 	 */
-	sendRequest: (requestId: string, dir: string, path: string, request: Request) => typedError<ResponseView, ApiError>(__TAURI_INVOKE("send_request", { requestId, dir, path, request })),
+	sendRequest: (requestId: string, dir: string, path: string, request: Request_Deserialize) => typedError<ResponseView_Serialize, ApiError>(__TAURI_INVOKE("send_request", { requestId, dir, path, request })),
 	/**
 	 *  Resolves the variables of `request` without sending it, for the inspector panel and the
 	 *  editor tooltips (highlighting, `{{` autocompletion). Secret values are masked.
@@ -222,11 +222,11 @@ export const commands = {
 	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
 	method: string,
 	url?: string,
-	params?: Params,
-	headers?: KeyValue[],
-	body?: Body,
+	params?: Params_Deserialize,
+	headers?: KeyValue_Deserialize[],
+	body?: Body_Deserialize,
 	auth?: Auth,
-	vars?: KeyValue[],
+	vars?: KeyValue_Deserialize[],
 	scripts?: Scripts,
 	tests?: string,
 	settings?: Settings,
@@ -245,11 +245,11 @@ export const commands = {
 	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
 	method: string,
 	url?: string,
-	params?: Params,
-	headers?: KeyValue[],
-	body?: Body,
+	params?: Params_Deserialize,
+	headers?: KeyValue_Deserialize[],
+	body?: Body_Deserialize,
 	auth?: Auth,
-	vars?: KeyValue[],
+	vars?: KeyValue_Deserialize[],
 	scripts?: Scripts,
 	tests?: string,
 	settings?: Settings,
@@ -294,9 +294,9 @@ export const commands = {
 
 /** Events */
 export const events = {
-	consoleLogged: makeEvent<ConsoleLogged>("console-logged"),
+	consoleLogged: makeEvent<ConsoleLogged_Deserialize>("console-logged"),
 	fsChanged: makeEvent<FsChanged>("fs-changed"),
-	runProgress: makeEvent<RunProgress>("run-progress"),
+	runProgress: makeEvent<RunProgress_Deserialize>("run-progress"),
 	scriptLogged: makeEvent<ScriptLogged>("script-logged"),
 };
 
@@ -436,18 +436,39 @@ export type AwsProfile = {
  *  The request body. All modes are kept side by side, so switching the mode in the UI
  *  doesn't lose what was typed for another mode.
  */
-export type Body = {
+export type Body = Body_Serialize | Body_Deserialize;
+
+export type BodyMode = "none" | "json" | "xml" | "text" | "form-urlencoded" | "multipart" | "binary";
+
+/**
+ *  The request body. All modes are kept side by side, so switching the mode in the UI
+ *  doesn't lose what was typed for another mode.
+ */
+export type Body_Deserialize = {
 	mode?: BodyMode,
 	json?: string,
 	xml?: string,
 	text?: string,
-	formUrlEncoded?: KeyValue[],
+	formUrlEncoded?: KeyValue_Deserialize[],
 	multipart?: MultipartField[],
 	/**  Path of the file to send for `mode: binary`. Relative to the collection, or absolute. */
 	binaryPath?: string,
 };
 
-export type BodyMode = "none" | "json" | "xml" | "text" | "form-urlencoded" | "multipart" | "binary";
+/**
+ *  The request body. All modes are kept side by side, so switching the mode in the UI
+ *  doesn't lose what was typed for another mode.
+ */
+export type Body_Serialize = {
+	mode: BodyMode,
+	json: string,
+	xml: string,
+	text: string,
+	formUrlEncoded: KeyValue_Serialize[],
+	multipart: MultipartField[],
+	/**  Path of the file to send for `mode: binary`. Relative to the collection, or absolute. */
+	binaryPath: string,
+};
 
 export type Branch = {
 	name: string,
@@ -457,19 +478,7 @@ export type Branch = {
 };
 
 /**  The root of a collection: the folder that contains `collection.yaml`. */
-export type Collection = {
-	version: number,
-	/**  Stable UUID. Keys local state (tabs, AWS profile mapping, secrets), so it must never change. */
-	id: string,
-	name: string,
-	vars?: KeyValue[],
-	headers?: KeyValue[],
-	auth?: Auth,
-	scripts?: Scripts,
-	tests?: string,
-	settings?: CollectionSettings,
-	docs?: string,
-};
+export type Collection = Collection_Serialize | Collection_Deserialize;
 
 /**
  *  The result of an import (OpenAPI or Bruno): the updated workspace, the new collection's
@@ -510,6 +519,36 @@ export type CollectionSummary = {
 	error: string | null,
 };
 
+/**  The root of a collection: the folder that contains `collection.yaml`. */
+export type Collection_Deserialize = {
+	version: number,
+	/**  Stable UUID. Keys local state (tabs, AWS profile mapping, secrets), so it must never change. */
+	id: string,
+	name: string,
+	vars?: KeyValue_Deserialize[],
+	headers?: KeyValue_Deserialize[],
+	auth?: Auth,
+	scripts?: Scripts,
+	tests?: string,
+	settings?: CollectionSettings,
+	docs?: string,
+};
+
+/**  The root of a collection: the folder that contains `collection.yaml`. */
+export type Collection_Serialize = {
+	version: number,
+	/**  Stable UUID. Keys local state (tabs, AWS profile mapping, secrets), so it must never change. */
+	id: string,
+	name: string,
+	vars: KeyValue_Serialize[],
+	headers: KeyValue_Serialize[],
+	auth: Auth,
+	scripts: Scripts,
+	tests: string,
+	settings: CollectionSettings,
+	docs: string,
+};
+
 /**  A body as text. Binary bodies are summarized instead of shown. */
 export type ConsoleBody = {
 	text: string,
@@ -517,17 +556,33 @@ export type ConsoleBody = {
 	truncated: boolean,
 };
 
-export type ConsoleEntry = {
+export type ConsoleEntry = ConsoleEntry_Serialize | ConsoleEntry_Deserialize;
+
+export type ConsoleEntry_Deserialize = {
 	id: string,
 	timestamp: string,
 	requestName: string,
 	requestPath: string,
 	method: string,
 	url: string,
-	requestHeaders: KeyValue[],
+	requestHeaders: KeyValue_Deserialize[],
 	requestBody: ConsoleBody | null,
 	/**  `None` when there was no response (see `error`). */
-	response: ConsoleResponse | null,
+	response: ConsoleResponse_Deserialize | null,
+	error: string | null,
+};
+
+export type ConsoleEntry_Serialize = {
+	id: string,
+	timestamp: string,
+	requestName: string,
+	requestPath: string,
+	method: string,
+	url: string,
+	requestHeaders: KeyValue_Serialize[],
+	requestBody: ConsoleBody | null,
+	/**  `None` when there was no response (see `error`). */
+	response: ConsoleResponse_Serialize | null,
 	error: string | null,
 };
 
@@ -535,15 +590,43 @@ export type ConsoleEntry = {
  *  Emitted after every send (successful or not): the raw request and response for the console.
  *  Secret values are already masked.
  */
-export type ConsoleLogged = {
-	entry: ConsoleEntry,
+export type ConsoleLogged = ConsoleLogged_Serialize | ConsoleLogged_Deserialize;
+
+/**
+ *  Emitted after every send (successful or not): the raw request and response for the console.
+ *  Secret values are already masked.
+ */
+export type ConsoleLogged_Deserialize = {
+	entry: ConsoleEntry_Deserialize,
 };
 
-export type ConsoleResponse = {
+/**
+ *  Emitted after every send (successful or not): the raw request and response for the console.
+ *  Secret values are already masked.
+ */
+export type ConsoleLogged_Serialize = {
+	entry: ConsoleEntry_Serialize,
+};
+
+export type ConsoleResponse = ConsoleResponse_Serialize | ConsoleResponse_Deserialize;
+
+export type ConsoleResponse_Deserialize = {
 	httpVersion: string,
 	status: number,
 	statusText: string,
-	headers: KeyValue[],
+	headers: KeyValue_Deserialize[],
+	body: ConsoleBody | null,
+	timeMs: number,
+	sizeBytes: number,
+	/**  The URL after redirects. */
+	finalUrl: string,
+};
+
+export type ConsoleResponse_Serialize = {
+	httpVersion: string,
+	status: number,
+	statusText: string,
+	headers: KeyValue_Serialize[],
 	body: ConsoleBody | null,
 	timeMs: number,
 	sizeBytes: number,
@@ -564,8 +647,17 @@ export type CookieView = {
 };
 
 /**  The imported request plus anything that couldn't be carried over. */
-export type CurlImport = {
-	request: Request,
+export type CurlImport = CurlImport_Serialize | CurlImport_Deserialize;
+
+/**  The imported request plus anything that couldn't be carried over. */
+export type CurlImport_Deserialize = {
+	request: Request_Deserialize,
+	warnings: string[],
+};
+
+/**  The imported request plus anything that couldn't be carried over. */
+export type CurlImport_Serialize = {
+	request: Request_Serialize,
 	warnings: string[],
 };
 
@@ -709,17 +801,34 @@ export type FileVersions = {
 };
 
 /**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
-export type Folder = {
+export type Folder = Folder_Serialize | Folder_Deserialize;
+
+/**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
+export type Folder_Deserialize = {
 	version: number,
 	name: string,
 	seq?: number,
-	vars?: KeyValue[],
-	headers?: KeyValue[],
+	vars?: KeyValue_Deserialize[],
+	headers?: KeyValue_Deserialize[],
 	auth?: Auth,
 	scripts?: Scripts,
 	tests?: string,
 	settings?: Settings,
 	docs?: string,
+};
+
+/**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
+export type Folder_Serialize = {
+	version: number,
+	name: string,
+	seq: number,
+	vars: KeyValue_Serialize[],
+	headers: KeyValue_Serialize[],
+	auth: Auth,
+	scripts: Scripts,
+	tests: string,
+	settings: Settings,
+	docs: string,
 };
 
 /**
@@ -739,14 +848,28 @@ export type GitInfo =
 { kind: "noRepo" } | { kind: "repo"; status: Status };
 
 /**  A full entry, opened read-only. */
-export type HistoryEntry = {
+export type HistoryEntry = HistoryEntry_Serialize | HistoryEntry_Deserialize;
+
+/**  A full entry, opened read-only. */
+export type HistoryEntry_Deserialize = {
 	summary: HistorySummary,
-	requestHeaders: KeyValue[],
+	requestHeaders: KeyValue_Deserialize[],
 	/**  The body as text, if it was text. */
 	requestBody: string | null,
 	requestBodyTruncated: boolean,
 	/**  The response in the same shape as a live one. Its `id` is `history-<id>`. */
-	response: ResponseView | null,
+	response: ResponseView_Deserialize | null,
+};
+
+/**  A full entry, opened read-only. */
+export type HistoryEntry_Serialize = {
+	summary: HistorySummary,
+	requestHeaders: KeyValue_Serialize[],
+	/**  The body as text, if it was text. */
+	requestBody: string | null,
+	requestBodyTruncated: boolean,
+	/**  The response in the same shape as a live one. Its `id` is `history-<id>`. */
+	response: ResponseView_Serialize | null,
 };
 
 /**  A row in the history list. */
@@ -798,11 +921,32 @@ export type ImportedArchive = {
 };
 
 /**  A `name: value` row that can be switched off, used for headers, query params, vars and form fields. */
-export type KeyValue = {
+export type KeyValue = KeyValue_Serialize | KeyValue_Deserialize;
+
+/**  A `name: value` row that can be switched off, used for headers, query params, vars and form fields. */
+export type KeyValue_Deserialize = {
 	name: string,
 	value?: string,
 	/**  Disabled rows stay in the file but are ignored when sending (PLAN.md §5.2). */
 	enabled?: boolean,
+	/**
+	 *  What the row is for, e.g. from an OpenAPI parameter. Only written when set, so files
+	 *  without descriptions look exactly as before.
+	 */
+	description?: string,
+};
+
+/**  A `name: value` row that can be switched off, used for headers, query params, vars and form fields. */
+export type KeyValue_Serialize = {
+	name: string,
+	value: string,
+	/**  Disabled rows stay in the file but are ignored when sending (PLAN.md §5.2). */
+	enabled: boolean,
+	/**
+	 *  What the row is for, e.g. from an OpenAPI parameter. Only written when set, so files
+	 *  without descriptions look exactly as before.
+	 */
+	description?: string,
 };
 
 export type LogLevel = "log" | "info" | "warn" | "error" | "debug";
@@ -859,16 +1003,36 @@ export type OpenApiGrouping =
 /**  One folder per operation tag (its first tag); untagged operations go to the root. */
 "tags";
 
-export type Params = {
+export type Params = Params_Serialize | Params_Deserialize;
+
+export type Params_Deserialize = {
 	/**  Kept in sync with the query string of `url` by the UI. */
-	query?: KeyValue[],
+	query?: KeyValue_Deserialize[],
 	/**  Values for `:name` segments in the URL. */
-	path?: PathParam[],
+	path?: PathParam_Deserialize[],
 };
 
-export type PathParam = {
+export type Params_Serialize = {
+	/**  Kept in sync with the query string of `url` by the UI. */
+	query: KeyValue_Serialize[],
+	/**  Values for `:name` segments in the URL. */
+	path: PathParam_Serialize[],
+};
+
+export type PathParam = PathParam_Serialize | PathParam_Deserialize;
+
+export type PathParam_Deserialize = {
 	name: string,
 	value?: string,
+	/**  What the parameter is for (see [`KeyValue::description`](super::KeyValue)). */
+	description?: string,
+};
+
+export type PathParam_Serialize = {
+	name: string,
+	value: string,
+	/**  What the parameter is for (see [`KeyValue::description`](super::KeyValue)). */
+	description?: string,
 };
 
 /**  The Settings dialog. Every field has a default, so older `settings.json` files load fine. */
@@ -886,7 +1050,9 @@ export type Preferences = {
 	aws?: AwsPreferences,
 };
 
-export type Request = {
+export type Request = Request_Serialize | Request_Deserialize;
+
+export type Request_Deserialize = {
 	version: number,
 	name: string,
 	/**  Sort order inside its folder. Lower comes first. */
@@ -894,15 +1060,34 @@ export type Request = {
 	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
 	method: string,
 	url?: string,
-	params?: Params,
-	headers?: KeyValue[],
-	body?: Body,
+	params?: Params_Deserialize,
+	headers?: KeyValue_Deserialize[],
+	body?: Body_Deserialize,
 	auth?: Auth,
-	vars?: KeyValue[],
+	vars?: KeyValue_Deserialize[],
 	scripts?: Scripts,
 	tests?: string,
 	settings?: Settings,
 	docs?: string,
+};
+
+export type Request_Serialize = {
+	version: number,
+	name: string,
+	/**  Sort order inside its folder. Lower comes first. */
+	seq: number,
+	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
+	method: string,
+	url: string,
+	params: Params_Serialize,
+	headers: KeyValue_Serialize[],
+	body: Body_Serialize,
+	auth: Auth,
+	vars: KeyValue_Serialize[],
+	scripts: Scripts,
+	tests: string,
+	settings: Settings,
+	docs: string,
 };
 
 /**  Everything the resolver found while resolving one request. */
@@ -934,12 +1119,34 @@ export type ResolvedVar = {
 	usedIn: UsageLocation[],
 };
 
-export type ResponseView = {
+export type ResponseView = ResponseView_Serialize | ResponseView_Deserialize;
+
+export type ResponseView_Deserialize = {
 	/**  Identifies the full body in the [`ResponseCache`]. */
 	id: string,
 	status: number,
 	statusText: string,
-	headers: KeyValue[],
+	headers: KeyValue_Deserialize[],
+	contentType: string | null,
+	sizeBytes: number,
+	timeMs: number,
+	finalUrl: string,
+	/**  The body as text when it is valid UTF-8 (or truncated, see `truncated`). */
+	bodyText: string | null,
+	/**  The body as base64 when it isn't text (e.g. images), and only when small enough. */
+	bodyBase64: string | null,
+	/**  `true` when the body was larger than [`MAX_DISPLAY_BYTES`] and only the start is shown. */
+	truncated: boolean,
+	/**  Test results and post-response script errors (filled in after the scripts ran). */
+	scripts: ScriptOutcome,
+};
+
+export type ResponseView_Serialize = {
+	/**  Identifies the full body in the [`ResponseCache`]. */
+	id: string,
+	status: number,
+	statusText: string,
+	headers: KeyValue_Serialize[],
 	contentType: string | null,
 	sizeBytes: number,
 	timeMs: number,
@@ -980,7 +1187,10 @@ export type RunOutcome =
 "skipped";
 
 /**  Emitted after each request of a run, while the run goes on. */
-export type RunProgress = {
+export type RunProgress = RunProgress_Serialize | RunProgress_Deserialize;
+
+/**  Emitted after each request of a run, while the run goes on. */
+export type RunProgress_Deserialize = {
 	/**  The id the UI chose when it started the run. */
 	runId: string,
 	result: RunResult,
@@ -988,7 +1198,19 @@ export type RunProgress = {
 	 *  The response, when the request was sent (its body is in the response cache too, for
 	 *  saving and filtering, until newer responses push it out).
 	 */
-	response: ResponseView | null,
+	response: ResponseView_Deserialize | null,
+};
+
+/**  Emitted after each request of a run, while the run goes on. */
+export type RunProgress_Serialize = {
+	/**  The id the UI chose when it started the run. */
+	runId: string,
+	result: RunResult,
+	/**
+	 *  The response, when the request was sent (its body is in the response cache too, for
+	 *  saving and filtering, until newer responses push it out).
+	 */
+	response: ResponseView_Serialize | null,
 };
 
 /**  The result of one request of the run. */

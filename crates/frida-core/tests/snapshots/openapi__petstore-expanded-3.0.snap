@@ -40,9 +40,11 @@ requests:
     - name: tags
       value: ""
       enabled: false
+      description: tags to filter by
     - name: limit
       value: ""
       enabled: false
+      description: maximum number of results to return
     path: []
   headers: []
   body:
@@ -113,6 +115,7 @@ requests:
     path:
     - name: id
       value: ""
+      description: ID of pet to fetch
   headers: []
   body:
     mode: none
@@ -145,6 +148,7 @@ requests:
     path:
     - name: id
       value: ""
+      description: ID of pet to delete
   headers: []
   body:
     mode: none

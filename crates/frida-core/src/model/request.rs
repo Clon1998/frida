@@ -77,6 +77,9 @@ pub struct PathParam {
     pub name: String,
     #[serde(default)]
     pub value: String,
+    /// What the parameter is for (see [`KeyValue::description`](super::KeyValue)).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
 }
 
 /// The request body. All modes are kept side by side, so switching the mode in the UI

@@ -76,9 +76,11 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
     update((r) => ({
       ...r,
       url,
+      // The saved version is passed too, so typing a URL (during which a param can vanish
+      // for a moment) doesn't lose saved descriptions.
       params: {
-        query: queryParamsFromUrl(url, r.params.query),
-        path: syncPathParams(url, r.params.path),
+        query: queryParamsFromUrl(url, r.params.query, tab.original.params.query),
+        path: syncPathParams(url, r.params.path, tab.original.params.path),
       },
     }));
 

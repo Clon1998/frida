@@ -73,6 +73,7 @@ async fn sends_query_path_params_and_headers() {
     req.params.path = vec![frida_core::model::PathParam {
         name: "id".to_string(),
         value: "42".to_string(),
+        description: String::new(),
     }];
     req.headers = vec![KeyValue::new("X-Correlation-Id", "abc")];
 

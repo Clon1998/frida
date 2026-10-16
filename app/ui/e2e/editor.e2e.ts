@@ -182,3 +182,36 @@ test("an open find bar stays under dialogs", async ({ app }) => {
     (e) => getComputedStyle(e.parentElement).isolation === "isolate")`);
   expect(isolated).toBe(true);
 });
+
+test("param descriptions are saved and survive editing the URL", async ({ app }) => {
+  await openWorkspace(app);
+  await openRequest(app, "Get order");
+  await setUrl(app, "{{baseUrl}}/orders/:orderId?expand=items");
+  const panel = app.getByRole("tabpanel");
+
+  await panel.getByRole("button", { name: "Descriptions" }).click();
+  await panel.getByLabel("Description").first().fill("Related data to include");
+  // Path params always have the column.
+  await panel.getByLabel("Description").last().fill("The order's id");
+
+  // Editing the URL in place: the description stays with its param.
+  await urlBar(app).click();
+  await app.keyboard.press("End");
+  for (let i = 0; i < "items".length; i++) await app.keyboard.press("Backspace");
+  await app.keyboard.type("lines");
+  await expect(panel.getByLabel("Description").first()).toHaveValue("Related data to include");
+
+  await save(app);
+  const saved = (await backend(app)).requests["orders/get-order.yaml"];
+  expect(saved.params.query[0]).toMatchObject({
+    name: "expand",
+    value: "lines",
+    description: "Related data to include",
+  });
+  expect(saved.params.path[0]).toMatchObject({ name: "orderId", description: "The order's id" });
+
+  // Retyping the whole URL (the params vanish while typing) brings saved descriptions back.
+  await setUrl(app, "{{baseUrl}}/orders/:orderId?expand=all");
+  await expect(panel.getByLabel("Description").first()).toHaveValue("Related data to include");
+  await expect(panel.getByLabel("Description").last()).toHaveValue("The order's id");
+});

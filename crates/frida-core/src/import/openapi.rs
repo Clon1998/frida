@@ -427,12 +427,18 @@ impl<'a> Mapper<'a> {
             let name = str_of(p, "name").unwrap_or("").to_string();
             let required = p.get("required").and_then(Value::as_bool).unwrap_or(false);
             let value = self.param_value(p);
+            let description = str_of(p, "description").unwrap_or("").trim().to_string();
             match str_of(p, "in") {
-                Some("path") => request.params.path.push(PathParam { name, value }),
+                Some("path") => request.params.path.push(PathParam {
+                    name,
+                    value,
+                    description,
+                }),
                 Some("query") => request.params.query.push(KeyValue {
                     name,
                     value,
                     enabled: required,
+                    description,
                 }),
                 Some("header") => {
                     // OpenAPI says these three are described elsewhere and must be ignored.
@@ -442,6 +448,7 @@ impl<'a> Mapper<'a> {
                             name,
                             value,
                             enabled: required,
+                            description,
                         });
                     }
                 }

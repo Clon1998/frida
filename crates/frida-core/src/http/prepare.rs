@@ -304,10 +304,12 @@ mod tests {
             PathParam {
                 name: "orderId".to_string(),
                 value: "42".to_string(),
+                description: String::new(),
             },
             PathParam {
                 name: "itemId".to_string(),
                 value: "7".to_string(),
+                description: String::new(),
             },
         ];
 

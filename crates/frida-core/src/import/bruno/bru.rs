@@ -43,6 +43,8 @@ pub(crate) struct Pair {
     pub value: String,
     /// `false` when the key starts with `~`.
     pub enabled: bool,
+    /// From a `@description('...')` annotation on the line(s) above, if any.
+    pub description: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,6 +194,8 @@ fn outdent(lines: &[&str], spaces: usize) -> String {
 
 fn parse_pairs(lines: &[&str]) -> Vec<Pair> {
     let mut pairs = Vec::new();
+    // A `@description` waiting for the pair below it.
+    let mut description = String::new();
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i];
@@ -200,14 +204,22 @@ fn parse_pairs(lines: &[&str]) -> Vec<Pair> {
         if trimmed.is_empty() {
             continue;
         }
-        // Annotations (`@number`, `@description('...')`) belong to the next pair; skip them,
-        // including multi-line `('''...''')` arguments.
+        // Annotations (`@number`, `@description('...')`) belong to the next pair. Descriptions
+        // are kept; others are skipped, including multi-line `('''...''')` arguments.
         if is_annotation(trimmed) {
+            let mut text = vec![trimmed.to_string()];
             if trimmed.contains("'''") && trimmed.matches("'''").count() == 1 {
                 while i < lines.len() && !lines[i].contains("'''") {
+                    text.push(lines[i].trim().to_string());
                     i += 1;
                 }
+                if i < lines.len() {
+                    text.push(lines[i].trim().to_string());
+                }
                 i += 1;
+            }
+            if let Some(found) = annotation_description(&text) {
+                description = found;
             }
             continue;
         }
@@ -251,9 +263,33 @@ fn parse_pairs(lines: &[&str]) -> Vec<Pair> {
             name,
             value,
             enabled,
+            description: std::mem::take(&mut description),
         });
     }
     pairs
+}
+
+/// The text of a `@description(...)` annotation. `lines` are the annotation's lines (trimmed),
+/// the first starting with `@`: `@description('text')`, `@description('''text''')`, or the
+/// multi-line form `@description('''`, the text lines, `''')`.
+fn annotation_description(lines: &[String]) -> Option<String> {
+    let first = lines.first()?;
+    let arg = first.strip_prefix("@description(")?.trim();
+    if let Some(rest) = arg.strip_prefix("'''") {
+        if let Some(end) = rest.find("'''") {
+            return Some(rest[..end].trim().to_string());
+        }
+        let body: Vec<&str> = lines[1..]
+            .iter()
+            .map(String::as_str)
+            .take_while(|l| !l.starts_with("'''"))
+            .collect();
+        return Some(body.join("\n").trim().to_string());
+    }
+    // `@description('text')` or `@description("text")`.
+    let quote = arg.chars().next()?;
+    let inner = arg.strip_prefix(quote)?.strip_suffix(')')?.trim_end();
+    Some(inner.strip_suffix(quote)?.to_string())
 }
 
 /// `@number` or `@description(...)`, but not a local variable `@name: value`.
@@ -389,6 +425,27 @@ script:pre-request {
             file.text("script:pre-request").as_deref(),
             Some("if (x) {\n  bru.setVar(\"a\", 1);\n}")
         );
+    }
+
+    #[test]
+    fn descriptions_belong_to_the_pair_below_them() {
+        let headers = parse(SAMPLE).dict("headers");
+        // The multi-line `@description('''...''')` in SAMPLE is above `X-Api`.
+        assert_eq!(headers[0].name, "X-Api");
+        assert_eq!(headers[0].description, "multi\nline");
+        assert_eq!(headers[1].description, "");
+
+        let file = parse(
+            "params:query {\n  @description('Page size')\n  limit: 20\n  @number\n  page: 1\n  @description(\"say \\\"hi\\\"\")\n  q: x\n}\n",
+        );
+        let params = file.dict("params:query");
+        let found: Vec<(&str, &str)> = params
+            .iter()
+            .map(|p| (p.name.as_str(), p.description.as_str()))
+            .collect();
+        assert_eq!(found[0], ("limit", "Page size"));
+        assert_eq!(found[1], ("page", ""));
+        assert_eq!(found[2].0, "q");
     }
 
     #[test]

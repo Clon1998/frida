@@ -104,6 +104,7 @@ fn kvs(pairs: Vec<Pair>) -> Vec<Kv> {
             name: p.name,
             value: p.value,
             enabled: p.enabled,
+            description: p.description,
         })
         .collect()
 }
