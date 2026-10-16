@@ -8,6 +8,7 @@ import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { ConsolePanel } from "@/components/console/ConsolePanel";
+import { AwsProfileDialog } from "@/components/env/AwsProfileDialog";
 import { GitStatusIndicator } from "@/components/git/GitStatusIndicator";
 import { HistoryView } from "@/components/history/HistoryView";
 import { useConsole } from "@/stores/console";
@@ -122,6 +123,7 @@ export function AppShell() {
 
       <CurlExportDialog />
       <CurlImportDialog />
+      <AwsProfileDialog />
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
         {collection && <GitStatusIndicator dir={collection.dir} />}

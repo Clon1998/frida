@@ -14,6 +14,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { AwsProfilePicker } from "./AwsProfilePicker";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { showError, unwrap } from "@/lib/api";
 import { forDisk, secretOps } from "@/lib/envs";
@@ -205,6 +213,40 @@ interface EnvFormProps {
   entry: EnvEntry;
   onRenamed: (name: string) => void;
   onDuplicate: () => void;
+}
+
+type AwsSource = NonNullable<EnvVar["source"]>;
+
+/** Where an AWS-backed secret comes from: secret id, optional JSON key and region. */
+function AwsSourceFields({
+  source,
+  onChange,
+}: {
+  source: AwsSource;
+  onChange: (source: AwsSource) => void;
+}) {
+  return (
+    <div className="flex divide-x">
+      <CellInput
+        className="flex-[2]"
+        placeholder="secret id or ARN"
+        value={source.secretId}
+        onChange={(e) => onChange({ ...source, secretId: e.target.value })}
+      />
+      <CellInput
+        className="flex-1"
+        placeholder="JSON key (optional)"
+        value={source.jsonKey ?? ""}
+        onChange={(e) => onChange({ ...source, jsonKey: e.target.value || null })}
+      />
+      <CellInput
+        className="flex-1"
+        placeholder="region (profile's)"
+        value={source.region ?? ""}
+        onChange={(e) => onChange({ ...source, region: e.target.value || null })}
+      />
+    </div>
+  );
 }
 
 /** Edits one environment. Changes are kept here until "Save". */
@@ -423,17 +465,22 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
           <TabsTrigger value="secrets">Secrets ({secretCount})</TabsTrigger>
         </TabsList>
       </Tabs>
+      {draft.variables.some((v) => v.secret && v.source) && (
+        <AwsProfilePicker scope={scope} environment={original.name} />
+      )}
       {secrets && (
         <p className="-mt-1 text-xs text-muted-foreground">
           Secret values are stored in {keychain ? "the OS keychain" : "an encrypted file"} on this
           machine. Only the names are saved in the environment file, so teammates see which secrets
-          they need to fill in.
+          they need to fill in. A secret can also come from AWS Secrets Manager (choose
+          &quot;AWS&quot; as its source).
         </p>
       )}
 
       <GridTable
         columns={[
           { label: secrets ? "Secret" : "Variable", width: "30%" },
+          ...(secrets ? [{ label: "Source", width: "7.5rem" }] : []),
           { label: "Value" },
           { label: "", width: "2.25rem" },
         ]}
@@ -453,8 +500,48 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
                   }
                 />
               </GridCell>
+              {secrets && (
+                <GridCell>
+                  <Select
+                    value={v.source ? "aws" : "keychain"}
+                    disabled={isNew}
+                    onValueChange={(kind) =>
+                      updateVar(index, {
+                        source:
+                          kind === "aws"
+                            ? {
+                                type: "aws-secrets-manager",
+                                secretId: "",
+                                jsonKey: null,
+                                region: null,
+                              }
+                            : null,
+                      })
+                    }
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      className="h-8 w-full rounded-none border-0 shadow-none"
+                      aria-label="Secret source"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="keychain">
+                        {keychain ? "Keychain" : "Local file"}
+                      </SelectItem>
+                      <SelectItem value="aws">AWS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </GridCell>
+              )}
               <GridCell>
-                {v.secret ? (
+                {v.secret && v.source ? (
+                  <AwsSourceFields
+                    source={v.source}
+                    onChange={(source) => updateVar(index, { source })}
+                  />
+                ) : v.secret ? (
                   <div className="flex items-center gap-1 pr-1">
                     <CellInput
                       type={shown !== undefined ? "text" : "password"}
@@ -469,7 +556,6 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
                     {!isNew && !wasSet && pending[v.name] === undefined && (
                       <Badge variant="outline">unset</Badge>
                     )}
-                    {v.source && <Badge variant="secondary">AWS</Badge>}
                     {wasSet && pending[v.name] === undefined && (
                       <Button
                         variant="ghost"

@@ -1,4 +1,5 @@
 import { KeyRound, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { type CognitoDomain, cognitoUrls, parseCognito } from "@/lib/cognito";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -254,10 +255,51 @@ function OAuth2Fields({
     prefix: "Bearer",
   };
   const set = (patch: Partial<OAuth2Config>) => onChange({ ...config, ...patch });
+  const cognito = config.preset === "cognito";
+  // Kept as typed (re-parsing a half-typed URL would scramble the fields).
+  const [cognitoDomain, setCognitoDomain] = useState(() => parseCognito(config.tokenUrl ?? ""));
+  /** Cognito preset: domain and region fill in the endpoints (PLAN.md §9.2). */
+  const setCognito = (patch: Partial<CognitoDomain>) => {
+    const next = { ...cognitoDomain, ...patch };
+    setCognitoDomain(next);
+    set({ preset: "cognito", ...cognitoUrls(next) });
+  };
 
   return (
     <div className="flex flex-col gap-4">
       <Fields>
+        <Field label="Preset">
+          <Select
+            value={cognito ? "cognito" : "none"}
+            onValueChange={(p) => set({ preset: p === "cognito" ? "cognito" : null })}
+          >
+            <SelectTrigger size="sm" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="cognito">AWS Cognito</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        {cognito && (
+          <>
+            <Field label="User pool domain">
+              <TextInput
+                value={cognitoDomain.domain}
+                placeholder="my-app (prefix) or auth.example.com"
+                onChange={(domain) => setCognito({ domain })}
+              />
+            </Field>
+            <Field label="Region">
+              <TextInput
+                value={cognitoDomain.region}
+                placeholder="eu-central-1"
+                onChange={(region) => setCognito({ region })}
+              />
+            </Field>
+          </>
+        )}
         <Field label="Grant type">
           <Select value={grant} onValueChange={(g) => set({ grant: g as OAuth2Grant })}>
             <SelectTrigger size="sm" className="w-full">

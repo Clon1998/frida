@@ -380,12 +380,17 @@ export const useTabs = create<TabsState>((set, get) => {
         const response = await unwrap(commands.sendRequest(requestId, dir, path, tab.draft));
         updateRequestTab(dir, path, (t) => ({ ...t, response, error: null, requestId: null }));
       } catch (e) {
-        updateRequestTab(dir, path, (t) => ({
-          ...t,
-          response: null,
-          error: toApiError(e),
-          requestId: null,
-        }));
+        const error = toApiError(e);
+        updateRequestTab(dir, path, (t) => ({ ...t, response: null, error, requestId: null }));
+        // First use of an environment with AWS secrets: ask for its profile, then send again.
+        if (error.code === "aws_profile_required" && error.aws) {
+          useDialogs.getState().openAwsProfile({
+            dir,
+            environment: error.aws.environment,
+            global: error.aws.global ?? false,
+            then: () => void get().send(dir, path),
+          });
+        }
       }
       // A history entry was written; let the history list refresh.
       useDialogs.getState().bumpHistory();

@@ -24,7 +24,7 @@ export async function unwrap<T>(result: Promise<CommandResult<T>>): Promise<T> {
 /** The structured error behind `e`, or a generic one for unexpected exceptions. */
 export function toApiError(e: unknown): ApiError {
   if (e instanceof FridaError) return e.apiError;
-  return { code: "io", message: e instanceof Error ? e.message : String(e), hint: null };
+  return { code: "io", message: e instanceof Error ? e.message : String(e), hint: null, aws: null };
 }
 
 /** Shows an error toast with the message and, if present, the hint. */

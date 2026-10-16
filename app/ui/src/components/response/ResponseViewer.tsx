@@ -34,6 +34,7 @@ export function ResponseViewer({ tab, dir }: { tab: RequestTab; dir: string }) {
         <AlertCircle className="size-6 text-destructive" />
         <p className="text-sm font-medium">{tab.error.message}</p>
         {tab.error.hint && <p className="text-xs text-muted-foreground">{tab.error.hint}</p>}
+        {tab.error.aws?.fixCommand && <FixCommand command={tab.error.aws.fixCommand} />}
       </div>
     );
   }
@@ -209,6 +210,27 @@ export function ResponsePanel({
           <TestResults scripts={response.scripts} />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/** A shell command that fixes the error (e.g. `aws sso login`), with a copy button. */
+function FixCommand({ command }: { command: string }) {
+  return (
+    <div className="mt-1 flex items-center gap-1 rounded-md border bg-muted/40 py-1 pr-1 pl-3">
+      <code className="text-xs">{command}</code>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-6"
+        aria-label="Copy command"
+        title="Copy command"
+        onClick={() =>
+          void navigator.clipboard.writeText(command).then(() => toast.success("Command copied"))
+        }
+      >
+        <Copy />
+      </Button>
     </div>
   );
 }

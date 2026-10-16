@@ -9,6 +9,12 @@ interface DialogsState {
   curlExport: { dir: string; path: string } | null;
   /** "New request from curl" in folder `parent` (`""` = collection root). */
   curlImport: { dir: string; parent: string } | null;
+  /**
+   * "Choose an AWS profile" for an environment with AWS secrets (PLAN.md §9.1), opened when a
+   * send needs one; `then` retries the send.
+   */
+  awsProfile: { dir: string; environment: string; global: boolean; then: () => void } | null;
+  openAwsProfile: (request: NonNullable<DialogsState["awsProfile"]>) => void;
   /** Bumped after every send, so the history list refreshes. */
   historyVersion: number;
   openCurlExport: (dir: string, path: string) => void;
@@ -21,8 +27,10 @@ export const useDialogs = create<DialogsState>((set) => ({
   curlExport: null,
   curlImport: null,
   historyVersion: 0,
+  awsProfile: null,
+  openAwsProfile: (awsProfile) => set({ awsProfile }),
   openCurlExport: (dir, path) => set({ curlExport: { dir, path } }),
   openCurlImport: (dir, parent) => set({ curlImport: { dir, parent } }),
-  close: () => set({ curlExport: null, curlImport: null }),
+  close: () => set({ curlExport: null, curlImport: null, awsProfile: null }),
   bumpHistory: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
 }));
