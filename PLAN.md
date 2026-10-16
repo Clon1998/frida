@@ -638,7 +638,7 @@ Decided with Patrick on 2026-10-16 (see the decisions log).
   send → see the response; create/rename/delete request and folder; environments (add a variable by typing, set active,
   secrets); unsaved-changes close dialog (Save / Don't save / Cancel); OpenAPI import preview; history list; git tab
   (status → diff → stage → commit). Runs in CI on Linux (Chromium). The Rust side keeps its integration tests.
-  *Done 2026-10-16:* `app/ui/e2e/*.e2e.ts` (8 flows), fake backend `app/ui/src/e2e/fakeBackend.ts`, dev server on
+  *Done 2026-10-16:* `app/ui/e2e/*.e2e.ts` (23 flows: request editing, variables, auth, secrets, tabs, runner, archives, curl, response viewer, history, external file changes, branches, shortcuts, settings, folder settings and the first 8), fake backend `app/ui/src/e2e/fakeBackend.ts`, dev server on
   port 5183 so it doesn't clash with `tauri dev`. The fixture fails a test on unhandled commands, page errors and
   error toasts, so the fake can't drift silently. CI job "UI flows (Playwright)". The flows found one real bug: the
   find bar didn't take keyboard focus when opened.

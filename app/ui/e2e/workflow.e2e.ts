@@ -50,7 +50,8 @@ test("run a folder, then stop a collection run", async ({ app }) => {
   await app.getByTestId("request-tree").click({ button: "right", position: { x: 40, y: 300 } });
   await app.getByRole("menuitem", { name: "Run collection…" }).click();
   await app.getByRole("button", { name: "Run 3 requests" }).click();
-  await expect(app.getByRole("main").getByLabel("passed")).toHaveCount(1);
+  // Stop once the first result is in (one request every 400 ms in the fake).
+  await expect(app.getByRole("main").getByLabel("passed").first()).toBeVisible();
   await app.getByRole("button", { name: "Stop" }).click();
   await expect(app.getByText(/stopped/)).toBeVisible();
   await expect(app.getByRole("main").getByLabel("passed")).not.toHaveCount(3);

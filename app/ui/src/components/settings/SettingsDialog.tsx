@@ -1,6 +1,6 @@
 import { open as openFile } from "@tauri-apps/plugin-dialog";
 import { Check, FolderOpen, Loader2 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import {
   type Accent,
@@ -256,9 +256,13 @@ function Rows({ children }: { children: ReactNode }) {
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  // Named after its label, so screen readers (and the UI tests) can find "Theme" etc.
+  const id = useId();
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
+    <div className="flex flex-col gap-1.5" role="group" aria-labelledby={id}>
+      <span id={id} className="text-sm font-medium">
+        {label}
+      </span>
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {children}
     </div>

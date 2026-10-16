@@ -5,6 +5,17 @@ import { expect, type Page, test as base } from "@playwright/test";
  * and fails on unhandled commands or uncaught errors, so the fake can't silently drift from the
  * real command set.
  */
+/** Error toasts a test expects (see `expectErrorToast`), per page. */
+const expectedToasts = new WeakMap<Page, string[]>();
+
+/** Waits for an error toast containing `text`; it then doesn't fail the test. */
+export async function expectErrorToast(page: Page, text: string) {
+  expectedToasts.set(page, [...(expectedToasts.get(page) ?? []), text]);
+  await expect(
+    page.locator('[data-sonner-toast][data-type="error"]', { hasText: text }),
+  ).toBeVisible();
+}
+
 export const test = base.extend<{ app: Page }>({
   app: async ({ page }, use) => {
     const problems: string[] = [];
@@ -16,8 +27,11 @@ export const test = base.extend<{ app: Page }>({
     await page.goto("/");
     await use(page);
     // Error toasts (`showError`) mean a command failed or returned something the UI can't use.
-    for (const toast of await page.locator('[data-sonner-toast][data-type="error"]').all())
-      problems.push(`error toast: ${await toast.innerText()}`);
+    const allowed = expectedToasts.get(page) ?? [];
+    for (const toast of await page.locator('[data-sonner-toast][data-type="error"]').all()) {
+      const text = await toast.innerText();
+      if (!allowed.some((a) => text.includes(a))) problems.push(`error toast: ${text}`);
+    }
     expect(problems, "unhandled commands, page errors or error toasts").toEqual([]);
   },
 });
@@ -58,6 +72,9 @@ export async function useEnvironment(page: Page, name: string) {
   await picker.click();
   await page.getByRole("menuitem", { name }).first().click();
   await expect(picker).toContainText(name);
+  // The closed menu hands the focus back to its button a moment later; wait for that, or it
+  // could take the focus away from whatever the test types into next.
+  await expect(picker).toBeFocused();
 }
 
 /** Saves the active tab (Ctrl/Cmd+S) and waits until it no longer shows unsaved changes. */
@@ -73,4 +90,16 @@ export async function save(page: Page) {
 export const backend = (page: Page): Promise<any> =>
   page.evaluate(() =>
     (globalThis as unknown as { __fridaE2E: { state: () => unknown } }).__fridaE2E.state(),
+  );
+
+/** Changes a request in the fake backend as if edited outside Frida, and sends `fs-changed`. */
+export const changeOnDisk = (page: Page, path: string, patch: Record<string, unknown>) =>
+  page.evaluate(
+    ([p, change]) =>
+      (
+        globalThis as unknown as {
+          __fridaE2E: { changeOnDisk: (p: string, c: unknown) => Promise<void> };
+        }
+      ).__fridaE2E.changeOnDisk(p, change),
+    [path, patch] as const,
   );

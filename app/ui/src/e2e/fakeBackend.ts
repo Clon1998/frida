@@ -106,7 +106,16 @@ function initialState() {
       pinnedWorkspaces: [],
       activeGlobalEnvironments: {},
       awsProfiles: {},
-      preferences: {},
+      // Complete, like the real backend's defaults.
+      preferences: {
+        theme: "system",
+        accent: "neutral",
+        uiScale: 100,
+        editorFontSize: 13,
+        historySize: 500,
+        gitPath: null,
+        aws: { configFile: null, credentialsFile: null, cacheMinutes: 15 },
+      },
     } as AppSettings,
     workspaceOpen: false,
     collection,
@@ -130,6 +139,8 @@ function initialState() {
     cancelled: new Set<string>(),
     /** Files written by "Save response" (path → response id). */
     savedBodies: new Map<string, string>(),
+    /** The options of the last "save file" dialog (e.g. the suggested file name). */
+    lastSaveDialog: null as unknown,
   };
 }
 
@@ -660,7 +671,10 @@ const handlers: Record<string, (args: any) => unknown> = {
     };
   },
   "plugin:dialog|open": () => "/fake/picked",
-  "plugin:dialog|save": () => "/fake/saved.zip",
+  "plugin:dialog|save": ({ options }) => {
+    state.lastSaveDialog = options;
+    return "/fake/saved.zip";
+  },
 };
 
 /** Starts answering IPC calls. `window.__fridaE2E.reset()` puts the state back. */
@@ -682,6 +696,12 @@ export function installFakeBackend() {
   (window as unknown as { __fridaE2E: unknown }).__fridaE2E = {
     reset: () => {
       state = initialState();
+    },
+    /** Changes a request "outside Frida" (an editor, git pull) and sends `fs-changed`. */
+    changeOnDisk: async (path: string, patch: Partial<Request>) => {
+      const current = state.requests.get(path);
+      if (current) state.requests.set(path, { ...current, ...patch });
+      await emit("fs-changed", { paths: [`${COLLECTION}/${path}`] });
     },
     /** A plain copy for the tests (`Map`s don't survive `page.evaluate`). */
     state: () => ({
