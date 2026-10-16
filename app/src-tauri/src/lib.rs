@@ -100,6 +100,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             env::create_environment,
             env::save_environment,
             env::duplicate_environment,
+            env::reorder_environments,
             env::list_aws_profiles,
             env::get_aws_profile,
             env::set_aws_profile,

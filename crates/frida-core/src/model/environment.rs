@@ -4,12 +4,17 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::common::{FORMAT_VERSION, default_true, is_false, is_true};
+use super::common::{FORMAT_VERSION, default_true, is_false, is_true, is_zero};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct Environment {
     pub version: u32,
     pub name: String,
+    /// Position in the environment list, starting at 1 (set by drag-and-drop). `0` means "not
+    /// ordered yet": those come after the ordered ones, by name. Only written when set, so
+    /// existing files don't change.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub seq: u32,
     /// Optional highlight color (e.g. `red` for production), shown on the environment picker so
     /// it is obvious which environment requests go to. One of the UI's named colors; unknown
     /// names are ignored by the UI.
@@ -24,6 +29,7 @@ impl Environment {
         Self {
             version: FORMAT_VERSION,
             name: name.into(),
+            seq: 0,
             color: None,
             variables: Vec::new(),
         }

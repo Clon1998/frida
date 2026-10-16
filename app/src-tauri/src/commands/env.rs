@@ -86,7 +86,6 @@ pub async fn save_environment(
     Ok(())
 }
 
-/// Deletes an environment file and its secrets.
 /// Copies an environment, including its secret values (copied inside Rust, never via the UI).
 /// Returns the copy's name.
 #[tauri::command]
@@ -106,6 +105,20 @@ pub async fn duplicate_environment(
     .await
 }
 
+/// Saves a new order of the environment list (drag and drop). `names` holds every environment
+/// of the scope, in the new order.
+#[tauri::command]
+#[specta::specta]
+pub async fn reorder_environments(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    names: Vec<String>,
+) -> ApiResult<()> {
+    let (dir, _) = state.env_location(&scope)?;
+    Ok(storage::reorder_environments(&dir, &names)?)
+}
+
+/// Deletes an environment file and its secrets.
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_environment(

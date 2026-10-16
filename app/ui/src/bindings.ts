@@ -92,11 +92,15 @@ export const commands = {
 	 */
 	saveEnvironment: (scope: EnvScope, originalName: string, environment: Environment_Deserialize) => typedError<null, ApiError>(__TAURI_INVOKE("save_environment", { scope, originalName, environment })),
 	/**
-	 *  Deletes an environment file and its secrets.
 	 *  Copies an environment, including its secret values (copied inside Rust, never via the UI).
 	 *  Returns the copy's name.
 	 */
 	duplicateEnvironment: (scope: EnvScope, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("duplicate_environment", { scope, name })),
+	/**
+	 *  Saves a new order of the environment list (drag and drop). `names` holds every environment
+	 *  of the scope, in the new order.
+	 */
+	reorderEnvironments: (scope: EnvScope, names: string[]) => typedError<null, ApiError>(__TAURI_INVOKE("reorder_environments", { scope, names })),
 	/**  The AWS profiles in `~/.aws/config` and `~/.aws/credentials`. */
 	listAwsProfiles: () => typedError<AwsProfile[], ApiError>(__TAURI_INVOKE("list_aws_profiles")),
 	getAwsProfile: (scope: EnvScope, environment: string) => typedError<string | null, ApiError>(__TAURI_INVOKE("get_aws_profile", { scope, environment })),
@@ -107,6 +111,7 @@ export const commands = {
 	setAwsProfile: (scope: EnvScope, environment: string, profile: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_aws_profile", { scope, environment, profile })),
 	/**  "Refresh secrets": forgets the cached AWS values, so the next send fetches them again. */
 	refreshAwsSecrets: () => __TAURI_INVOKE<void>("refresh_aws_secrets"),
+	/**  Deletes an environment file and its secrets. */
 	deleteEnvironment: (scope: EnvScope, name: string) => typedError<null, ApiError>(__TAURI_INVOKE("delete_environment", { scope, name })),
 	/**  Stores a secret value in the keychain (never in YAML). */
 	setSecret: (scope: EnvScope, environment: string, variable: string, value: string) => typedError<null, ApiError>(__TAURI_INVOKE("set_secret", { scope, environment, variable, value })),
@@ -527,6 +532,12 @@ export type Environment_Deserialize = {
 	version: number,
 	name: string,
 	/**
+	 *  Position in the environment list, starting at 1 (set by drag-and-drop). `0` means "not
+	 *  ordered yet": those come after the ordered ones, by name. Only written when set, so
+	 *  existing files don't change.
+	 */
+	seq?: number,
+	/**
 	 *  Optional highlight color (e.g. `red` for production), shown on the environment picker so
 	 *  it is obvious which environment requests go to. One of the UI's named colors; unknown
 	 *  names are ignored by the UI.
@@ -538,6 +549,12 @@ export type Environment_Deserialize = {
 export type Environment_Serialize = {
 	version: number,
 	name: string,
+	/**
+	 *  Position in the environment list, starting at 1 (set by drag-and-drop). `0` means "not
+	 *  ordered yet": those come after the ordered ones, by name. Only written when set, so
+	 *  existing files don't change.
+	 */
+	seq?: number,
 	/**
 	 *  Optional highlight color (e.g. `red` for production), shown on the environment picker so
 	 *  it is obvious which environment requests go to. One of the UI's named colors; unknown

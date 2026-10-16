@@ -7,12 +7,6 @@ import { CellInput, GridCell, GridRow, GridTable } from "@/components/request/Gr
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
@@ -24,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AwsProfilePicker } from "./AwsProfilePicker";
+import { EnvironmentList } from "./EnvironmentList";
 import { useRowIds } from "@/components/request/useRowIds";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { showError, unwrap } from "@/lib/api";
@@ -39,7 +34,7 @@ import {
 } from "@/stores/envs";
 import { useSubTab } from "@/stores/subTabs";
 import { useActiveCollection } from "@/stores/workspace";
-import { ENV_COLORS, envColor } from "@/lib/envColors";
+import { ENV_COLORS } from "@/lib/envColors";
 import { cn } from "cn";
 
 type ScopeKind = "global" | "collection";
@@ -61,7 +56,6 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
   const setSelected = (name: string | null) => setSelectedIn(kind, name);
   const [creating, setCreating] = useState(false);
   const scope = scopeOf(kind, dir);
-  const drafts = useEnvs((s) => s.editorDrafts);
 
   // Keep a valid selection when the list or the scope changes.
   const current = entries.find((e) => e.environment.name === selected) ?? entries[0] ?? null;
@@ -110,41 +104,14 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
       ) : (
         <div className="flex min-h-0 flex-1">
           <aside className="flex w-52 shrink-0 flex-col gap-1 border-r p-2">
-            {entries.map((e) => (
-              <ContextMenu key={e.environment.name}>
-                <ContextMenuTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(e.environment.name)}
-                    className={cn(
-                      "truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent",
-                      current?.environment.name === e.environment.name && "bg-accent font-medium",
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "size-2 shrink-0 rounded-full",
-                          envColor(e.environment.color)?.dot ?? "border border-muted-foreground/60",
-                        )}
-                      />
-                      <span className="truncate">{e.environment.name}</span>
-                      {drafts[envDraftKey(scope, e.environment.name)] && (
-                        <span
-                          className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground"
-                          title="Unsaved changes"
-                        />
-                      )}
-                    </span>
-                  </button>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem onSelect={() => void duplicate(e.environment.name)}>
-                    <Copy /> Duplicate
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
+            <EnvironmentList
+              dir={dir}
+              scope={scope}
+              entries={entries}
+              selected={current?.environment.name ?? null}
+              onSelect={setSelected}
+              onDuplicate={(name) => void duplicate(name)}
+            />
             {entries.length === 0 && (
               <p className="px-2 py-1 text-xs text-muted-foreground">No environments yet.</p>
             )}

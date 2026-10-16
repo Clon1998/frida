@@ -12,7 +12,7 @@ pub use collection::{
 };
 pub use environments::{
     create_environment, delete_environment, duplicate_environment, find_environment,
-    list_environments, save_environment,
+    list_environments, reorder_environments, save_environment,
 };
 pub use paths::{COLLECTION_FILE, FOLDER_FILE, WORKSPACE_FILE, slugify};
 pub use workspace::{

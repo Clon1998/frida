@@ -22,6 +22,10 @@ pub(crate) fn is_false(value: &bool) -> bool {
     !*value
 }
 
+pub(crate) fn is_zero(value: &u32) -> bool {
+    *value == 0
+}
+
 /// A `name: value` row that can be switched off, used for headers, query params, vars and form fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct KeyValue {

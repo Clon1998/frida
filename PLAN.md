@@ -208,6 +208,7 @@ docs: |
 ```yaml
 version: 1
 name: dev
+seq: 2                         # optional: position in the environment list (drag to reorder)
 color: green                   # optional: highlight color in the UI (e.g. red for prod)
 variables:
   - name: baseUrl
@@ -750,6 +751,12 @@ Deviations from and clarifications of this plan, newest last.
   AWS. Bruno imports keep disabled environment variables (disabled) instead of dropping them. All key/value tables
   (params, headers, form and multipart fields, variables at every level, environment variables/secrets) can be
   reordered by dragging (or with the keyboard); editing the URL keeps disabled query params at their position.
+
+- **2026-10-16 Environment order (on-disk change, approved by Patrick).** Environments can be reordered by dragging
+  them in the environment editor. The position is an optional `seq` in each environment file (like requests), only
+  written once the list has been ordered, so existing files don't change. Unordered environments (`seq` 0 or missing)
+  come after ordered ones, by name. Once a scope is ordered, new and duplicated environments go last. Saving an
+  environment keeps the `seq` that is on disk; only `reorder_environments` changes it.
 
 ## 17. Testing strategy
 

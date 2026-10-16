@@ -22,8 +22,25 @@ pub fn list_environments(dir: &Path) -> Result<Vec<Environment>> {
             }
         })
         .collect();
-    environments.sort_by_key(|env| env.name.to_lowercase());
+    // Ordered ones first (by `seq`), then the rest by name. `seq == 0` sorts as `true`, after
+    // `false`; tuples compare field by field, like a chained Java `Comparator`.
+    environments.sort_by_key(|env| (env.seq == 0, env.seq, env.name.to_lowercase()));
     Ok(environments)
+}
+
+/// Saves the order of the environment list: `ordered` holds every environment name, in the
+/// new order. Only files whose position changed are written.
+pub fn reorder_environments(dir: &Path, ordered: &[String]) -> Result<()> {
+    for (i, name) in ordered.iter().enumerate() {
+        let seq = (i + 1) as u32;
+        let file = file_of(dir, name)?;
+        let mut env: Environment = read_yaml(&file)?;
+        if env.seq != seq {
+            env.seq = seq;
+            write_yaml(&file, &env.without_secret_values())?;
+        }
+    }
+    Ok(())
 }
 
 /// The environment called `name`, or `None` if there is none.
@@ -46,7 +63,16 @@ pub fn create_environment(dir: &Path, name: &str) -> Result<Environment> {
             "an environment called {name:?} already exists"
         )));
     }
-    let env = Environment::new(name);
+    // Once the list has been ordered by hand, new environments go to the end of it.
+    let last_seq = list_environments(dir)?
+        .iter()
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(0);
+    let env = Environment {
+        seq: if last_seq > 0 { last_seq + 1 } else { 0 },
+        ..Environment::new(name)
+    };
     let envs_dir = dir.join(ENVIRONMENTS_DIR);
     let file = envs_dir.join(unique_name(&envs_dir, name, EntryKind::Request, None));
     write_yaml(&file, &env.without_secret_values())?;
@@ -99,7 +125,14 @@ pub fn save_environment(dir: &Path, original_name: &str, env: &Environment) -> R
         EntryKind::Request,
         Some(&old_file),
     ));
-    write_yaml(&new_file, &env.without_secret_values())?;
+    // The list position is only changed by `reorder_environments`: the editor's copy may be
+    // older (or not carry `seq` at all), so keep what the file says.
+    let seq = read_yaml::<Environment>(&old_file)?.seq;
+    let env = Environment {
+        seq,
+        ..env.without_secret_values()
+    };
+    write_yaml(&new_file, &env)?;
     if new_file != old_file {
         std::fs::remove_file(&old_file).map_err(|e| CoreError::io(&old_file, e))?;
     }
@@ -152,6 +185,49 @@ mod tests {
             source: None,
             enabled: true,
         }
+    }
+
+    fn names(root: &Path) -> Vec<String> {
+        list_environments(root)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.name)
+            .collect()
+    }
+
+    #[test]
+    fn reorder_is_kept_and_new_environments_go_last() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for name in ["dev", "prod", "staging"] {
+            create_environment(root, name).unwrap();
+        }
+        // Not ordered yet: by name, and files without `seq` stay unchanged.
+        assert_eq!(names(root), ["dev", "prod", "staging"]);
+        let dev = std::fs::read_to_string(root.join("environments/dev.yaml")).unwrap();
+        assert!(!dev.contains("seq"));
+
+        let order = ["prod", "dev", "staging"].map(String::from);
+        reorder_environments(root, &order).unwrap();
+        assert_eq!(names(root), order);
+
+        create_environment(root, "alpha").unwrap();
+        assert_eq!(names(root), ["prod", "dev", "staging", "alpha"]);
+
+        // A copy is new too: it goes last.
+        duplicate_environment(root, "prod").unwrap();
+        assert_eq!(
+            names(root),
+            ["prod", "dev", "staging", "alpha", "prod copy"]
+        );
+
+        // Saving from the editor (which doesn't send `seq`) keeps the position.
+        let mut dev = find_environment(root, "dev").unwrap().unwrap();
+        dev.seq = 0;
+        save_environment(root, "dev", &dev).unwrap();
+        assert_eq!(find_environment(root, "dev").unwrap().unwrap().seq, 2);
+
+        assert!(reorder_environments(root, &["nope".to_string()]).is_err());
     }
 
     #[test]
