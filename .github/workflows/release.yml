@@ -1,0 +1,102 @@
+name: Release
+
+# Pushing a tag like `v0.2.0` builds the installers for every platform and attaches them to a
+# draft GitHub Release. Review the draft (notes are generated from the commits), then publish it.
+# The tag must match the version in app/src-tauri/tauri.conf.json and Cargo.toml.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create:
+    name: Create draft release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check that the tag matches the app version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          app=$(jq -r .version app/src-tauri/tauri.conf.json)
+          crates=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$tag" != "$app" ] || [ "$tag" != "$crates" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match tauri.conf.json ($app) / Cargo.toml ($crates)"
+            exit 1
+          fi
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes \
+            --title "Frida $GITHUB_REF_NAME"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: create
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: linux-x64
+            # Oldest supported Ubuntu, so the AppImage/.deb run on as many distros as possible.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Tauri system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install UI dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app bundles
+        working-directory: app
+        run: pnpm tauri build --target ${{ matrix.target }}
+
+      - name: Attach the installers to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "target/${{ matrix.target }}/release/bundle"
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(find . -type f \
+            \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' -o -name '*.AppImage' \
+               -o -name '*.deb' -o -name '*.rpm' \))
+          echo "Uploading: ${files[*]}"
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"

@@ -92,6 +92,24 @@ The builds aren't code-signed yet (planned for later), so the OS warns about the
   `xattr -dr com.apple.quarantine /Applications/Frida.app`. Apps you build locally aren't affected.
 - **Windows:** SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
 
+### Releases
+
+Pushing a version tag builds the installers for all platforms and attaches them to a **draft**
+GitHub Release (`.github/workflows/release.yml`):
+
+1. Set the same version in `app/src-tauri/tauri.conf.json` and in `[workspace.package]` of
+   `Cargo.toml`, and commit.
+2. `git tag v0.2.0 && git push origin v0.2.0`
+3. When the workflow is done, review the draft release on GitHub (its notes are generated from
+   the commits) and publish it.
+
+The installers are not code-signed yet, so the first start needs one extra step:
+
+- **macOS**: right-click Frida in Applications → *Open* → *Open*, or run
+  `xattr -dr com.apple.quarantine /Applications/Frida.app`.
+- **Windows**: SmartScreen shows "Windows protected your PC": *More info* → *Run anyway*.
+- **Linux**: make the AppImage executable (`chmod +x Frida_*.AppImage`), or install the `.deb`.
+
 ## Where Frida keeps its local data
 
 Settings, open tabs and logs are stored per machine (never in your repo):
