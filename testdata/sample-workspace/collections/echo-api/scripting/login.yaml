@@ -9,12 +9,12 @@ body:
     {"user": "ann", "sessionToken": "{{$uuid}}"}
 scripts:
   pre: |
-    console.log("logging in to", bru.interpolate("{{baseUrl}}"));
+    console.log("logging in to", fri.interpolate("{{baseUrl}}"));
   post: |
     // The echo server returns what was sent; pretend it is a token response.
     const sent = JSON.parse(res.body.body);
-    bru.setVar("sessionToken", sent.sessionToken);
-    console.log("stored sessionToken", bru.getVar("sessionToken"));
+    fri.setVar("sessionToken", sent.sessionToken);
+    console.log("stored sessionToken", fri.getVar("sessionToken"));
 tests: |
   test("status 200", () => expect(res).to.have.status(200));
   test("echoes the user", () => expect(JSON.parse(res.body.body).user).to.equal("ann"));

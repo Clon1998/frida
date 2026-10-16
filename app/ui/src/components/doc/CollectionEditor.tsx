@@ -78,7 +78,7 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
             variant="outline"
             size="sm"
             className="mt-4"
-            title="Variables (bru.setVar) and in-memory environment changes (bru.setEnvVar) that scripts made during this session"
+            title="Variables (fri.setVar) and in-memory environment changes (fri.setEnvVar) that scripts made during this session"
             onClick={() =>
               void unwrap(commands.clearRuntimeVars(dir)).then(
                 () => toast.success("Script variables cleared"),

@@ -56,7 +56,7 @@ async fn every_sample_request_succeeds_against_the_test_server() {
         .unwrap()
         .unwrap();
 
-    // One session for all, like the app: the login's `bru.setVar` reaches the next request.
+    // One session for all, like the app: the login's `fri.setVar` reaches the next request.
     let session = http::SessionStore::default();
     for path in paths.iter().filter(|p| !p.contains("slow")) {
         let mut request = storage::read_request(&collection, path).unwrap();

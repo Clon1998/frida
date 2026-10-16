@@ -10,6 +10,7 @@
   `baseUrl` in a `default` environment, security schemes as collection or request auth with credential variables.
 - **Import summary**: counts, base URL, secrets to fill in and warnings (external refs, unsupported auth, relative
   server URL, ...), shown before and after importing.
+- **Scripting**: the scripting object is now `fri` (Frida's own name); `bru` stays as an alias for Bruno scripts.
 - **UI**: "Import OpenAPI…" in the collection menu and the empty sidebar; a dialog that previews, lets you pick the
   target folder and shows the result.
 

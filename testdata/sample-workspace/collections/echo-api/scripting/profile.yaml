@@ -10,11 +10,11 @@ headers:
 scripts:
   pre: |
     // A request from a script, awaited.
-    const ping = await bru.sendRequest({ url: bru.interpolate("{{baseUrl}}/ping?from=script") });
+    const ping = await fri.sendRequest({ url: fri.interpolate("{{baseUrl}}/ping?from=script") });
     console.log("ping answered with", ping.status);
   post: ""
 tests: |
   test("sends the token from login", () => {
-    expect(res.body.headers.authorization).to.equal("Bearer " + bru.getVar("sessionToken"));
+    expect(res.body.headers.authorization).to.equal("Bearer " + fri.getVar("sessionToken"));
   });
   test("a failing test looks like this", () => expect(res.status).to.equal(201));

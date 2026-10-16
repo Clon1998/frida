@@ -20,7 +20,7 @@ pub use scope::{ScopeInput, VarDef, VarLayer, VarScope};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum VarSource {
-    /// Set by a script with `bru.setVar` (M5). Cleared on restart.
+    /// Set by a script with `fri.setVar` (M5). Cleared on restart.
     Runtime,
     Request,
     /// `path` is the folder's collection-relative path.

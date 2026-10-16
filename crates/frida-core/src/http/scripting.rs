@@ -30,11 +30,11 @@ use crate::model::{
 use crate::storage;
 use crate::vars::{Resolver, ScopeInput, UsageLocation, VarScope, iso_timestamp};
 
-/// Runtime variables (`bru.setVar`) of one collection, kept for the app session.
+/// Runtime variables (`fri.setVar`) of one collection, kept for the app session.
 /// Values are JSON because scripts may store objects, like in Bruno.
 pub type RuntimeVars = Map<String, Value>;
 
-/// Session-only changes to environments made by `bru.setEnvVar` (without `persist`), by
+/// Session-only changes to environments made by `fri.setEnvVar` (without `persist`), by
 /// environment name. `None` means the script deleted the variable.
 #[derive(Debug, Default)]
 pub struct EnvOverrides(Mutex<HashMap<String, BTreeMap<String, Option<String>>>>);
@@ -250,7 +250,7 @@ impl Pipeline<'_> {
         (state, tests, errors)
     }
 
-    /// `bru.setEnvVar`/`setGlobalEnvVar`: a session override, plus the file with `persist`.
+    /// `fri.setEnvVar`/`setGlobalEnvVar`: a session override, plus the file with `persist`.
     fn apply_env_write(&mut self, write: &EnvWrite, masker: &Masker) {
         let (env, overrides, dir) = if write.global {
             (
@@ -418,7 +418,7 @@ impl Pipeline<'_> {
 
 #[derive(Debug, Default)]
 pub(crate) struct PreOutcome {
-    /// `bru.runner.skipRequest()` was called.
+    /// `fri.runner.skipRequest()` was called.
     pub skip: bool,
 }
 
@@ -636,8 +636,8 @@ fn now_iso() -> String {
     iso_timestamp(millis)
 }
 
-/// The app side of the sandbox: real HTTP for `bru.sendRequest` and the variable resolver
-/// for `bru.interpolate`. Holds owned copies (`'static`), because it is shared with the
+/// The app side of the sandbox: real HTTP for `fri.sendRequest` and the variable resolver
+/// for `fri.interpolate`. Holds owned copies (`'static`), because it is shared with the
 /// script's thread.
 struct CoreHost {
     collection: Collection,
@@ -748,7 +748,12 @@ mod tests {
         r.body.mode = BodyMode::FormUrlencoded;
         set_body(&mut r, &serde_json::json!({ "x": "1", "n": 2 }));
         assert_eq!(r.body.form_url_encoded.len(), 2);
-        let n = r.body.form_url_encoded.iter().find(|f| f.name == "n").unwrap();
+        let n = r
+            .body
+            .form_url_encoded
+            .iter()
+            .find(|f| f.name == "n")
+            .unwrap();
         assert_eq!(n.value, "2");
 
         r.body.mode = BodyMode::None;

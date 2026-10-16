@@ -1,6 +1,6 @@
 //! M5 acceptance: scripts in the send pipeline, against the echo server.
-//! `testdata/scripting` chains a login (post-response `bru.setVar("token")`) into an
-//! authenticated request whose folder script uses `bru.sendRequest`.
+//! `testdata/scripting` chains a login (post-response `fri.setVar("token")`) into an
+//! authenticated request whose folder script uses `fri.sendRequest`.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -118,7 +118,7 @@ async fn pre_request_scripts_can_rewrite_the_request() {
         const body = req.getBody();
         body.extra = true;
         req.setBody(body);
-        bru.setEnvVar("user", "bob");
+        fri.setEnvVar("user", "bob");
     "#
     .into();
     request.scripts.post = String::new();

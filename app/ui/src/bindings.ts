@@ -81,8 +81,8 @@ export const commands = {
 	/**  Unlocks (or, the first time, creates) the encrypted secret file. */
 	unlockSecretFile: (password: string) => typedError<null, ApiError>(__TAURI_INVOKE("unlock_secret_file", { password })),
 	/**
-	 *  Clears what scripts set in this session: the collection's runtime variables (`bru.setVar`)
-	 *  and the in-memory environment changes (`bru.setEnvVar`, `bru.setGlobalEnvVar`).
+	 *  Clears what scripts set in this session: the collection's runtime variables (`fri.setVar`)
+	 *  and the in-memory environment changes (`fri.setEnvVar`, `fri.setGlobalEnvVar`).
 	 */
 	clearRuntimeVars: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("clear_runtime_vars", { dir })),
 	listCookies: (dir: string) => typedError<CookieView[], ApiError>(__TAURI_INVOKE("list_cookies", { dir })),
@@ -754,7 +754,7 @@ export type UsageLocation = { kind: "url" } | { kind: "pathParam"; name: string 
  *  separate namespaces `process.env.*` and `$dynamic`.
  */
 export type VarSource = 
-/**  Set by a script with `bru.setVar` (M5). Cleared on restart. */
+/**  Set by a script with `fri.setVar` (M5). Cleared on restart. */
 { kind: "runtime" } | { kind: "request" } | 
 /**  `path` is the folder's collection-relative path. */
 { kind: "folder"; path: string; name: string } | { kind: "collectionEnv"; name: string } | { kind: "collection" } | { kind: "globalEnv"; name: string } | 

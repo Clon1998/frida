@@ -38,9 +38,9 @@ export function ScriptsSection({
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <SectionNote>
-        JavaScript with Bruno&apos;s <code>req</code>, <code>res</code> and <code>bru</code> API.
-        Collection scripts run first, then folders, then the request. <code>console.log</code>{" "}
-        output goes to the console (Ctrl/Cmd+J).
+        JavaScript with the <code>req</code>, <code>res</code> and <code>fri</code> API
+        (Bruno&apos;s <code>bru</code> works too). Collection scripts run first, then folders, then
+        the request. <code>console.log</code> output goes to the console (Ctrl/Cmd+J).
       </SectionNote>
       <span className="text-xs font-medium text-muted-foreground">Pre-request</span>
       <CodeEditor

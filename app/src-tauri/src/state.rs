@@ -31,10 +31,10 @@ pub struct AppState {
     pub responses: Mutex<ResponseCache>,
     pub watcher: Mutex<Option<FsWatcher>>,
     pub secrets: SecretBackend,
-    /// What scripts changed (`bru.setVar`, `bru.setEnvVar`), per collection folder. In memory
+    /// What scripts changed (`fri.setVar`, `fri.setEnvVar`), per collection folder. In memory
     /// only. `Arc` so a send can keep using it without holding the map's lock.
     pub sessions: Mutex<HashMap<PathBuf, Arc<SessionStore>>>,
-    /// `bru.setGlobalEnvVar` changes, shared by all collections like the global environment.
+    /// `fri.setGlobalEnvVar` changes, shared by all collections like the global environment.
     pub global_overrides: EnvOverrides,
     /// One cookie jar per collection folder, in memory only.
     pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,

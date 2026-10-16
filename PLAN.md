@@ -692,6 +692,10 @@ Deviations from and clarifications of this plan, newest last.
   rendered from the example; non-JSON `+json` types get an explicit `Content-Type` header. The import dialog previews
   the summary before writing, and the target folder defaults to `<workspace>/collections/<title>`.
 
+- **2026-10-16 `fri` scripting object (requested by Patrick).** The scripting object is `fri` (Frida's own name);
+  `bru` is the same object under Bruno's name, so Bruno scripts and imported Bruno collections run unchanged. Docs,
+  samples and error messages use `fri`. §10's `bru.*` list applies to `fri.*`.
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.

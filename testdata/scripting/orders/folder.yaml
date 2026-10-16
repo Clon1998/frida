@@ -7,6 +7,6 @@ headers:
   enabled: true
 scripts:
   pre: |
-    // bru.sendRequest from a script, awaited.
-    const ping = await bru.sendRequest({ url: bru.interpolate("{{baseUrl}}/ping?from=script") });
-    bru.setVar("pinged", ping.data.query);
+    // fri.sendRequest from a script, awaited.
+    const ping = await fri.sendRequest({ url: fri.interpolate("{{baseUrl}}/ping?from=script") });
+    fri.setVar("pinged", ping.data.query);

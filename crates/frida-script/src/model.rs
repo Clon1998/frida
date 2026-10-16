@@ -74,7 +74,7 @@ pub struct ScriptResponse {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptVars {
-    /// `bru.getVar/setVar`. Any JSON value (Bruno allows objects).
+    /// `fri.getVar/setVar`. Any JSON value (Bruno allows objects).
     pub runtime: Map<String, Value>,
     pub env_name: Option<String>,
     /// The active collection environment, after earlier `setEnvVar` calls.
@@ -87,7 +87,7 @@ pub struct ScriptVars {
     pub request: BTreeMap<String, String>,
 }
 
-/// An environment change from `bru.setEnvVar`, `setGlobalEnvVar` or their delete versions.
+/// An environment change from `fri.setEnvVar`, `setGlobalEnvVar` or their delete versions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvWrite {
@@ -145,15 +145,15 @@ pub struct ScriptState {
     pub logs: Vec<LogLine>,
     #[serde(default)]
     pub tests: Vec<TestResult>,
-    /// `bru.setNextRequest(name)`, for the collection runner (later).
+    /// `fri.setNextRequest(name)`, for the collection runner (later).
     #[serde(default)]
     pub next_request: Option<String>,
-    /// `bru.runner.skipRequest()` in a pre-request script: don't send.
+    /// `fri.runner.skipRequest()` in a pre-request script: don't send.
     #[serde(default)]
     pub skip_request: bool,
 }
 
-/// A request made by `bru.sendRequest` (axios-style options, like Bruno).
+/// A request made by `fri.sendRequest` (axios-style options, like Bruno).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpCall {

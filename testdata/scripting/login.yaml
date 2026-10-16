@@ -9,10 +9,10 @@ body:
     {"user": "{{user}}", "token": "t-123"}
 scripts:
   pre: |
-    console.log("logging in as", bru.getEnvVar("user"));
+    console.log("logging in as", fri.getEnvVar("user"));
   post: |
     // The echo server returns the sent body as a string.
     const sent = JSON.parse(res.body.body);
-    bru.setVar("token", sent.token);
+    fri.setVar("token", sent.token);
 tests: |
   test("login ok", () => expect(res).to.have.status(200));

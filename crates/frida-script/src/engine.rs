@@ -26,7 +26,7 @@ const SCRIPT_FILE: &str = "script";
 ///
 /// QuickJS runtimes are not thread-safe (`!Send`), but Tauri commands and tokio tasks may move
 /// between threads at every `.await`. So the script gets a thread of its own
-/// (`spawn_blocking`) and drives its async work (`await bru.sendRequest(...)`) there with
+/// (`spawn_blocking`) and drives its async work (`await fri.sendRequest(...)`) there with
 /// `Handle::block_on`, which still uses the app's tokio runtime for timers and network I/O.
 pub async fn run_script(
     script: Script,

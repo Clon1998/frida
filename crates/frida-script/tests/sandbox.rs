@@ -9,7 +9,7 @@ use frida_script::{
 };
 use serde_json::json;
 
-/// Answers every `bru.sendRequest` with a JSON echo of the call.
+/// Answers every `fri.sendRequest` with a JSON echo of the call.
 struct FakeHost;
 
 impl ScriptHost for FakeHost {
@@ -115,10 +115,10 @@ async fn pre_request_scripts_change_the_request_and_variables() {
         const body = req.getBody();
         body.user = "bob";
         req.setBody(body);
-        bru.setVar("started", Date.now() > 0);
-        bru.setVar("user", { id: 1 });
-        bru.setEnvVar("host", "other.local", { persist: true });
-        console.log("host was", bru.getEnvVar("host"), { a: 1 });
+        fri.setVar("started", Date.now() > 0);
+        fri.setVar("user", { id: 1 });
+        fri.setEnvVar("host", "other.local", { persist: true });
+        console.log("host was", fri.getEnvVar("host"), { a: 1 });
         "#,
         state(ScriptPhase::Pre),
     )
@@ -146,7 +146,7 @@ async fn tests_record_passes_and_failures() {
         test("status helper", () => expect(res).to.have.status(201));
         test("negation", () => expect([1, 2]).to.not.include(3));
         test("async", async () => {
-          await bru.sleep(5);
+          await fri.sleep(5);
           expect({ a: [1] }).to.deep.equal({ a: [1] });
         });
         test("throws", () => { throw new Error("boom"); });
@@ -219,7 +219,7 @@ async fn awaiting_too_long_is_stopped_too() {
         timeout: Duration::from_millis(200),
         ..ScriptLimits::default()
     };
-    let (_, error) = run_with("await bru.sleep(10000);", state(ScriptPhase::Pre), limits).await;
+    let (_, error) = run_with("await fri.sleep(10000);", state(ScriptPhase::Pre), limits).await;
     assert!(error.expect("stopped").message.contains("time limit"));
 }
 
@@ -242,13 +242,13 @@ async fn memory_is_limited() {
 async fn send_request_works_with_await_and_callbacks() {
     let (out, error) = run(
         r#"
-        const r = await bru.sendRequest({ method: "post", url: "http://api/token", data: { a: 1 } });
-        bru.setVar("method", r.data.method);
-        bru.setVar("body", r.data.body);
-        await bru.sendRequest({ url: "http://api/404" }, (err, res) => {
-          bru.setVar("callbackStatus", err.response.status);
+        const r = await fri.sendRequest({ method: "post", url: "http://api/token", data: { a: 1 } });
+        fri.setVar("method", r.data.method);
+        fri.setVar("body", r.data.body);
+        await fri.sendRequest({ url: "http://api/404" }, (err, res) => {
+          fri.setVar("callbackStatus", err.response.status);
         });
-        try { await bru.sendRequest("http://fail"); } catch (e) { bru.setVar("failed", e.message); }
+        try { await fri.sendRequest("http://fail"); } catch (e) { fri.setVar("failed", e.message); }
         "#,
         state(ScriptPhase::Pre),
     )
@@ -259,7 +259,7 @@ async fn send_request_works_with_await_and_callbacks() {
     assert_eq!(out.vars.runtime["callbackStatus"], json!(404));
     assert_eq!(
         out.vars.runtime["failed"],
-        json!("bru.sendRequest: connection refused")
+        json!("fri.sendRequest: connection refused")
     );
 }
 
@@ -267,17 +267,17 @@ async fn send_request_works_with_await_and_callbacks() {
 async fn helpers_and_sandbox_boundaries() {
     let (out, error) = run(
         r#"
-        bru.setVar("b64", btoa("hello"));
-        bru.setVar("sha", crypto.sha256("abc"));
-        bru.setVar("uuid", crypto.randomUUID().length);
-        bru.setVar("year", dayjs("2026-10-16").year());
-        bru.setVar("qs", new URLSearchParams({ a: "1 2", b: "x" }).toString());
-        bru.setVar("bytes", new TextEncoder().encode("é").length);
-        bru.setVar("name", "ann");
-        bru.setVar("interp", bru.interpolate("hi {{name}}"));
-        bru.setVar("native", typeof __native);
-        try { require("fs"); } catch (e) { bru.setVar("require", e.message); }
-        try { bru.cwd(); } catch (e) { bru.setVar("cwd", e.message); }
+        fri.setVar("b64", btoa("hello"));
+        fri.setVar("sha", crypto.sha256("abc"));
+        fri.setVar("uuid", crypto.randomUUID().length);
+        fri.setVar("year", dayjs("2026-10-16").year());
+        fri.setVar("qs", new URLSearchParams({ a: "1 2", b: "x" }).toString());
+        fri.setVar("bytes", new TextEncoder().encode("é").length);
+        fri.setVar("name", "ann");
+        fri.setVar("interp", fri.interpolate("hi {{name}}"));
+        fri.setVar("native", typeof __native);
+        try { require("fs"); } catch (e) { fri.setVar("require", e.message); }
+        try { fri.cwd(); } catch (e) { fri.setVar("cwd", e.message); }
         "#,
         state(ScriptPhase::Pre),
     )
@@ -297,4 +297,20 @@ async fn helpers_and_sandbox_boundaries() {
     assert_eq!(v["native"], json!("undefined"));
     assert!(v["require"].as_str().unwrap().contains("not available"));
     assert!(v["cwd"].as_str().unwrap().contains("not supported"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bru_is_an_alias_for_fri() {
+    let (out, error) = run(
+        r#"
+        bru.setVar("a", 1);
+        fri.setVar("b", bru.getVar("a") + 1);
+        bru.setVar("same", bru === fri);
+        "#,
+        state(ScriptPhase::Pre),
+    )
+    .await;
+    assert_eq!(error, None);
+    assert_eq!(out.vars.runtime["b"], json!(2));
+    assert_eq!(out.vars.runtime["same"], json!(true));
 }

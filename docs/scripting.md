@@ -1,8 +1,12 @@
 # Scripting & tests
 
-Frida runs JavaScript before and after a request, compatible with a large part of
-[Bruno's scripting API](https://docs.usebruno.com/testing/script/javascript-reference)
-(`req`, `res`, `bru`, `test`, `expect`). This page lists exactly what is supported.
+Frida runs JavaScript before and after a request. Scripts use `req` (the request), `res` (the
+response), `fri` (variables, environments and utilities), `test` and `expect`. This page lists
+exactly what is supported.
+
+**Coming from Bruno?** `bru` is an alias for `fri`, so scripts written for
+[Bruno](https://docs.usebruno.com/testing/script/javascript-reference) run unchanged as far as
+the functions below are supported (`bru.setVar(...)` and `fri.setVar(...)` are the same call).
 
 ## Where scripts live and when they run
 
@@ -19,7 +23,7 @@ On every send:
 4. **Tests**: collection, folders, request.
 
 Every script runs in a **fresh sandbox**, so plain JS variables don't carry over from one script
-to the next. Use `bru.setVar` for that.
+to the next. Use `fri.setVar` for that.
 
 - A pre-request script that throws stops the send. The error names the script and line, e.g.
   `folder "Orders", pre-request script (line 3): token is not defined`.
@@ -32,10 +36,10 @@ to the next. Use `bru.setVar` for that.
 
 Scripts run in QuickJS (ES2023, `async`/`await` and top-level `await` included):
 
-- **10 seconds** per script, including time spent awaiting `bru.sendRequest` or `bru.sleep`.
+- **10 seconds** per script, including time spent awaiting `fri.sendRequest` or `fri.sleep`.
   Endless loops are stopped.
 - **128 MB** of memory per script.
-- **No file system, network, `require` or Node APIs.** The only way out is `bru.sendRequest`.
+- **No file system, network, `require` or Node APIs.** The only way out is `fri.sendRequest`.
 
 ## `req`
 
@@ -64,45 +68,45 @@ In post-response scripts and tests, `req` is the request **as sent** (variables 
 | `res.setBody(body)` | Changes the body for later scripts only. |
 | `res("data.items[0].id")` | Reads a path from the body. |
 
-## `bru`
+## `fri`
 
 **Runtime variables** live in memory for the app session (per collection). They are the
 highest-priority variable layer, so `{{name}}` resolves to them. Values may be objects.
 The variables inspector shows them; **Collection settings → Vars → Clear runtime variables**
 clears them (and the in-memory environment changes below).
 
-`bru.getVar(name)`, `bru.setVar(name, value)`, `bru.hasVar(name)`, `bru.deleteVar(name)`,
-`bru.getAllVars()`, `bru.deleteAllVars()`
+`fri.getVar(name)`, `fri.setVar(name, value)`, `fri.hasVar(name)`, `fri.deleteVar(name)`,
+`fri.getAllVars()`, `fri.deleteAllVars()`
 
-**Environments.** `bru.setEnvVar(name, value)` changes the active collection environment **for
+**Environments.** `fri.setEnvVar(name, value)` changes the active collection environment **for
 this session only** (the file is untouched). Pass `{ persist: true }` to also write it to the
 environment file. Secret variables are never written to files.
 
-`bru.getEnvName()`, `bru.getEnvVar(name)`, `bru.hasEnvVar(name)`, `bru.setEnvVar(name, value, { persist? })`,
-`bru.deleteEnvVar(name)` (also from the file), `bru.getAllEnvVars()`
+`fri.getEnvName()`, `fri.getEnvVar(name)`, `fri.hasEnvVar(name)`, `fri.setEnvVar(name, value, { persist? })`,
+`fri.deleteEnvVar(name)` (also from the file), `fri.getAllEnvVars()`
 
-The same for the global environment: `bru.getGlobalEnvName()`, `bru.getGlobalEnvVar`,
-`bru.hasGlobalEnvVar`, `bru.setGlobalEnvVar(name, value, { persist? })`, `bru.deleteGlobalEnvVar`,
-`bru.getAllGlobalEnvVars()`
+The same for the global environment: `fri.getGlobalEnvName()`, `fri.getGlobalEnvVar`,
+`fri.hasGlobalEnvVar`, `fri.setGlobalEnvVar(name, value, { persist? })`, `fri.deleteGlobalEnvVar`,
+`fri.getAllGlobalEnvVars()`
 
-> Difference to Bruno: Bruno writes `setEnvVar` to disk right away. Frida keeps it in memory
+> Difference to Bruno: Bruno writes `bru.setEnvVar` to disk right away. Frida keeps it in memory
 > unless you ask for `{ persist: true }`, so scripts don't create git changes by accident.
 
-**Other variables (read-only):** `bru.getCollectionName()`, `bru.getCollectionVar(name)`,
-`bru.hasCollectionVar(name)`, `bru.getFolderVar(name)` (nearest folder wins),
-`bru.getRequestVar(name)`, `bru.getProcessEnv(name)` (the OS environment).
+**Other variables (read-only):** `fri.getCollectionName()`, `fri.getCollectionVar(name)`,
+`fri.hasCollectionVar(name)`, `fri.getFolderVar(name)` (nearest folder wins),
+`fri.getRequestVar(name)`, `fri.getProcessEnv(name)` (the OS environment).
 
 **Utilities**
 
 | | Notes |
 |---|---|
-| `await bru.sendRequest(options)` or `bru.sendRequest(options, (err, res) => ...)` | axios-style options: `method`, `url`, `headers`, `data` (objects are sent as JSON, `URLSearchParams` as a form), `timeout`. The response has `status`, `statusText`, `headers`, `data` (parsed JSON when possible) and `duration`. Like axios, statuses outside 2xx reject, with `error.response`. Uses the collection's TLS settings and cookie jar. |
-| `await bru.sleep(ms)` | |
-| `bru.interpolate(text)` | Resolves `{{variables}}` (and `{{$dynamic}}` ones) with the current values. Objects are interpolated as JSON. |
-| `bru.setNextRequest(name)`, `bru.runner.setNextRequest(name)`, `bru.runner.stopExecution()` | Recorded for the collection runner (later); no effect on a single send. |
-| `bru.runner.skipRequest()` | In a pre-request script: the request is not sent. |
-| `bru.getTestResults()` | The tests so far in this script. |
-| `bru.isSafeMode()` | Always `true`: Frida scripts are always sandboxed. |
+| `await fri.sendRequest(options)` or `fri.sendRequest(options, (err, res) => ...)` | axios-style options: `method`, `url`, `headers`, `data` (objects are sent as JSON, `URLSearchParams` as a form), `timeout`. The response has `status`, `statusText`, `headers`, `data` (parsed JSON when possible) and `duration`. Like axios, statuses outside 2xx reject, with `error.response`. Uses the collection's TLS settings and cookie jar. |
+| `await fri.sleep(ms)` | |
+| `fri.interpolate(text)` | Resolves `{{variables}}` (and `{{$dynamic}}` ones) with the current values. Objects are interpolated as JSON. |
+| `fri.setNextRequest(name)`, `fri.runner.setNextRequest(name)`, `fri.runner.stopExecution()` | Recorded for the collection runner (later); no effect on a single send. |
+| `fri.runner.skipRequest()` | In a pre-request script: the request is not sent. |
+| `fri.getTestResults()` | The tests so far in this script. |
+| `fri.isSafeMode()` | Always `true`: Frida scripts are always sandboxed. |
 
 ## Tests
 
@@ -150,9 +154,9 @@ test("returns the order", async () => {
 Calling these throws an error that says so:
 
 - `require(...)` and npm packages (`axios`, `lodash`, `chai`, `crypto-js`, ...). Use the helpers above.
-- `bru.setCollectionVar`, `bru.deleteCollectionVar`, `bru.deleteAllCollectionVars`,
-  `bru.deleteAllEnvVars`, `bru.deleteAllGlobalEnvVars`
-- `bru.cookies.*`, `bru.getOauth2CredentialVar`, `bru.resetOauth2Credential`, `bru.getSecretVar`
-- `bru.runRequest`, `bru.cwd`, `req.setMaxRedirects`, `req.onFail`
+- `fri.setCollectionVar`, `fri.deleteCollectionVar`, `fri.deleteAllCollectionVars`,
+  `fri.deleteAllEnvVars`, `fri.deleteAllGlobalEnvVars`
+- `fri.cookies.*`, `fri.getOauth2CredentialVar`, `fri.resetOauth2Credential`, `fri.getSecretVar`
+- `fri.runRequest`, `fri.cwd`, `req.setMaxRedirects`, `req.onFail`
 - `req.headerList` / `res.headerList` (Postman-style property lists)
 - Bruno's declarative `assert` blocks (planned together with the Bruno importer).

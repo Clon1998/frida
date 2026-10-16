@@ -1,5 +1,8 @@
-// The script API (Bruno-compatible subset, see docs/scripting.md), built on the state that
-// Rust passes in as `__stateJson`. Runs before every script in a fresh QuickJS context.
+// The script API (see docs/scripting.md), built on the state that Rust passes in as
+// `__stateJson`. Runs before every script in a fresh QuickJS context.
+//
+// Frida's own object is `fri`. `bru` is the same object under Bruno's name, so scripts written
+// for Bruno (and collections imported from it) run unchanged.
 //
 // Only `__native` reaches outside the sandbox; it is captured here and then removed from the
 // global object, so scripts can only use it through this API.
@@ -194,7 +197,7 @@
     define("res", res);
   }
 
-  // ---------------------------------------------------------------- bru
+  // ---------------------------------------------------------------- fri (alias: bru)
 
   const v = state.vars;
   const envWrite = (global, name, value, options) => {
@@ -207,12 +210,12 @@
   };
   const toEnvValue = (value) => (typeof value === "string" ? value : JSON.stringify(value));
 
-  const bru = {
+  const fri = {
     // Runtime variables (this session).
     hasVar: (name) => Object.prototype.hasOwnProperty.call(v.runtime, name),
     getVar: (name) => v.runtime[name],
     setVar: (name, value) => {
-      checkName("bru.setVar", name);
+      checkName("fri.setVar", name);
       v.runtime[name] = value === undefined ? null : value;
     },
     deleteVar: (name) => {
@@ -228,8 +231,8 @@
     hasEnvVar: (name) => Object.prototype.hasOwnProperty.call(v.env, name),
     getEnvVar: (name) => v.env[name],
     setEnvVar: (name, value, options) => {
-      if (v.envName == null) throw new Error("bru.setEnvVar: no collection environment is selected");
-      checkName("bru.setEnvVar", name);
+      if (v.envName == null) throw new Error("fri.setEnvVar: no collection environment is selected");
+      checkName("fri.setEnvVar", name);
       v.env[name] = toEnvValue(value);
       envWrite(false, name, v.env[name], options);
     },
@@ -246,9 +249,9 @@
     getGlobalEnvVar: (name) => v.globalEnv[name],
     setGlobalEnvVar: (name, value, options) => {
       if (v.globalEnvName == null) {
-        throw new Error("bru.setGlobalEnvVar: no global environment is selected");
+        throw new Error("fri.setGlobalEnvVar: no global environment is selected");
       }
-      checkName("bru.setGlobalEnvVar", name);
+      checkName("fri.setGlobalEnvVar", name);
       v.globalEnv[name] = toEnvValue(value);
       envWrite(true, name, v.globalEnv[name], options);
     },
@@ -291,37 +294,39 @@
       state.nextRequest = name === null ? null : String(name);
     },
     runner: {
-      setNextRequest: (name) => bru.setNextRequest(name),
+      setNextRequest: (name) => fri.setNextRequest(name),
       skipRequest: () => {
         state.skipRequest = true;
       },
       stopExecution: () => {},
     },
 
-    setCollectionVar: unsupported("bru.setCollectionVar"),
-    deleteCollectionVar: unsupported("bru.deleteCollectionVar"),
-    deleteAllCollectionVars: unsupported("bru.deleteAllCollectionVars"),
-    deleteAllEnvVars: unsupported("bru.deleteAllEnvVars"),
-    deleteAllGlobalEnvVars: unsupported("bru.deleteAllGlobalEnvVars"),
-    getOauth2CredentialVar: unsupported("bru.getOauth2CredentialVar"),
-    resetOauth2Credential: unsupported("bru.resetOauth2Credential"),
-    getSecretVar: unsupported("bru.getSecretVar"),
-    runRequest: unsupported("bru.runRequest"),
-    cwd: unsupported("bru.cwd"),
+    setCollectionVar: unsupported("fri.setCollectionVar"),
+    deleteCollectionVar: unsupported("fri.deleteCollectionVar"),
+    deleteAllCollectionVars: unsupported("fri.deleteAllCollectionVars"),
+    deleteAllEnvVars: unsupported("fri.deleteAllEnvVars"),
+    deleteAllGlobalEnvVars: unsupported("fri.deleteAllGlobalEnvVars"),
+    getOauth2CredentialVar: unsupported("fri.getOauth2CredentialVar"),
+    resetOauth2Credential: unsupported("fri.resetOauth2Credential"),
+    getSecretVar: unsupported("fri.getSecretVar"),
+    runRequest: unsupported("fri.runRequest"),
+    cwd: unsupported("fri.cwd"),
     getAssertionResults: () => [],
     cookies: new Proxy(
       {},
       {
-        get: (_, prop) => unsupported(`bru.cookies.${String(prop)}`),
+        get: (_, prop) => unsupported(`fri.cookies.${String(prop)}`),
       },
     ),
   };
-  define("bru", bru);
+  define("fri", fri);
+  // Bruno compatibility: the same API under Bruno's name.
+  define("bru", fri);
 
-  /** `bru.sendRequest`: axios-style options and response, like Bruno. */
+  /** `fri.sendRequest`: axios-style options and response, like Bruno. */
   async function sendRequest(options) {
     const o = typeof options === "string" ? { url: options } : options || {};
-    if (!o.url) throw new Error("bru.sendRequest: `url` is required");
+    if (!o.url) throw new Error("fri.sendRequest: `url` is required");
     const headers = Object.entries(o.headers || {}).map(([name, value]) => ({
       name,
       value: String(value),
@@ -348,7 +353,7 @@
       timeoutMs: o.timeout ? Number(o.timeout) : null,
     };
     const reply = JSON.parse(await native.send(JSON.stringify(call)));
-    if (reply.error) throw new Error(`bru.sendRequest: ${reply.error}`);
+    if (reply.error) throw new Error(`fri.sendRequest: ${reply.error}`);
     const x = reply.ok;
     const response = {
       status: x.status,

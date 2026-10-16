@@ -10,4 +10,4 @@ tests: |
   test("collection header and script header", () => {
     expect(res.body.headers).to.include({ "x-client": "frida", "x-request-name": "List orders" });
   });
-  test("sendRequest ran", () => expect(bru.getVar("pinged")).to.equal("from=script"));
+  test("sendRequest ran", () => expect(fri.getVar("pinged")).to.equal("from=script"));

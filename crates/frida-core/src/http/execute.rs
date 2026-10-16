@@ -129,7 +129,7 @@ pub async fn execute(
     let pre = pipeline.run_pre().await.map_err(CoreError::Script)?;
     if pre.skip {
         return Err(CoreError::InvalidInput(
-            "the pre-request script skipped this request (bru.runner.skipRequest())".into(),
+            "the pre-request script skipped this request (fri.runner.skipRequest())".into(),
         ));
     }
 
