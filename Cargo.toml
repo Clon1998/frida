@@ -55,6 +55,12 @@ chacha20poly1305 = "0.11.0"
 getrandom = "0.4.3"
 sha2 = "0.11.1"
 reqwest_cookie_store = "0.10.0"
+# Scripting (frida-script): QuickJS with async support, and the hash helpers of `crypto`.
+rquickjs = { version = "0.14.0", features = ["futures"] }
+sha1 = "0.11.0"
+md-5 = "0.11.0"
+hmac = "0.13.0"
+
 # Response decompression (see frida-core http/decode.rs). Already in the tree through reqwest.
 flate2 = "1.1.10"
 brotli = "9.0.0"
