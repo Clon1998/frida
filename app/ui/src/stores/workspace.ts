@@ -3,6 +3,7 @@ import {
   type AppSettings,
   commands,
   type ImportSummary,
+  type OpenApiGrouping,
   type Preferences,
   type TreeNode,
   type WorkspaceOverview,
@@ -41,6 +42,8 @@ interface WorkspaceState {
     kind: ImportKind,
     source: string,
     target: string | null,
+    /** OpenAPI only; default `paths`. */
+    grouping?: OpenApiGrouping,
   ) => Promise<ImportSummary>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
@@ -130,10 +133,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       }
     },
 
-    importCollection: async (kind, source, target) => {
+    importCollection: async (kind, source, target, grouping = "paths") => {
       const result = await unwrap(
         kind === "openapi"
-          ? commands.importOpenapi(source, target)
+          ? commands.importOpenapi(source, target, grouping)
           : commands.importBruno(source, target),
       );
       set({ activeCollectionDir: result.dir });

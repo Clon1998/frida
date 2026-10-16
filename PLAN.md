@@ -395,7 +395,7 @@ UI requirements:
 
 ### 11.1 OpenAPI 3.0 / 3.1 (file only: YAML or JSON)
 - Create a collection in a target folder chosen by the user.
-- Tags become folders; untagged operations go to the root. An operation with multiple tags goes into its first tag.
+- Folders come from the URL paths by default: each static path segment becomes a nested folder (`/legs/resolve/{n}` → `legs/resolve`), path params get none, `/` goes to the root. Optionally by tag instead: tags become folders, untagged operations go to the root, and an operation with multiple tags goes into its first tag. See the decisions log (2026-10-16 OpenAPI grouping).
 - Each operation becomes a request: the name is `summary` or `operationId` or `METHOD path`. Path params become `:param`. Query and header params are created disabled unless required.
 - The request body uses the example from the spec, or one generated from the schema (handle `$ref`, `allOf/oneOf/anyOf` with a sensible pick, enums, formats; depth-limited).
 - `servers[0].url` becomes a `baseUrl` variable in a created `default` collection env. Server variables are resolved to their defaults.
@@ -796,6 +796,12 @@ Deviations from and clarifications of this plan, newest last.
   several or none an array; Copy copies what is shown. The **Timeline** tab is not built: the console panel shows the
   request as sent (resolved headers, body) and the response, which covers it. The **network status** in the status
   bar is dropped: a failed send already says what went wrong, and online/offline says nothing about a given API.
+
+- **2026-10-16 OpenAPI grouping by path (requested by Patrick).** Tag-only folders were too flat compared with
+  Postman and Bruno. The OpenAPI import has a "Folders from" choice: *URL paths* (default, nested folders per static
+  segment) or *tags* (the previous behaviour). `OpenApiGrouping` is passed to `preview_openapi`/`import_openapi`.
+  The importer also orders a combined requirement so the primary scheme (e.g. OAuth2) comes first and API keys follow,
+  as the auth editor expects (§4.5).
 
 ## 17. Testing strategy
 

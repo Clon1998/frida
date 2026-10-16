@@ -40,12 +40,12 @@ export const commands = {
 	/**  Removes a collection from the workspace list. Its files are not deleted. */
 	removeCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("remove_collection", { dir })),
 	/**  What importing the OpenAPI spec at `file` would create (counts, base URL, warnings). */
-	previewOpenapi: (file: string) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file })),
+	previewOpenapi: (file: string, grouping: OpenApiGrouping) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file, grouping })),
 	/**
 	 *  Imports the OpenAPI spec at `file` as a new collection, in `target` or by default in
 	 *  `<workspace>/collections/<title>`, and adds it to the workspace.
 	 */
-	importOpenapi: (file: string, target: string | null) => typedError<CollectionImported, ApiError>(__TAURI_INVOKE("import_openapi", { file, target })),
+	importOpenapi: (file: string, target: string | null, grouping: OpenApiGrouping) => typedError<CollectionImported, ApiError>(__TAURI_INVOKE("import_openapi", { file, target, grouping })),
 	gitInfo: (dir: string) => typedError<GitInfo, ApiError>(__TAURI_INVOKE("git_info", { dir })),
 	/**  `git init` in the collection folder. */
 	gitInit: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_init", { dir })),
@@ -733,6 +733,16 @@ export type OAuth2Config = {
 };
 
 export type OAuth2Grant = "client_credentials" | "authorization_code" | "password";
+
+/**  How imported operations are put into folders. */
+export type OpenApiGrouping = 
+/**
+ *  One nested folder per static path segment, like Postman and Bruno:
+ *  `/legs/resolve/{legNumber}` goes into `legs/resolve`. Path parameters get no folder.
+ */
+"paths" | 
+/**  One folder per operation tag (its first tag); untagged operations go to the root. */
+"tags";
 
 export type Params = {
 	/**  Kept in sync with the query string of `url` by the UI. */

@@ -1,7 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle, FileUp, KeyRound } from "lucide-react";
 import { useState } from "react";
-import { commands, type ImportSummary } from "@/bindings";
+import { commands, type ImportSummary, type OpenApiGrouping } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,6 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toApiError, unwrap } from "@/lib/api";
 import { type ImportKind, useWorkspace } from "@/stores/workspace";
 
@@ -64,6 +71,20 @@ function ImportFlow({ kind, onClose }: { kind: ImportKind; onClose: () => void }
   const [target, setTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // OpenAPI only: folders from the URL paths (like Postman and Bruno) or from the tags.
+  const [grouping, setGrouping] = useState<OpenApiGrouping>("paths");
+
+  const preview = async (file: string, grouping: OpenApiGrouping) => {
+    setError(null);
+    try {
+      const summary = await unwrap(
+        kind === "openapi" ? commands.previewOpenapi(file, grouping) : commands.previewBruno(file),
+      );
+      setStep({ kind: "preview", file, summary });
+    } catch (e) {
+      setError(toApiError(e).message);
+    }
+  };
 
   const pickFile = async () => {
     const file =
@@ -74,15 +95,7 @@ function ImportFlow({ kind, onClose }: { kind: ImportKind; onClose: () => void }
           })
         : await open({ directory: true, title: "Choose the Bruno collection folder" });
     if (typeof file !== "string") return;
-    setError(null);
-    try {
-      const summary = await unwrap(
-        kind === "openapi" ? commands.previewOpenapi(file) : commands.previewBruno(file),
-      );
-      setStep({ kind: "preview", file, summary });
-    } catch (e) {
-      setError(toApiError(e).message);
-    }
+    await preview(file, grouping);
   };
 
   const pickTarget = async () => {
@@ -94,7 +107,7 @@ function ImportFlow({ kind, onClose }: { kind: ImportKind; onClose: () => void }
     setBusy(true);
     setError(null);
     try {
-      setStep({ kind: "done", summary: await importCollection(kind, file, target) });
+      setStep({ kind: "done", summary: await importCollection(kind, file, target, grouping) });
     } catch (e) {
       setError(toApiError(e).message);
     } finally {
@@ -120,6 +133,28 @@ function ImportFlow({ kind, onClose }: { kind: ImportKind; onClose: () => void }
       )}
 
       {step.kind !== "pick" && <SummaryView summary={step.summary} done={step.kind === "done"} />}
+
+      {step.kind === "preview" && kind === "openapi" && (
+        <div className="flex items-center gap-2 text-sm">
+          <p className="font-medium">Folders from</p>
+          <Select
+            value={grouping}
+            onValueChange={(value) => {
+              const next = value as OpenApiGrouping;
+              setGrouping(next);
+              void preview(step.file, next);
+            }}
+          >
+            <SelectTrigger size="sm" className="w-56" aria-label="Folders from">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="paths">URL paths (/legs/resolve → legs › resolve)</SelectItem>
+              <SelectItem value="tags">Tags (one folder per tag)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {step.kind === "preview" && (
         <div className="space-y-1 text-sm">

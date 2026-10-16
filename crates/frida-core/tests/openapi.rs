@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use frida_core::http;
-use frida_core::import::{map_openapi, write_plan};
+use frida_core::import::{OpenApiGrouping, map_openapi, write_plan};
 use frida_core::model::{Auth, AuthScheme, BodyMode, MultipartKind};
 use frida_core::storage::{self, TreeNode};
 use frida_core::yaml::to_yaml_string;
@@ -35,7 +35,8 @@ fn specs_match_snapshots() {
     assert!(files.len() >= 3);
     for file in files {
         let text = std::fs::read_to_string(&file).unwrap();
-        let mut plan = map_openapi(&text).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
+        let mut plan = map_openapi(&text, OpenApiGrouping::Tags)
+            .unwrap_or_else(|e| panic!("{}: {e}", file.display()));
         plan.collection.id = "<generated>".into();
         let name = file.file_stem().unwrap().to_string_lossy().to_string();
         insta::assert_snapshot!(name, to_yaml_string(&plan).unwrap());
@@ -44,7 +45,7 @@ fn specs_match_snapshots() {
 
 #[test]
 fn internal_spec_maps_the_tricky_parts() {
-    let plan = map_openapi(&spec("internal-orders-3.1.json")).unwrap();
+    let plan = map_openapi(&spec("internal-orders-3.1.json"), OpenApiGrouping::Tags).unwrap();
     let s = &plan.summary;
     assert_eq!(s.base_url, "https://eu.orders.example.com/v2");
     assert_eq!(s.requests, 8);
@@ -115,7 +116,7 @@ async fn imported_collection_loads_and_sends() {
         .await
         .unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let plan = map_openapi(&spec("petstore-expanded-3.0.yaml")).unwrap();
+    let plan = map_openapi(&spec("petstore-expanded-3.0.yaml"), OpenApiGrouping::Paths).unwrap();
     write_plan(dir.path(), &plan).unwrap();
 
     let tree = storage::scan_tree(dir.path()).unwrap();

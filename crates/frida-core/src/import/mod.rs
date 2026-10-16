@@ -10,6 +10,6 @@ pub use bruno::{
 };
 pub use curl::{CurlImport, import_curl, query_params};
 pub use openapi::{
-    ImportPlan, ImportSummary, PlannedFolder, import_openapi_file, map_openapi,
+    ImportPlan, ImportSummary, OpenApiGrouping, PlannedFolder, import_openapi_file, map_openapi,
     preview_openapi_file, write_plan,
 };

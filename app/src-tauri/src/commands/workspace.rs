@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use frida_core::import::{self, ImportSummary};
+use frida_core::import::{self, ImportSummary, OpenApiGrouping};
 use frida_core::storage::{self, WorkspaceOverview};
 use tauri::State;
 
@@ -101,8 +101,8 @@ pub fn remove_collection(state: State<'_, AppState>, dir: String) -> ApiResult<W
 /// What importing the OpenAPI spec at `file` would create (counts, base URL, warnings).
 #[tauri::command]
 #[specta::specta]
-pub async fn preview_openapi(file: String) -> ApiResult<ImportSummary> {
-    blocking(move || Ok(import::preview_openapi_file(Path::new(&file))?)).await
+pub async fn preview_openapi(file: String, grouping: OpenApiGrouping) -> ApiResult<ImportSummary> {
+    blocking(move || Ok(import::preview_openapi_file(Path::new(&file), grouping)?)).await
 }
 
 /// The result of an import (OpenAPI or Bruno): the updated workspace, the new collection's
@@ -123,6 +123,7 @@ pub async fn import_openapi(
     state: State<'_, AppState>,
     file: String,
     target: Option<String>,
+    grouping: OpenApiGrouping,
 ) -> ApiResult<CollectionImported> {
     let ws = state.workspace_dir()?;
     let ws_for_import = ws.clone();
@@ -132,6 +133,7 @@ pub async fn import_openapi(
             &ws_for_import,
             Path::new(&file),
             target.as_deref(),
+            grouping,
         )?)
     })
     .await?;

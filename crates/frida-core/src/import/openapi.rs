@@ -45,11 +45,50 @@ pub struct ImportSummary {
     pub warnings: Vec<String>,
 }
 
-/// A folder to create, with its requests in order.
+/// How imported operations are put into folders.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum OpenApiGrouping {
+    /// One nested folder per static path segment, like Postman and Bruno:
+    /// `/legs/resolve/{legNumber}` goes into `legs/resolve`. Path parameters get no folder.
+    #[default]
+    Paths,
+    /// One folder per operation tag (its first tag); untagged operations go to the root.
+    Tags,
+}
+
+/// A folder to create, with its requests in order and its subfolders.
 #[derive(Debug, Clone, Serialize)]
 pub struct PlannedFolder {
     pub folder: Folder,
     pub requests: Vec<Request>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<PlannedFolder>,
+}
+
+impl PlannedFolder {
+    fn new(name: String) -> Self {
+        Self {
+            folder: Folder::new(name),
+            requests: Vec::new(),
+            folders: Vec::new(),
+        }
+    }
+
+    /// This folder and all folders below it.
+    fn count(&self) -> usize {
+        1 + self.folders.iter().map(PlannedFolder::count).sum::<usize>()
+    }
+
+    /// The requests in this folder and all folders below it.
+    fn request_count(&self) -> usize {
+        self.requests.len()
+            + self
+                .folders
+                .iter()
+                .map(PlannedFolder::request_count)
+                .sum::<usize>()
+    }
 }
 
 /// Everything an import will create.
@@ -58,13 +97,13 @@ pub struct ImportPlan {
     pub collection: Collection,
     pub environment: Environment,
     pub folders: Vec<PlannedFolder>,
-    /// Untagged operations, at the collection root.
+    /// Operations at the collection root (untagged ones, or `/` when grouping by path).
     pub requests: Vec<Request>,
     pub summary: ImportSummary,
 }
 
 /// Reads an OpenAPI 3.x document (YAML or JSON) and plans the collection for it.
-pub fn map_openapi(text: &str) -> Result<ImportPlan> {
+pub fn map_openapi(text: &str, grouping: OpenApiGrouping) -> Result<ImportPlan> {
     let root = parse(text)?;
     let version = root.get("openapi").and_then(Value::as_str).unwrap_or("");
     if !version.starts_with("3.") {
@@ -81,7 +120,7 @@ pub fn map_openapi(text: &str) -> Result<ImportPlan> {
         warnings: Vec::new(),
         env_vars: Vec::new(),
     };
-    Ok(mapper.plan())
+    Ok(mapper.plan(grouping))
 }
 
 /// Writes `plan` as a new collection in `dir` (which may exist but must not be a collection).
@@ -99,22 +138,30 @@ pub fn write_plan(dir: &Path, plan: &ImportPlan) -> Result<()> {
     for request in &plan.requests {
         storage::create_request(dir, "", request)?;
     }
-    for planned in &plan.folders {
-        let rel = storage::create_folder(dir, "", &planned.folder.name)?;
-        let mut folder = storage::read_folder(dir, &rel)?;
-        folder.docs = planned.folder.docs.clone();
-        storage::save_folder(dir, &rel, &folder)?;
+    write_folders(dir, "", &plan.folders)
+}
+
+/// Creates `folders` (and their subfolders, recursively) inside the folder `parent`.
+fn write_folders(dir: &Path, parent: &str, folders: &[PlannedFolder]) -> Result<()> {
+    for planned in folders {
+        let rel = storage::create_folder(dir, parent, &planned.folder.name)?;
+        if !planned.folder.docs.is_empty() {
+            let mut folder = storage::read_folder(dir, &rel)?;
+            folder.docs = planned.folder.docs.clone();
+            storage::save_folder(dir, &rel, &folder)?;
+        }
         for request in &planned.requests {
             storage::create_request(dir, &rel, request)?;
         }
+        write_folders(dir, &rel, &planned.folders)?;
     }
     Ok(())
 }
 
 /// Reads a spec file and shows what importing it would create, without writing anything.
-pub fn preview_openapi_file(file: &Path) -> Result<ImportSummary> {
+pub fn preview_openapi_file(file: &Path, grouping: OpenApiGrouping) -> Result<ImportSummary> {
     let text = std::fs::read_to_string(file).map_err(|e| CoreError::io(file, e))?;
-    Ok(map_openapi(&text)?.summary)
+    Ok(map_openapi(&text, grouping)?.summary)
 }
 
 /// Imports a spec file as a new collection and adds it to the workspace. `target` is the
@@ -123,9 +170,10 @@ pub fn import_openapi_file(
     workspace_dir: &Path,
     file: &Path,
     target: Option<&Path>,
+    grouping: OpenApiGrouping,
 ) -> Result<(std::path::PathBuf, ImportSummary)> {
     let text = std::fs::read_to_string(file).map_err(|e| CoreError::io(file, e))?;
-    let plan = map_openapi(&text)?;
+    let plan = map_openapi(&text, grouping)?;
     let dir = match target {
         Some(dir) => dir.to_path_buf(),
         None => storage::new_collection_dir(workspace_dir, &plan.collection.name)?,
@@ -156,12 +204,14 @@ struct Mapper<'a> {
 
 /// An operation found under `paths`, before it is placed in a folder.
 struct Operation {
+    /// The path as written in the spec, e.g. `/legs/{legNumber}`.
+    path: String,
     tag: Option<String>,
     request: Request,
 }
 
 impl<'a> Mapper<'a> {
-    fn plan(&mut self) -> ImportPlan {
+    fn plan(&mut self, grouping: OpenApiGrouping) -> ImportPlan {
         let info = self.root.get("info").unwrap_or(&Value::Null);
         let name = str_of(info, "title")
             .unwrap_or("Imported API")
@@ -179,7 +229,52 @@ impl<'a> Mapper<'a> {
         let base_url = self.base_url();
         let operations = self.operations(global_security);
 
-        // Folders follow the order of the top-level `tags` list, then first use.
+        let (folders, root_requests) = match grouping {
+            OpenApiGrouping::Tags => self.group_by_tag(operations),
+            OpenApiGrouping::Paths => group_by_path(operations),
+        };
+
+        let mut environment = Environment::new("default");
+        environment.variables.push(EnvVariable {
+            name: "baseUrl".into(),
+            value: Some(base_url.clone()),
+            secret: false,
+            source: None,
+            enabled: true,
+        });
+        environment.variables.append(&mut self.env_vars);
+
+        let requests = root_requests.len()
+            + folders
+                .iter()
+                .map(PlannedFolder::request_count)
+                .sum::<usize>();
+        let summary = ImportSummary {
+            collection_name: name,
+            requests: u32::try_from(requests).unwrap_or(u32::MAX),
+            folders: u32::try_from(folders.iter().map(PlannedFolder::count).sum::<usize>())
+                .unwrap_or(u32::MAX),
+            environments: 1,
+            base_url,
+            secrets_to_fill: environment
+                .variables
+                .iter()
+                .filter(|v| v.secret)
+                .map(|v| v.name.clone())
+                .collect(),
+            warnings: dedup(std::mem::take(&mut self.warnings)),
+        };
+        ImportPlan {
+            collection,
+            environment,
+            folders,
+            requests: root_requests,
+            summary,
+        }
+    }
+
+    /// One folder per tag, in the order of the top-level `tags` list, then first use.
+    fn group_by_tag(&self, operations: Vec<Operation>) -> (Vec<PlannedFolder>, Vec<Request>) {
         let mut tag_order: Vec<String> = self
             .root
             .get("tags")
@@ -198,12 +293,9 @@ impl<'a> Mapper<'a> {
         let mut folders: Vec<PlannedFolder> = tag_order
             .iter()
             .map(|tag| {
-                let mut folder = Folder::new(tag.clone());
-                folder.docs = self.tag_description(tag);
-                PlannedFolder {
-                    folder,
-                    requests: Vec::new(),
-                }
+                let mut folder = PlannedFolder::new(tag.clone());
+                folder.folder.docs = self.tag_description(tag);
+                folder
             })
             .collect();
         let mut root_requests = Vec::new();
@@ -220,40 +312,7 @@ impl<'a> Mapper<'a> {
             }
         }
         folders.retain(|f| !f.requests.is_empty());
-
-        let mut environment = Environment::new("default");
-        environment.variables.push(EnvVariable {
-            name: "baseUrl".into(),
-            value: Some(base_url.clone()),
-            secret: false,
-            source: None,
-            enabled: true,
-        });
-        environment.variables.append(&mut self.env_vars);
-
-        let requests =
-            root_requests.len() + folders.iter().map(|f| f.requests.len()).sum::<usize>();
-        let summary = ImportSummary {
-            collection_name: name,
-            requests: u32::try_from(requests).unwrap_or(u32::MAX),
-            folders: u32::try_from(folders.len()).unwrap_or(u32::MAX),
-            environments: 1,
-            base_url,
-            secrets_to_fill: environment
-                .variables
-                .iter()
-                .filter(|v| v.secret)
-                .map(|v| v.name.clone())
-                .collect(),
-            warnings: dedup(std::mem::take(&mut self.warnings)),
-        };
-        ImportPlan {
-            collection,
-            environment,
-            folders,
-            requests: root_requests,
-            summary,
-        }
+        (folders, root_requests)
     }
 
     fn tag_description(&self, tag: &str) -> String {
@@ -318,7 +377,11 @@ impl<'a> Mapper<'a> {
                     .map(str::to_string);
                 let op = op.clone();
                 let request = self.request(path, method, &op, &shared_params, global_security);
-                out.push(Operation { tag, request });
+                out.push(Operation {
+                    path: path.clone(),
+                    tag,
+                    request,
+                });
             }
         }
         out
@@ -908,6 +971,49 @@ impl<'a> Mapper<'a> {
     }
 }
 
+/// Nested folders from the static path segments, in order of first use.
+/// `/legs/resolve/{legNumber}` lands in `legs` → `resolve`; `/` lands at the root.
+fn group_by_path(operations: Vec<Operation>) -> (Vec<PlannedFolder>, Vec<Request>) {
+    let mut folders: Vec<PlannedFolder> = Vec::new();
+    let mut root_requests = Vec::new();
+    for op in operations {
+        let segments: Vec<&str> = op
+            .path
+            .split('/')
+            .filter(|s| !s.is_empty() && !(s.starts_with('{') && s.ends_with('}')))
+            .collect();
+        if segments.is_empty() {
+            root_requests.push(op.request);
+        } else {
+            insert_at_path(&mut folders, &segments, op.request);
+        }
+    }
+    (folders, root_requests)
+}
+
+/// Puts `request` into the folder `segments` below `folders`, creating folders as needed.
+///
+/// Recursion keeps the borrowing simple: each call holds a `&mut` to one level of folders and
+/// hands a `&mut` to the chosen child's list down to the next call.
+fn insert_at_path(folders: &mut Vec<PlannedFolder>, segments: &[&str], request: Request) {
+    let Some((first, rest)) = segments.split_first() else {
+        return;
+    };
+    let index = match folders.iter().position(|f| f.folder.name == *first) {
+        Some(i) => i,
+        None => {
+            folders.push(PlannedFolder::new((*first).to_string()));
+            folders.len() - 1
+        }
+    };
+    let folder = &mut folders[index];
+    if rest.is_empty() {
+        folder.requests.push(request);
+    } else {
+        insert_at_path(&mut folder.folders, rest, request);
+    }
+}
+
 fn str_of<'v>(value: &'v Value, key: &str) -> Option<&'v str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -997,7 +1103,8 @@ mod tests {
 
     #[test]
     fn rejects_swagger_2_with_a_hint() {
-        let err = map_openapi("swagger: '2.0'\ninfo: {title: x}").unwrap_err();
+        let err =
+            map_openapi("swagger: '2.0'\ninfo: {title: x}", OpenApiGrouping::Tags).unwrap_err();
         assert!(err.to_string().contains("Swagger 2.0"));
     }
 
@@ -1028,6 +1135,7 @@ components:
         name: { type: string }
         child: { $ref: "#/components/schemas/Node" }
 "##,
+            OpenApiGrouping::Tags,
         )
         .unwrap();
         assert_eq!(plan.requests.len(), 2);
@@ -1066,6 +1174,7 @@ components:
       flows:
         clientCredentials: { tokenUrl: "https://auth.example.com/oauth2/token", scopes: {} }
 "#,
+            OpenApiGrouping::Tags,
         )
         .unwrap();
         let Auth::Custom { schemes } = &plan.collection.auth else {
@@ -1083,6 +1192,41 @@ components:
             "https://auth.dev.example.com/oauth2/token"
         );
         assert!(matches!(&schemes[1], AuthScheme::ApiKey { name, .. } if name == "X-Api-Key"));
+    }
+
+    #[test]
+    fn grouping_by_path_nests_static_segments() {
+        let spec = r#"
+openapi: 3.0.3
+info: { title: T, version: "1" }
+paths:
+  /:
+    get: { operationId: root }
+  /legs:
+    get: { operationId: listLegs, tags: [legs] }
+  /legs/resolve/{legNumber}:
+    get: { operationId: resolveLeg, tags: [legs] }
+  /legs/{id}/crew:
+    get: { operationId: legCrew, tags: [legs] }
+"#;
+        let plan = map_openapi(spec, OpenApiGrouping::Paths).unwrap();
+        assert_eq!(plan.requests[0].name, "root");
+        let legs = &plan.folders[0];
+        assert_eq!(legs.folder.name, "legs");
+        assert_eq!(legs.requests[0].name, "listLegs");
+        let names: Vec<_> = legs
+            .folders
+            .iter()
+            .map(|f| f.folder.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["resolve", "crew"]);
+        assert_eq!(legs.folders[0].requests[0].name, "resolveLeg");
+        assert_eq!(plan.summary.folders, 3);
+        assert_eq!(plan.summary.requests, 4);
+
+        let by_tag = map_openapi(spec, OpenApiGrouping::Tags).unwrap();
+        assert_eq!(by_tag.folders.len(), 1);
+        assert_eq!(by_tag.folders[0].requests.len(), 3);
     }
 
     #[test]
