@@ -543,9 +543,12 @@ sample workspace has a "Scripting" folder for trying it by hand.*
 variables, bearer/basic/OAuth2 and per-operation security), checks the tricky mappings and sends an imported request.*
 
 ### M7: Git panel
-- [ ] §12.
+- [x] §12.
 
 **Acceptance:** integration tests run against a temporary repo with a local bare remote, covering status, stage, commit, push, ff-pull, a refused non-ff pull and a blocked branch switch.
+*Status 2026-10-16: done (automated): `crates/frida-git/tests/repo.rs` (bare remote + two clones: status, stage,
+unstage, diff, commit, push, fetch, ff-pull, refused diverged pull, blocked switch, collection inside a bigger repo,
+`git init`). Destructive commands are refused by an allowlist (`crates/frida-git/src/run.rs`, unit-tested).*
 
 ### M8: AWS
 - [ ] Profile discovery, profile mapping per env, the Secrets Manager provider, TTL caching and a refresh action. Actionable SSO errors.
@@ -712,6 +715,15 @@ Deviations from and clarifications of this plan, newest last.
   NTLM, AWS SigV4, OAuth1, WSSE, Akamai) and the implicit OAuth2 grant become "none" with a warning; gRPC/WebSocket
   requests are skipped with a warning. Script calls Frida lacks are listed per script; disabled environment
   variables are left out with a warning. The Bruno folder is only read, never changed.
+
+- **2026-10-16 Git panel (M7).** `frida-git` runs the system `git` through one function with an allowlist of
+  subcommands (`status`, `add`, `restore --staged`, `rm --cached`, `diff`, `commit`, `fetch`, `push`, `pull`,
+  `for-each-ref`, `switch`, `init`, `rev-parse`) and forbidden flags (`--force`, `--hard`, ...); `GIT_TERMINAL_PROMPT=0`
+  and timeouts keep it from hanging. Status, "stage all" and file paths are limited to the collection folder, so a
+  collection inside a bigger repository doesn't touch other files. Pushing a branch without upstream sets it to
+  `origin/<branch>`. Branch switching is refused while *tracked* files have changes (untracked files don't block).
+  The status bar shows branch, changed files and ahead/behind; it refreshes on file changes and window focus
+  (the watcher ignores `.git`). Diffs open in a dialog with a simple diff highlighter.
 
 ## 17. Testing strategy
 

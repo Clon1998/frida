@@ -1,5 +1,28 @@
 # Changelog
 
+## M7: Git panel (2026-10-16)
+
+### What was built
+- **`frida-git`**: status (porcelain v2, parsed in `parse.rs`), stage/unstage (per file and all), diffs (also for
+  new files), commit, fetch, push (sets upstream on first push), `pull --ff-only`, branches, switch (blocked with
+  uncommitted changes), create branch and `git init`. Only allowlisted, non-destructive commands can run.
+- **App/UI**: a Git tab in the sidebar (branch menu, fetch/pull/push with ahead/behind, commit box with
+  Ctrl/Cmd+Enter, staged and unstaged files with stage/unstage buttons, diff dialog), a live git indicator in the
+  status bar, clear messages and hints when git refuses something (diverged pull, missing identity, auth).
+
+### Rust things worth understanding in this milestone
+1. **Running a child process with a timeout** (`crates/frida-git/src/run.rs`). `Command::spawn` starts git; its
+   output is read on two threads (a full pipe would otherwise block git), and `try_wait` in a loop lets us kill it
+   after the deadline. `std::process` has no built-in timeout, unlike Java's `Process.waitFor(timeout)`.
+2. **Assertions as a safety net** (`run.rs` `ALLOWED`). `assert!` panics on a programming error (trying to run a
+   forbidden command), which tests catch with `#[should_panic]`. It's for bugs, not user errors: those are `Result`s.
+3. **Parsing NUL-separated output** (`parse.rs`). `git status -z` separates records with `\0`, so file names with
+   spaces or newlines can't break parsing; `split('\0')` and `splitn` keep the path as one piece.
+4. **Generic helper with a closure** (`with_repo` in `app/src-tauri/src/commands/git.rs`). Each command passes
+   "what to do with the repo" as an `FnOnce` closure that is moved to a blocking thread; the `Send + 'static` bounds
+   are what make that move allowed.
+
+
 ## M9: Bruno import (2026-10-16, done before M7)
 
 ### What was built
