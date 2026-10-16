@@ -76,6 +76,9 @@ zstd = "0.14.2"
 cookie_store = "0.22.1"
 shell-words = "1.1.1"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+# Frida archives (export/import as .zip, PLAN.md M12). Only deflate, in pure Rust (zlib-rs is
+# already in the tree through flate2).
+zip = { version = "9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 # Rust <-> TypeScript type generation. The Tauri 2 compatible line of tauri-specta is still a
 # release candidate, and it requires an *exact* specta version, so both are pinned with `=`.

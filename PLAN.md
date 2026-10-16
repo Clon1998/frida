@@ -620,12 +620,18 @@ Decided with Patrick on 2026-10-16 (see the decisions log).
   Added/deleted/binary files get a clear placeholder. The raw `git diff` text view is dropped.
   *Done 2026-10-16:* `Repo::file_versions` + `git_file_versions` (replaces `git_diff`; `diff` left the allow-list,
   `show` joined it), `ChangesView`/`DiffView` with `@codemirror/merge` 6.12.2 and `@codemirror/lang-yaml` 6.1.3.
-- [ ] **Frida archive export/import** (feedback #13): export a workspace, a collection, a folder or a single request
+- [x] **Frida archive export/import** (feedback #13): export a workspace, a collection, a folder or a single request
   as a `.zip` that contains the on-disk files in their §4 layout plus `frida-export.yaml`
   (`format: 1`, `kind: workspace|collection|folder|request`, Frida version, export time). Secret values are never
   included, only `secret: true` markers. Import asks for the target (workspace folder, or a collection/folder in the
   tree), checks the manifest, rejects absolute paths and `..` entries, and regenerates collection ids that already
   exist in the workspace. New dependency: the `zip` crate (9.x, default features off + `deflate`), in `frida-core`.
+  *Done 2026-10-16:* `frida_core::archive` (`zip` 9.0.4 with only `deflate-flate2-zlib-rs`), commands
+  `export_archive`/`preview_archive`/`import_archive` (folders checked against the open workspace), "Export…" in the
+  tree, collection and workspace menus, "Import Frida archive…" in the collection menu, the tree and the start screen.
+  Archive layout: `frida-export.yaml` + `content/…`; a workspace export moves outside collections to
+  `collections/<slug>` and rewrites `frida-workspace.yaml`. Hidden files (`.git`, `.gitignore`, `.DS_Store`) are
+  left out. Import refuses `..`/absolute/drive paths, symlinks, >100 MB entries, >500 MB total, >20k entries.
 - [ ] **UI flow tests with Playwright** (feedback #11): `@playwright/test` (1.64.x) drives the Vite dev server with a
   fake backend: `@tauri-apps/api/mocks` `mockIPC` serving an in-memory workspace, injected only when
   `VITE_E2E=1`, so production builds don't contain it. Core flows: open workspace → open request → edit URL/params →

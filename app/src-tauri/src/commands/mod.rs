@@ -6,6 +6,7 @@
 //! (`get_tree` becomes `commands.getTree(...)`).
 
 pub mod app;
+pub mod archive;
 pub mod collection;
 pub mod env;
 pub mod git;

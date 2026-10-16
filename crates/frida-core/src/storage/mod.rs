@@ -2,7 +2,7 @@
 
 mod collection;
 mod environments;
-mod paths;
+pub(crate) mod paths;
 mod workspace;
 
 pub use collection::{

@@ -8,6 +8,7 @@ import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { ConsolePanel } from "@/components/console/ConsolePanel";
 import { QuickOpen } from "./QuickOpen";
+import { ArchiveImportDialog } from "./ArchiveImportDialog";
 import { CloseTabsDialog } from "./CloseTabsDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { formatKeys, isMac } from "@/lib/shortcuts";
@@ -147,6 +148,7 @@ export function AppShell() {
       <ShortcutsDialog />
       <AwsProfileDialog />
       <CloseTabsDialog />
+      <ArchiveImportDialog />
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
         {collection && <GitStatusIndicator dir={collection.dir} />}

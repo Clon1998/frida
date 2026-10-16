@@ -5,6 +5,7 @@
 //! so it stays testable and reusable for the future CLI.
 
 mod about;
+pub mod archive;
 pub mod auth;
 pub mod codegen;
 pub mod error;

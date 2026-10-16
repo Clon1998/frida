@@ -32,9 +32,11 @@ serde_json_path = { workspace = true }
 flate2 = { workspace = true }
 brotli = { workspace = true }
 zstd = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+zip = { workspace = true }
 insta = { workspace = true }
 frida-testserver = { workspace = true }
 

@@ -98,6 +98,14 @@ export function CollectionTree({ dir }: { dir: string }) {
     fromCurl: (parent: string) => useDialogs.getState().openCurlImport(dir, parent),
     copyCurl: (path: string) => useDialogs.getState().openCurlExport(dir, path),
     run: (folder: string) => void openTab(dir, runnerTabPath(folder)),
+    exportItem: (node: TreeNode & { name: string }) =>
+      void actions.exportArchive(
+        node.kind === "folder"
+          ? { kind: "folder", collectionDir: dir, rel: node.path }
+          : { kind: "request", collectionDir: dir, rel: node.path },
+        node.name,
+      ),
+    importInto: (parent: string) => useDialogs.getState().openArchiveImport(dir, parent),
   };
 
   return (
@@ -153,6 +161,9 @@ export function CollectionTree({ dir }: { dir: string }) {
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => menu.run("")}>Run collection…</ContextMenuItem>
+          <ContextMenuItem onSelect={() => menu.importInto("")}>
+            Import Frida archive…
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => void actions.revealItem(dir, "")}>
             Reveal in file manager
@@ -217,6 +228,10 @@ interface TreeRowProps {
     copyCurl: (path: string) => void;
     /** Opens the collection runner for a folder. */
     run: (folder: string) => void;
+    /** Saves a folder or request as a Frida archive. */
+    exportItem: (node: TreeNode & { name: string }) => void;
+    /** Imports a Frida archive into a folder. */
+    importInto: (parent: string) => void;
   };
 }
 
@@ -343,6 +358,9 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
                 Settings…
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => menu.run(node.path)}>Run folder…</ContextMenuItem>
+              <ContextMenuItem onSelect={() => menu.importInto(node.path)}>
+                Import Frida archive here…
+              </ContextMenuItem>
               <ContextMenuSeparator />
             </>
           )}
@@ -358,6 +376,9 @@ function TreeRow({ dir, node, depth, expanded, active, drop, menu }: TreeRowProp
             <ContextMenuItem onSelect={() => menu.copyCurl(node.path)}>
               Copy as curl
             </ContextMenuItem>
+          )}
+          {node.kind !== "invalid" && (
+            <ContextMenuItem onSelect={() => menu.exportItem(node)}>Export…</ContextMenuItem>
           )}
           <ContextMenuItem
             className="text-destructive focus:text-destructive"

@@ -2,7 +2,9 @@ import { create } from "zustand";
 import {
   type AppSettings,
   commands,
+  type ImportedArchive,
   type ImportSummary,
+  type ImportTarget,
   type OpenApiGrouping,
   type Preferences,
   type TreeNode,
@@ -48,6 +50,12 @@ interface WorkspaceState {
     /** OpenAPI only; default `paths`. */
     grouping?: OpenApiGrouping,
   ) => Promise<ImportSummary>;
+  /**
+   * Imports a Frida archive (PLAN.md M12) into `target`. A new collection becomes the active
+   * one; a folder or request shows up in the tree; a new workspace is opened. Throws on
+   * failure, so the dialog can show it.
+   */
+  importArchive: (file: string, target: ImportTarget) => Promise<ImportedArchive>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
   reloadTree: (dir: string) => Promise<void>;
@@ -161,6 +169,19 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       set({ activeCollectionDir: result.dir });
       await applyOverview(result.overview);
       return result.summary;
+    },
+
+    importArchive: async (file, target) => {
+      const { imported, overview } = await unwrap(commands.importArchive(file, target));
+      if (target.kind === "workspace") {
+        await get().openWorkspace(imported.dir);
+      } else if (overview) {
+        set({ activeCollectionDir: imported.dir });
+        await applyOverview(overview);
+      } else {
+        await get().reloadTree(imported.dir);
+      }
+      return imported;
     },
 
     removeCollection: async (dir) => {

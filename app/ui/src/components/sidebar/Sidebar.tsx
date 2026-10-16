@@ -1,5 +1,13 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { ChevronsUpDown, FileUp, FolderPlus, Plus, Settings } from "lucide-react";
+import {
+  ChevronsUpDown,
+  Download,
+  FileArchive,
+  FileUp,
+  FolderPlus,
+  Plus,
+  Settings,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +20,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
+import { exportArchive } from "@/stores/actions";
+import { useDialogs } from "@/stores/dialogs";
 import { useTabs } from "@/stores/tabs";
 import { type ImportKind, useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { HistoryPanel } from "@/components/history/HistoryPanel";
@@ -93,6 +103,20 @@ export function Sidebar() {
             <DropdownMenuItem onSelect={() => setImporting("bruno")}>
               <FileUp /> Import Bruno collection…
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => useDialogs.getState().openArchiveImport(active?.dir ?? null, "")}
+            >
+              <FileArchive /> Import Frida archive…
+            </DropdownMenuItem>
+            {active && (
+              <DropdownMenuItem
+                onSelect={() =>
+                  void exportArchive({ kind: "collection", collectionDir: active.dir }, active.name)
+                }
+              >
+                <Download /> Export “{active.name}”…
+              </DropdownMenuItem>
+            )}
             {active && (
               <DropdownMenuItem onSelect={() => void openTab(active.dir, "")}>
                 <Settings /> Collection settings…

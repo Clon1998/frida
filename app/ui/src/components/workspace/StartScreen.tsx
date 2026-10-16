@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, Pin, PinOff, Plus, Settings, X } from "lucide-react";
+import { FileArchive, FolderOpen, Pin, PinOff, Plus, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,8 @@ import {
 import { folderName, workspaceLists } from "@/lib/workspaces";
 import { useUi } from "@/stores/ui";
 import { useWorkspace } from "@/stores/workspace";
+import { useDialogs } from "@/stores/dialogs";
+import { ArchiveImportDialog } from "./ArchiveImportDialog";
 import { NameDialog } from "./NameDialog";
 
 /** Shown when no workspace is open: create one, open one, or pick a recent one. */
@@ -52,6 +54,9 @@ export function StartScreen() {
         <Button variant="outline" onClick={() => void pickExisting()}>
           <FolderOpen /> Open workspace…
         </Button>
+        <Button variant="outline" onClick={() => useDialogs.getState().openArchiveImport(null, "")}>
+          <FileArchive /> Import archive…
+        </Button>
       </div>
       <ul className="max-w-md space-y-1.5 text-sm text-muted-foreground">
         <li>
@@ -73,6 +78,7 @@ export function StartScreen() {
       </ul>
       <WorkspaceList title="Pinned" dirs={pinned} pinned />
       <WorkspaceList title="Recent" dirs={recent} pinned={false} />
+      <ArchiveImportDialog />
       <NameDialog
         open={newDir !== null}
         title="New workspace"

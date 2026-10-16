@@ -3,6 +3,8 @@ import {
   Briefcase,
   Check,
   ChevronsUpDown,
+  Download,
+  FileArchive,
   FolderOpen,
   LogOut,
   Pin,
@@ -23,6 +25,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NameDialog } from "@/components/workspace/NameDialog";
 import { folderName, workspaceLists } from "@/lib/workspaces";
+import { exportArchive } from "@/stores/actions";
+import { useDialogs } from "@/stores/dialogs";
 import { useWorkspace } from "@/stores/workspace";
 
 /**
@@ -81,6 +85,16 @@ export function WorkspaceSwitcher() {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void pickNew()}>
             <Plus /> New workspace…
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() =>
+              void exportArchive({ kind: "workspace", workspaceDir: workspace.dir }, workspace.name)
+            }
+          >
+            <Download /> Export workspace…
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => useDialogs.getState().openArchiveImport(null, "")}>
+            <FileArchive /> Import workspace archive…
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => void closeWorkspace()}>

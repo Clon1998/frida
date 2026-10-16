@@ -39,6 +39,15 @@ export const commands = {
 	addCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("add_collection", { dir })),
 	/**  Removes a collection from the workspace list. Its files are not deleted. */
 	removeCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("remove_collection", { dir })),
+	/**  Writes `source` as a Frida archive to `target` (chosen in a save dialog). */
+	exportArchive: (source: ExportSource, target: string) => typedError<ArchiveSummary, ApiError>(__TAURI_INVOKE("export_archive", { source, target })),
+	/**  What the archive at `file` contains, without importing it. */
+	previewArchive: (file: string) => typedError<ArchiveSummary, ApiError>(__TAURI_INVOKE("preview_archive", { file })),
+	/**
+	 *  Imports the archive at `file` into `target`. A new workspace (`target.kind == "workspace"`)
+	 *  is not opened here; the UI opens it afterwards.
+	 */
+	importArchive: (file: string, target: ImportTarget) => typedError<ArchiveImported, ApiError>(__TAURI_INVOKE("import_archive", { file, target })),
 	/**
 	 *  "Remove from list": takes `dir` off the recent and pinned workspaces. Returns the new
 	 *  settings.
@@ -324,6 +333,23 @@ export type AppSettings = {
 	 *  by itself.
 	 */
 	preferences?: Preferences,
+};
+
+/**  The result of an import, plus the refreshed workspace when one is open. */
+export type ArchiveImported = {
+	imported: ImportedArchive,
+	overview: WorkspaceOverview | null,
+};
+
+/**  What an archive contains. */
+export type ArchiveKind = "workspace" | "collection" | "folder" | "request";
+
+/**  What an export wrote or an import found, for the UI. */
+export type ArchiveSummary = {
+	manifest: Manifest,
+	/**  Number of files in the archive. */
+	files: number,
+	warnings: string[],
 };
 
 /**
@@ -626,6 +652,9 @@ export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already
 /**  An environment with AWS secrets has no AWS profile yet: the UI asks for one. */
 "aws_profile_required" | "aws";
 
+/**  What to export. Paths are absolute folders; `rel` is collection-relative (as in the tree). */
+export type ExportSource = { kind: "workspace"; workspaceDir: string } | { kind: "collection"; collectionDir: string } | { kind: "folder"; collectionDir: string; rel: string } | { kind: "request"; collectionDir: string; rel: string };
+
 /**  One changed file. Status letters as in `git status --short` (`M`, `A`, `D`, `R`, ...). */
 export type FileChange = {
 	/**  Relative to the folder the repo was opened for (the collection). */
@@ -729,6 +758,27 @@ export type ImportSummary = {
 	warnings: string[],
 };
 
+/**  Where to import an archive. Which one fits depends on the archive's kind. */
+export type ImportTarget = 
+/**  A workspace archive becomes a new workspace in `dir` (missing or empty). */
+{ kind: "workspace"; dir: string } | 
+/**
+ *  A collection archive becomes a new collection of the workspace, in `dir` (missing or
+ *  empty) or by default in `<workspace>/collections/<name>`.
+ */
+{ kind: "collection"; workspaceDir: string; dir: string | null } | 
+/**  A folder or request archive goes into the folder `parent` (`""`: root) of a collection. */
+{ kind: "into"; collectionDir: string; parent: string };
+
+/**  The result of an import. */
+export type ImportedArchive = {
+	summary: ArchiveSummary,
+	/**  The new workspace or collection folder, or the collection the folder/request went into. */
+	dir: string,
+	/**  For a folder or request: its collection-relative path. */
+	path: string | null,
+};
+
 /**  A `name: value` row that can be switched off, used for headers, query params, vars and form fields. */
 export type KeyValue = {
 	name: string,
@@ -738,6 +788,17 @@ export type KeyValue = {
 };
 
 export type LogLevel = "log" | "info" | "warn" | "error" | "debug";
+
+/**  `frida-export.yaml`. */
+export type Manifest = {
+	format: number,
+	kind: ArchiveKind,
+	/**  The display name of what was exported. */
+	name: string,
+	fridaVersion: string,
+	/**  ISO 8601, UTC. */
+	exportedAt: string,
+};
 
 export type MultipartField = {
 	name: string,

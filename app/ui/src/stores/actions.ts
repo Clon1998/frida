@@ -1,4 +1,6 @@
-import { commands } from "@/bindings";
+import { save } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
+import { commands, type ExportSource } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
 import { useDialogs } from "./dialogs";
 import { type DiffSelection, useGit } from "./git";
@@ -96,4 +98,32 @@ export function closeTabsAsking(dir: string, paths: string[]) {
 export function openChanges(dir: string, selection?: DiffSelection) {
   if (selection) useGit.getState().select(dir, selection);
   void tabs().openTab(dir, GIT_TAB);
+}
+
+/** `Orders API` → `orders-api`, for suggested file names. */
+const fileSlug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "export";
+
+/**
+ * "Export…" (PLAN.md M12): asks where to save, then writes `source` as a Frida archive. Secret
+ * values are never included; the toast says so, and lists anything that was left out.
+ */
+export async function exportArchive(source: ExportSource, name: string) {
+  const target = await save({
+    title: `Export "${name}"`,
+    defaultPath: `${fileSlug(name)}.frida.zip`,
+    filters: [{ name: "Frida archive", extensions: ["zip"] }],
+  });
+  if (!target) return;
+  try {
+    const summary = await unwrap(commands.exportArchive(source, target));
+    toast.success(`Exported "${name}" (${summary.files} files)`, {
+      description: ["Secret values are not included.", ...summary.warnings].join(" "),
+    });
+  } catch (e) {
+    showError(e);
+  }
 }
