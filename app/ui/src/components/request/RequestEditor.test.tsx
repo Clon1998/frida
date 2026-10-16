@@ -84,9 +84,12 @@ describe("RequestEditor params", () => {
     const [name] = screen.getAllByPlaceholderText("Add name");
     if (!name) throw new Error("no name input");
     fireEvent.change(name, { target: { value: "q" } });
-    const [value] = screen.getAllByPlaceholderText("Value");
-    if (!value) throw new Error("no value input");
-    fireEvent.change(value, { target: { value: "1" } });
+    // Value cells are one-line code editors (for {{variables}}); the first one after the URL
+    // bar is the new query row's value.
+    const value = document.querySelectorAll<HTMLElement>(".cm-editor")[1];
+    const valueView = value && EditorView.findFromDOM(value);
+    if (!valueView) throw new Error("no value editor");
+    act(() => valueView.dispatch({ changes: { from: 0, insert: "1" } }));
 
     expect(draft().url).toBe("http://x/a?q=1");
     expect(urlEditor().state.doc.toString()).toBe("http://x/a?q=1");

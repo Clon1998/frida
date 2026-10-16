@@ -533,7 +533,8 @@ function TextInput({
   const masked = secret && !editing && !value.trim().startsWith("{{");
   const hint = placeholder ?? (secret ? "{{secretVariable}} recommended" : undefined);
 
-  if (!variables || masked) {
+  // Plain input outside editor tabs (see VariablesContext), and for hidden secrets.
+  if (variables === undefined || masked) {
     return (
       <Input
         className="h-8 font-mono text-xs"
@@ -548,9 +549,12 @@ function TextInput({
     );
   }
   return (
+    // Styled like the shadcn <Input> above (border, focus ring, 32px high, 12px padding), so
+    // editor fields and plain ones (hidden secrets) look the same side by side.
     <div
+      className="min-w-0 rounded-md border border-input px-1 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30"
       onBlur={(e) => {
-        // Popups (autocompletion) live in <body>; only leaving the field itself counts.
+        // Popups (autocompletion) live outside; only leaving the field itself counts.
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEditing(false);
       }}
     >
@@ -558,7 +562,7 @@ function TextInput({
         singleLine
         compact
         autoFocus={editing}
-        className="w-full min-w-0 rounded-md border border-input font-mono shadow-xs dark:bg-input/30 has-[.cm-focused]:border-ring has-[.cm-focused]:ring-[3px] has-[.cm-focused]:ring-ring/50 [&_.cm-editor]:bg-transparent"
+        className="w-full font-mono [&_.cm-editor]:bg-transparent [&_.cm-scroller]:leading-[30px]!"
         value={value}
         placeholder={hint}
         onChange={onChange}

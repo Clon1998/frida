@@ -31,8 +31,12 @@ export interface VariableContext {
 /**
  * Provides the variable context to every editor below (URL, body, scripts, key/value cells),
  * so each one doesn't need it passed down by hand.
+ *
+ * `undefined` (no provider): not inside an editor tab, fields are plain inputs.
+ * `null`: inside one, but the first report hasn't arrived yet. Fields must already be code
+ * editors then, or they would visibly switch from a plain input to an editor a moment later.
  */
-export const VariablesContext = createContext<VariableContext | null>(null);
+export const VariablesContext = createContext<VariableContext | null | undefined>(undefined);
 
 /** Replaces the known variables (sent when a new inspect report arrives). */
 export const setVariables = StateEffect.define<VariableContext | null>();

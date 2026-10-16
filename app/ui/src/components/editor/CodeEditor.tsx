@@ -168,7 +168,7 @@ export function CodeEditor({
   onPasteText,
   autoFocus = false,
 }: CodeEditorProps) {
-  const contextVariables = useContext(VariablesContext);
+  const contextVariables = useContext(VariablesContext) ?? null;
   const variables = variablesProp === undefined ? contextVariables : variablesProp;
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);

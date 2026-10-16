@@ -214,8 +214,9 @@ export function VarCellInput({
   onChange: (value: string) => void;
   placeholder?: string;
 }) {
+  // Only outside editor tabs; see VariablesContext for why `null` (still loading) doesn't count.
   const variables = useContext(VariablesContext);
-  if (!variables) {
+  if (variables === undefined) {
     return (
       <CellInput
         placeholder={placeholder}

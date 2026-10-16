@@ -49,6 +49,22 @@ describe("auth fields", () => {
     expect(missing).toEqual(["{{missing}}"]);
   });
 
+  // Regression: fields were plain inputs until the variables arrived, then switched to editors.
+  it("are editors right away, before the variables have loaded", () => {
+    render(
+      <VariablesContext.Provider value={null}>
+        <AuthEditor
+          auth={basic("{{user}}", "{{pw}}")}
+          onChange={() => {}}
+          canInherit
+          context={{ dir: "/c", path: "", request: null }}
+        />
+      </VariablesContext.Provider>,
+    );
+    expect(document.querySelectorAll(".cm-editor")).toHaveLength(2);
+    expect(document.querySelectorAll("input")).toHaveLength(0);
+  });
+
   it("hide literal secrets until the field is focused", () => {
     renderEditor(basic("alice", "hunter2"));
     const password = document.querySelector<HTMLInputElement>('input[type="password"]');
