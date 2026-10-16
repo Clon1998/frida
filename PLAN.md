@@ -423,13 +423,14 @@ UI requirements:
 - Features:
   - Current branch with ahead/behind counts (via `fetch` on demand).
   - Changed files list, grouped staged/unstaged with status letters.
-  - A diff viewer per file (unified, with syntax highlighting).
+  - A diff viewer per file in a git tab (unified or side by side, with syntax highlighting; M12).
   - Stage/unstage per file and all.
   - Commit with a message.
   - Push.
   - Pull (`--ff-only`). If it fails, show git's message and suggest resolving outside Frida.
   - Branch list and switch, blocked when there are uncommitted changes, with a clear message.
 - Show a live git status indicator per collection (via the file watcher). Each collection can live in its own repo.
+- Read-only `git show <rev>:<path>` is allowed for the diff viewer (M12).
 - Never run destructive commands such as reset, force push or clean.
 
 ## 13. History
@@ -604,6 +605,35 @@ checks the results; unit tests cover the order, skip, setNextRequest jumps, stop
 run; skip, jump, repeat and stop; loop guard; failed test and unknown jump; cancel), `runner.rs` unit test for the
 order, `crates/frida-script/tests/sandbox.rs` for the script controls, `app/ui/src/stores/runner.test.ts`. The UI
 was checked in a browser with a mocked backend; a manual run in the app is still open.*
+
+### M12: Feedback round 2 (search, diffs in tabs, Frida archives, UI flow tests)
+Decided with Patrick on 2026-10-16 (see the decisions log).
+- [ ] **Search in bodies** (feedback #3): Cmd/Ctrl+F and a search button in the response body, request body and
+  script editors (CodeMirror's search panel, already part of `basicSetup`; styled to the theme), with match count and
+  next/previous. The JSONPath filter becomes less prominent: a filter icon next to Pretty/Raw that expands the field;
+  it stays open while a filter is set.
+- [ ] **Git diffs in tabs** (feedback #14/#15): instead of a dialog, "Changes" opens a git tab (`@git/<collection>`)
+  with the changed-files list (staged/unstaged) on the left and the selected file's diff on the right; selecting a file
+  only swaps the diff. Rendered with **`@codemirror/merge`** (6.12.x, official CodeMirror package, unified view with
+  a side-by-side toggle, syntax highlighting for YAML), which needs the old and new text: new read-only commands return
+  `HEAD:<path>` / index (`:<path>`) / worktree content via `git show` (read-only, add it to the §12 command list).
+  Added/deleted/binary files get a clear placeholder. The raw `git diff` text view is dropped.
+- [ ] **Frida archive export/import** (feedback #13): export a workspace, a collection, a folder or a single request
+  as a `.zip` that contains the on-disk files in their §4 layout plus `frida-export.yaml`
+  (`format: 1`, `kind: workspace|collection|folder|request`, Frida version, export time). Secret values are never
+  included, only `secret: true` markers. Import asks for the target (workspace folder, or a collection/folder in the
+  tree), checks the manifest, rejects absolute paths and `..` entries, and regenerates collection ids that already
+  exist in the workspace. New dependency: the `zip` crate (9.x, default features off + `deflate`), in `frida-core`.
+- [ ] **UI flow tests with Playwright** (feedback #11): `@playwright/test` (1.64.x) drives the Vite dev server with a
+  fake backend: `@tauri-apps/api/mocks` `mockIPC` serving an in-memory workspace, injected only when
+  `VITE_E2E=1`, so production builds don't contain it. Core flows: open workspace → open request → edit URL/params →
+  send → see the response; create/rename/delete request and folder; environments (add a variable by typing, set active,
+  secrets); unsaved-changes close dialog (Save / Don't save / Cancel); OpenAPI import preview; history list; git tab
+  (status → diff → stage → commit). Runs in CI on Linux (Chromium). The Rust side keeps its integration tests.
+
+**Acceptance:** search works in all three editors; the git tab replaces the diff dialog; a collection exported and
+imported into another workspace loads unchanged (integration test, plus one checking that no secret values are in the
+archive and that path traversal entries are rejected); `pnpm e2e` passes locally and in CI.
 
 ### Later (backlog, not scheduled)
 - `frida-cli` headless runner (`frida run <collection> --env dev`).
@@ -807,6 +837,12 @@ Deviations from and clarifications of this plan, newest last.
   workspaces first, then at most 5 recent ones (10 are still remembered). Entries can be pinned/unpinned and removed
   from the list: on hover in the menu (a right-click menu inside an open dropdown fights Radix for focus), by
   right-click on the start screen. `pinnedWorkspaces` is new in the local `settings.json` (§4.6); no repo format change.
+
+- **2026-10-16 M12 scope (decided with Patrick).** From the second feedback round, the bugs were fixed right away and
+  four features were planned as M12: diffs use `@codemirror/merge` (chosen over `@git-diff-view/react` and
+  `diff2html`: we already ship CodeMirror, so it's small and matches the theme); Frida archives are a zip of the
+  on-disk YAML plus a manifest (not a second single-file format); Playwright tests run against Vite with a mocked IPC
+  (`tauri-driver` doesn't support macOS).
 
 ## 17. Testing strategy
 
