@@ -100,6 +100,13 @@ pub enum OAuth2Error {
 /// Holds OAuth2 tokens in memory and fetches or refreshes them when needed.
 pub struct OAuth2Manager {
     tokens: Mutex<HashMap<TokenKey, Token>>,
+    /// One lock per token, held while fetching or refreshing it, so requests that need the same
+    /// token at the same time wait for one fetch instead of each starting their own (for the
+    /// authorization code grant: one browser sign-in, not one per request).
+    ///
+    /// A `tokio::sync::Mutex`, because it is held across the `.await` of the HTTP call; a
+    /// `std::sync::Mutex` must never be (it would block the runtime thread).
+    fetching: Mutex<HashMap<TokenKey, Arc<tokio::sync::Mutex<()>>>>,
     open_browser: BrowserOpener,
 }
 
@@ -117,6 +124,7 @@ impl OAuth2Manager {
     pub fn new(open_browser: BrowserOpener) -> Self {
         Self {
             tokens: Mutex::new(HashMap::new()),
+            fetching: Mutex::new(HashMap::new()),
             open_browser,
         }
     }
@@ -130,6 +138,18 @@ impl OAuth2Manager {
         cancel: &CancellationToken,
     ) -> Result<Token, OAuth2Error> {
         let key = TokenKey::of(config);
+        if let Some(token) = self.cached_valid(&key) {
+            return Ok(token);
+        }
+        // Only one fetch per token at a time; whoever waited here finds its result in the cache.
+        let lock = Arc::clone(
+            self.fetching
+                .lock()
+                .expect("token fetch locks")
+                .entry(key.clone())
+                .or_default(),
+        );
+        let _fetching = lock.lock().await;
         let cached = self
             .tokens
             .lock()
@@ -150,6 +170,16 @@ impl OAuth2Manager {
         }
         let fresh = self.fetch(config, client, cancel).await?;
         Ok(self.store(key, fresh))
+    }
+
+    /// The cached token for `key` if it doesn't need a refresh yet.
+    fn cached_valid(&self, key: &TokenKey) -> Option<Token> {
+        self.tokens
+            .lock()
+            .expect("token cache lock")
+            .get(key)
+            .filter(|t| !t.needs_refresh())
+            .cloned()
     }
 
     /// Fetches a new token, ignoring the cache ("Get new token" in the UI).

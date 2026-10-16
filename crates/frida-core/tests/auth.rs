@@ -326,3 +326,29 @@ async fn rejected_credentials_give_a_clear_error() {
         "{message}"
     );
 }
+
+/// Requests sent at the same time share one token fetch (for the authorization code grant,
+/// one fetch means one browser sign-in, not one per request).
+#[tokio::test]
+async fn concurrent_requests_share_one_token_fetch() {
+    let addr = server().await;
+    let scheme = oauth2(addr, OAuth2Grant::ClientCredentials, "frida");
+    let (dir, rel, request) = collection_with(
+        Auth::Custom {
+            schemes: vec![scheme],
+        },
+        addr,
+    );
+    let oauth = OAuth2Manager::new(simulated_browser());
+    let (a, b, c, d) = tokio::join!(
+        send(dir.path(), &rel, &request, &oauth),
+        send(dir.path(), &rel, &request, &oauth),
+        send(dir.path(), &rel, &request, &oauth),
+        send(dir.path(), &rel, &request, &oauth),
+    );
+    let tokens: std::collections::BTreeSet<_> = [a, b, c, d]
+        .iter()
+        .map(|r| r["authorization"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(tokens.len(), 1, "one token for all four: {tokens:?}");
+}
