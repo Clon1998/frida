@@ -2,7 +2,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { Annotation, Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
-import { autocompletion, completionStatus } from "@codemirror/autocomplete";
+import { acceptCompletion, autocompletion, completionStatus } from "@codemirror/autocomplete";
 import {
   EditorView,
   keymap,
@@ -214,6 +214,10 @@ export function CodeEditor({
         doc: value,
         extensions: [
           lineMode,
+          // Tab accepts the highlighted suggestion (CodeMirror's default keymap only binds Enter).
+          // Without an open suggestion list `acceptCompletion` returns false, so Tab still moves
+          // the focus to the next field.
+          Prec.highest(keymap.of([{ key: "Tab", run: acceptCompletion }])),
           theme,
           tooltips({ parent: tooltipHost() }),
           variablesExtension({ pathParams }),
