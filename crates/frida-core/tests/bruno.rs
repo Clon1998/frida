@@ -17,18 +17,37 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Collection ids are random and file paths depend on the checkout location.
+/// Collection ids are random and file paths depend on the checkout location. Paths are replaced
+/// *before* writing YAML: the YAML writer wraps long lines, so replacing afterwards would give
+/// different line breaks on machines with longer or shorter paths.
 fn snapshot(plan: &BrunoPlan) -> String {
     let mut plan = plan.clone();
     plan.collection.id = "<generated>".into();
-    let root = fixture("").canonicalize().unwrap();
-    to_yaml_string(&plan)
-        .unwrap()
-        .replace(&root.to_string_lossy().to_string(), "<testdata/bruno>")
-        .replace(
-            &fixture("").to_string_lossy().to_string(),
-            "<testdata/bruno>/",
-        )
+    let roots = [
+        fixture("")
+            .canonicalize()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
+        fixture("").to_string_lossy().to_string(),
+    ];
+    let mut value = serde_json::to_value(&plan).unwrap();
+    replace_strings(&mut value, &roots);
+    to_yaml_string(&value).unwrap()
+}
+
+fn replace_strings(value: &mut serde_json::Value, roots: &[String]) {
+    match value {
+        serde_json::Value::String(s) => {
+            for root in roots {
+                let root = root.trim_end_matches('/');
+                *s = s.replace(root, "<testdata/bruno>");
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(|v| replace_strings(v, roots)),
+        serde_json::Value::Object(map) => map.values_mut().for_each(|v| replace_strings(v, roots)),
+        _ => {}
+    }
 }
 
 fn requests(items: &[PlannedItem], out: &mut Vec<Request>) {

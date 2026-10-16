@@ -188,8 +188,7 @@ root:
               enabled: true
             - name: invoice
               type: file
-              value: >-
-                <testdata/bruno>/shop/files/invoice.pdf
+              value: <testdata/bruno>/shop/files/invoice.pdf
               enabled: true
             - name: draft
               type: text
