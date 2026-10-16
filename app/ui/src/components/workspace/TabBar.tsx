@@ -1,5 +1,5 @@
 import { Folder, History, Layers, Play, Settings, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -14,7 +14,6 @@ import { useDialogs } from "@/stores/dialogs";
 import { useEnvs } from "@/stores/envs";
 import { isDirty, type Tab, tabTitle, useTabs } from "@/stores/tabs";
 import { cn } from "cn";
-import { ConfirmDialog } from "./ConfirmDialog";
 
 const NO_TABS: Tab[] = [];
 
@@ -46,21 +45,10 @@ export function TabBar({ dir }: { dir: string }) {
     el?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [active, tabs.length]);
 
-  /** Tabs waiting for "close without saving?" confirmation. */
-  const [confirmClose, setConfirmClose] = useState<string[] | null>(null);
-
-  /** Closes `paths`, asking first if any of them has unsaved changes. */
-  const requestClose = (paths: string[]) => {
-    const dirty = tabs.filter((t) => paths.includes(t.path) && isDirty(t));
-    if (dirty.length > 0) setConfirmClose(paths);
-    else closeTabs(dir, paths);
-  };
+  const requestClose = (paths: string[]) => actions.closeTabsAsking(dir, paths);
 
   if (tabs.length === 0) return null;
 
-  const dirtyInConfirm = confirmClose
-    ? tabs.filter((t) => confirmClose.includes(t.path) && isDirty(t))
-    : [];
   const paths = (list: Tab[]) => list.map((t) => t.path);
 
   return (
@@ -108,7 +96,7 @@ export function TabBar({ dir }: { dir: string }) {
                     e.stopPropagation();
                     requestClose([tab.path]);
                   }}
-                  className="ml-1 flex size-4 shrink-0 items-center justify-center rounded hover:bg-muted"
+                  className="ml-auto flex size-4 shrink-0 items-center justify-center rounded hover:bg-muted"
                 >
                   {/* Unsaved tabs show a dot that turns into the close button on hover. */}
                   {isDirty(tab) ? (
@@ -179,23 +167,6 @@ export function TabBar({ dir }: { dir: string }) {
           </ContextMenu>
         ))}
       </div>
-      <ConfirmDialog
-        open={confirmClose !== null}
-        title="Close without saving?"
-        description={
-          dirtyInConfirm.length === 1 && dirtyInConfirm[0]
-            ? `"${tabTitle(dirtyInConfirm[0])}" has unsaved changes that will be lost.`
-            : `${dirtyInConfirm.length} tabs have unsaved changes that will be lost: ${dirtyInConfirm
-                .map(tabTitle)
-                .join(", ")}.`
-        }
-        confirmLabel="Close"
-        destructive
-        onOpenChange={(o) => !o && setConfirmClose(null)}
-        onConfirm={() => {
-          if (confirmClose) closeTabs(dir, confirmClose);
-        }}
-      />
     </>
   );
 }

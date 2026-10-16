@@ -1,6 +1,7 @@
 import { commands } from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
-import { useTabs } from "./tabs";
+import { useDialogs } from "./dialogs";
+import { isDirty, useTabs } from "./tabs";
 import { useWorkspace } from "./workspace";
 
 /**
@@ -78,3 +79,14 @@ export const moveItem = (dir: string, path: string, parent: string, index: numbe
 
 export const revealItem = (dir: string, path: string) =>
   run(() => unwrap(commands.revealItem(dir, path)));
+
+/**
+ * Closes the tabs at `paths`. If any of them has unsaved changes, asks first (save, don't save
+ * or cancel) in the app-wide CloseTabsDialog.
+ */
+export function closeTabsAsking(dir: string, paths: string[]) {
+  const open = tabs().byCollection[dir]?.tabs ?? [];
+  if (open.some((t) => paths.includes(t.path) && isDirty(t)))
+    useDialogs.getState().openCloseTabs(dir, paths);
+  else tabs().closeTabs(dir, paths);
+}

@@ -1,4 +1,3 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { Columns2, Keyboard, PanelRight, Rows2, Settings, SquareChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
@@ -9,6 +8,7 @@ import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { ConsolePanel } from "@/components/console/ConsolePanel";
 import { QuickOpen } from "./QuickOpen";
+import { CloseTabsDialog } from "./CloseTabsDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { formatKeys, isMac } from "@/lib/shortcuts";
 import * as actions from "@/stores/actions";
@@ -24,7 +24,7 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useEnvs } from "@/stores/envs";
-import { isDirty, showsResponse, tabTitle, useTabs } from "@/stores/tabs";
+import { showsResponse, useTabs } from "@/stores/tabs";
 import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { RunnerView } from "@/components/runner/RunnerView";
 import { listenToRunProgress } from "@/stores/runner";
@@ -140,6 +140,7 @@ export function AppShell() {
       <QuickOpen />
       <ShortcutsDialog />
       <AwsProfileDialog />
+      <CloseTabsDialog />
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
         {collection && <GitStatusIndicator dir={collection.dir} />}
@@ -335,16 +336,7 @@ function useShortcuts() {
         void tabs.save(dir, active);
       } else if (e.key === "w") {
         e.preventDefault();
-        const tab = tabs.byCollection[dir]?.tabs.find((t) => t.path === active);
-        if (tab && isDirty(tab)) {
-          void ask(`"${tabTitle(tab)}" has unsaved changes that will be lost.`, {
-            title: "Close without saving?",
-            kind: "warning",
-            okLabel: "Close",
-          }).then((close) => close && tabs.closeTab(dir, active));
-        } else {
-          tabs.closeTab(dir, active);
-        }
+        actions.closeTabsAsking(dir, [active]);
       }
     };
     window.addEventListener("keydown", onKeyDown);
