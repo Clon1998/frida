@@ -1,0 +1,25 @@
+headers {
+  X-Client: bruno
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+vars:pre-request {
+  apiVersion: v1
+}
+
+script:pre-request {
+  req.setHeader("X-Api-Version", bru.getVar("apiVersion") || "v1");
+}
+
+docs {
+  # Shop
+  
+  Fixture for the Bruno importer.
+}

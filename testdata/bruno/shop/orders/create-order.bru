@@ -1,0 +1,26 @@
+meta {
+  name: Create order
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/orders/:region
+  body: multipartForm
+  auth: inherit
+}
+
+params:path {
+  region: eu
+}
+
+body:multipart-form {
+  note: hello @contentType(text/plain)
+  invoice: @file(files/invoice.pdf)
+  ~draft: true
+}
+
+script:pre-request {
+  bru.setVar("orderTs", Date.now());
+  const dir = bru.cwd();
+}

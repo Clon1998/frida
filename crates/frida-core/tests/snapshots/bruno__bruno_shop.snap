@@ -1,0 +1,311 @@
+---
+source: crates/frida-core/tests/bruno.rs
+expression: snapshot(&plan)
+---
+collection:
+  version: 1
+  id: <generated>
+  name: Shop
+  vars:
+  - name: apiVersion
+    value: v1
+    enabled: true
+  headers:
+  - name: X-Client
+    value: bruno
+    enabled: true
+  auth:
+    mode: custom
+    schemes:
+    - type: bearer
+      token: "{{token}}"
+  scripts:
+    pre: req.setHeader("X-Api-Version", bru.getVar("apiVersion") || "v1");
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: 30000
+    tls:
+      verify: true
+      caCertPaths: []
+  docs: |-
+    # Shop
+    
+    Fixture for the Bruno importer.
+environments:
+- version: 1
+  name: local
+  variables:
+  - name: baseUrl
+    value: http://localhost:8787
+  - name: user
+    value: ann
+  - name: password
+    secret: true
+root:
+  folder: null
+  items:
+  - folder:
+      folder:
+        version: 1
+        name: Auth
+        seq: 0
+        vars: []
+        headers: []
+        auth:
+          mode: none
+        scripts:
+          pre: ""
+          post: ""
+        tests: ""
+        settings:
+          timeoutMs: null
+        docs: ""
+      items:
+      - request:
+          version: 1
+          name: Login
+          seq: 0
+          method: POST
+          url: "{{baseUrl}}/login"
+          params:
+            query: []
+            path: []
+          headers: []
+          body:
+            mode: json
+            json: |-
+              {
+                "user": "{{user}}",
+                "token": "t-1"
+              }
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: inherit
+          vars: []
+          scripts:
+            pre: ""
+            post: |-
+              // Converted from Bruno post-response variables.
+              fri.setVar("token", JSON.parse(res.body.body).token);
+          tests: |-
+            test("echoes the user", () => {
+              expect(JSON.parse(res.body.body).user).to.equal("ann");
+            });
+            
+            // Converted from Bruno assertions.
+            test("res.status: eq 200", () => expect(res.status).to.eql(200));
+            test("res.body.method: eq POST", () => expect(res.body.method).to.eql("POST"));
+            // (disabled) res.body.never: eq 1
+          settings:
+            timeoutMs: null
+          docs: ""
+  - folder:
+      folder:
+        version: 1
+        name: Orders
+        seq: 0
+        vars: []
+        headers:
+        - name: X-Tenant
+          value: acme
+          enabled: true
+        auth:
+          mode: inherit
+        scripts:
+          pre: ""
+          post: ""
+        tests: ""
+        settings:
+          timeoutMs: null
+        docs: ""
+      items:
+      - request:
+          version: 1
+          name: List orders
+          seq: 0
+          method: GET
+          url: "{{baseUrl}}/orders?limit=10"
+          params:
+            query:
+            - name: limit
+              value: "10"
+              enabled: true
+            - name: status
+              value: open
+              enabled: false
+            path: []
+          headers: []
+          body:
+            mode: none
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: inherit
+          vars: []
+          scripts:
+            pre: ""
+            post: ""
+          tests: |-
+            // Converted from Bruno assertions.
+            test("res.status: 200", () => expect(res.status).to.eql(200));
+            test("res.body.headers.authorization: eq Bearer t-1", () => expect(res.body.headers.authorization).to.eql("Bearer t-1"));
+            test("res.body.headers.x-tenant: isDefined", () => expect(res.body.headers["x-tenant"]).to.not.be.undefined);
+            test("res.body.query: contains limit=10", () => expect(res.body.query).to.include("limit=10"));
+          settings:
+            timeoutMs: 5000
+          docs: ""
+      - request:
+          version: 1
+          name: Create order
+          seq: 0
+          method: POST
+          url: "{{baseUrl}}/orders/:region"
+          params:
+            query: []
+            path:
+            - name: region
+              value: eu
+          headers: []
+          body:
+            mode: multipart
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart:
+            - name: note
+              type: text
+              value: hello
+              enabled: true
+            - name: invoice
+              type: file
+              value: >-
+                <testdata/bruno>/shop/files/invoice.pdf
+              enabled: true
+            - name: draft
+              type: text
+              value: "true"
+              enabled: false
+            binaryPath: ""
+          auth:
+            mode: inherit
+          vars: []
+          scripts:
+            pre: |-
+              bru.setVar("orderTs", Date.now());
+              const dir = bru.cwd();
+            post: ""
+          tests: ""
+          settings:
+            timeoutMs: null
+          docs: ""
+      - request:
+          version: 1
+          name: Search (GraphQL)
+          seq: 0
+          method: POST
+          url: "{{baseUrl}}/graphql"
+          params:
+            query: []
+            path: []
+          headers: []
+          body:
+            mode: json
+            json: |-
+              {
+                "query": "query Orders($limit: Int) {\n  orders(limit: $limit) { id }\n}",
+                "variables": {
+                  "limit": 5
+                }
+              }
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: inherit
+          vars: []
+          scripts:
+            pre: ""
+            post: ""
+          tests: ""
+          settings:
+            timeoutMs: null
+          docs: ""
+  - folder:
+      folder:
+        version: 1
+        name: misc
+        seq: 0
+        vars: []
+        headers: []
+        auth:
+          mode: none
+        scripts:
+          pre: ""
+          post: ""
+        tests: ""
+        settings:
+          timeoutMs: null
+        docs: ""
+      items:
+      - request:
+          version: 1
+          name: Digest protected
+          seq: 0
+          method: GET
+          url: "{{baseUrl}}/digest"
+          params:
+            query: []
+            path: []
+          headers: []
+          body:
+            mode: none
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: none
+          vars: []
+          scripts:
+            pre: ""
+            post: ""
+          tests: ""
+          settings:
+            timeoutMs: null
+          docs: ""
+summary:
+  collectionName: Shop
+  requests: 5
+  folders: 3
+  environments: 1
+  baseUrl: ""
+  secretsToFill:
+  - "local: password"
+  warnings:
+  - >-
+    request "Create order", pre-request script uses bru.cwd, which Frida doesn't
+    support (see docs/scripting.md).
+  - >-
+    request "Digest protected" uses digest auth, which Frida doesn't support; its
+    auth was set to none.
+  - "Environment \"local\": the disabled variable \"legacyHost\" was left out."
+  - >-
+    1 GraphQL request(s) were imported as JSON POST requests ({"query",
+    "variables"}).
+  - >-
+    File bodies and multipart files point to files in the Bruno collection
+    (<testdata/bruno>/shop); keep them there or update the paths.

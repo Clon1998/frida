@@ -1,0 +1,16 @@
+meta {
+  name: Digest protected
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/digest
+  body: none
+  auth: digest
+}
+
+auth:digest {
+  username: ann
+  password: secret
+}

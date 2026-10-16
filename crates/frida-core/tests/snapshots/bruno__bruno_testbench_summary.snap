@@ -1,0 +1,120 @@
+---
+source: crates/frida-core/tests/bruno.rs
+expression: "format!(\"requests: {}\\nfolders: {}\\nenvironments: {}\\nsecrets: {:?}\\nwarnings:\\n{}\",\ns.requests, s.folders, s.environments, s.secrets_to_fill,\ns.warnings.join(\"\\n\")).replace(&fixture(\"\").to_string_lossy().to_string(),\n\"<testdata/bruno>/\")"
+---
+requests: 227
+folders: 56
+environments: 2
+secrets: ["Local: github_client_secret", "Local: github_client_id", "Local: google_client_id", "Local: google_client_secret", "Local: github_authorization_code", "Local: passwordCredentials_access_token", "Local: client_credentials_access_token", "Local: authorization_code_access_token", "Local: github_access_token"]
+warnings:
+request "Basic Auth 200", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "Basic Auth 401", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "Digest Auth 200" uses digest auth, which Frida doesn't support; its auth was set to none.
+request "Digest Auth 401" uses digest auth, which Frida doesn't support; its auth was set to none.
+request "echo multipart via scripting", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "Disable Redirect", pre-request script uses req.setMaxRedirects, which Frida doesn't support (see docs/scripting.md).
+request "getCookie", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "getCookie", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "setCookie", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "setCookie", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "getCookies", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "getCookies", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "setCookies", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "setCookies", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "deleteCookie", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "deleteCookie", post-response script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "deleteCookie", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "clear", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "clear", post-response script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "clear", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "setCookie header inclusion", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "setCookie header inclusion", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "deleteCookies", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "deleteCookies", post-response script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "deleteCookies", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "Redirect Cookie Save", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directGet", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directGet", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "hasCookie", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "hasCookie", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directReadMethods", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directReadMethods", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directIteration", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directIteration", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directWrite", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "directWrite", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "clearScope", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "clearScope", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "crossDomainIsolation", pre-request script uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "crossDomainIsolation", tests uses bru.cookies, which Frida doesn't support (see docs/scripting.md).
+request "runRequest", pre-request script uses bru.runRequest, which Frida doesn't support (see docs/scripting.md).
+request "runRequest", post-response script uses bru.runRequest, which Frida doesn't support (see docs/scripting.md).
+request "runRequest", tests uses bru.runRequest, which Frida doesn't support (see docs/scripting.md).
+request "runRequest-1", pre-request script uses bru.runRequest, which Frida doesn't support (see docs/scripting.md).
+request "deleteAllGlobalEnvVars", tests uses bru.deleteAllGlobalEnvVars, which Frida doesn't support (see docs/scripting.md).
+request "deleteAllEnvVars", tests uses bru.deleteAllEnvVars, which Frida doesn't support (see docs/scripting.md).
+request "setCollectionVar", post-response script uses bru.setCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "deleteCollectionVar", pre-request script uses bru.setCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "deleteCollectionVar", post-response script uses bru.deleteCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "deleteCollectionVar", tests uses bru.deleteCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "deleteAllCollectionVars", pre-request script uses bru.setCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "deleteAllCollectionVars", tests uses bru.deleteAllCollectionVars, bru.getAllCollectionVars, bru.setCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "getAllCollectionVars", pre-request script uses bru.setCollectionVar, which Frida doesn't support (see docs/scripting.md).
+request "getAllCollectionVars", tests uses bru.getAllCollectionVars, which Frida doesn't support (see docs/scripting.md).
+request "read-methods", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "search-methods", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "iteration-methods", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "transform-methods", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "add", pre-request script uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "add", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "remove", pre-request script uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "remove", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "clear", pre-request script uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "clear", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "populate", pre-request script uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "populate", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "assimilate", pre-request script uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "assimilate", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "disabled-headers", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "case-insensitive", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "case-insensitive-write", pre-request script uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "case-insensitive-write", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "context-binding", tests uses req.headerList, which Frida doesn't support (see docs/scripting.md).
+request "getPathParam", tests uses req.getPathParams, which Frida doesn't support (see docs/scripting.md).
+request "read-methods", tests uses res.headerList, which Frida doesn't support (see docs/scripting.md).
+request "search-methods", tests uses res.headerList, which Frida doesn't support (see docs/scripting.md).
+request "iteration-methods", tests uses res.headerList, which Frida doesn't support (see docs/scripting.md).
+request "transform-methods", tests uses res.headerList, which Frida doesn't support (see docs/scripting.md).
+request "case-insensitive", tests uses res.headerList, which Frida doesn't support (see docs/scripting.md).
+request "axios-pre-req-script", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "cheerio", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "cheerio", post-response script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "cheerio", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "crypto-js-pre-request-script", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "getRandomValues", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "randomBytes", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "nanoid", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "tv4", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "uuid", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "xml2js", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "xml2js", post-response script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "xml2js", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "sum", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "sum (without js extn)", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "invalid and valid module imports", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "additional context root", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-path", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-crypto", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-fs", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-os", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-util", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-querystring", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-zlib", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "node-stream", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "fakerjs", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "ajv", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "ajv", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "jose", pre-request script uses require(...), which Frida doesn't support (see docs/scripting.md).
+request "external-lib-bru-req-res", tests uses require(...), which Frida doesn't support (see docs/scripting.md).
+3 GraphQL request(s) were imported as JSON POST requests ({"query", "variables"}).
+File bodies and multipart files point to files in the Bruno collection (<testdata/bruno>/testbench); keep them there or update the paths.

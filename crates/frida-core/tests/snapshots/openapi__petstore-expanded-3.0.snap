@@ -171,6 +171,7 @@ summary:
   collectionName: Swagger Petstore
   requests: 4
   folders: 0
+  environments: 1
   baseUrl: https://petstore.swagger.io/v2
   secretsToFill: []
   warnings: []

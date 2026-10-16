@@ -1,0 +1,28 @@
+meta {
+  name: List orders
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/orders?limit=10
+  body: none
+  auth: inherit
+}
+
+params:query {
+  limit: 10
+  ~status: open
+}
+
+settings {
+  encodeUrl: true
+  timeout: 5000
+}
+
+assert {
+  res.status: 200
+  res.body.headers.authorization: eq Bearer t-1
+  res.body.headers.x-tenant: isDefined
+  res.body.query: contains limit=10
+}

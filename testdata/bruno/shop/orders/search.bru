@@ -1,0 +1,23 @@
+meta {
+  name: Search (GraphQL)
+  type: graphql
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/graphql
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query Orders($limit: Int) {
+    orders(limit: $limit) { id }
+  }
+}
+
+body:graphql:vars {
+  {
+    "limit": 5
+  }
+}

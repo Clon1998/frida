@@ -1,0 +1,34 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/login
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "user": "{{user}}",
+    "token": "t-1"
+  }
+}
+
+vars:post-response {
+  token: JSON.parse(res.body.body).token
+}
+
+assert {
+  res.status: eq 200
+  res.body.method: eq POST
+  ~res.body.never: eq 1
+}
+
+tests {
+  test("echoes the user", () => {
+    expect(JSON.parse(res.body.body).user).to.equal("ann");
+  });
+}

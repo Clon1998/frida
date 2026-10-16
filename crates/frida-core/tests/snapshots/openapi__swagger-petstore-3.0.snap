@@ -788,6 +788,7 @@ summary:
   collectionName: Swagger Petstore - OpenAPI 3.0
   requests: 19
   folders: 3
+  environments: 1
   baseUrl: /api/v3
   secretsToFill:
   - api_key

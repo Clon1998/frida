@@ -37,7 +37,8 @@ pub struct ImportSummary {
     pub collection_name: String,
     pub requests: u32,
     pub folders: u32,
-    /// The `baseUrl` of the created `default` environment.
+    pub environments: u32,
+    /// The `baseUrl` of the created `default` environment (empty when not applicable).
     pub base_url: String,
     /// Secret variables created without a value, for the user to fill in.
     pub secrets_to_fill: Vec<String>,
@@ -235,6 +236,7 @@ impl<'a> Mapper<'a> {
             collection_name: name,
             requests: u32::try_from(requests).unwrap_or(u32::MAX),
             folders: u32::try_from(folders.len()).unwrap_or(u32::MAX),
+            environments: 1,
             base_url,
             secrets_to_fill: environment
                 .variables

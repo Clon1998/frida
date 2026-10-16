@@ -1,0 +1,546 @@
+---
+source: crates/frida-core/tests/bruno.rs
+expression: snapshot(&plan)
+---
+collection:
+  version: 1
+  id: <generated>
+  name: bruno-yml-testbench
+  vars:
+  - name: coll_str
+    value: collection_string
+    enabled: true
+  - name: coll_num
+    value: "100"
+    enabled: true
+  - name: coll_bool
+    value: "false"
+    enabled: true
+  - name: coll_obj
+    value: "{\"scope\":\"collection\"}"
+    enabled: true
+  headers: []
+  auth:
+    mode: none
+  scripts:
+    pre: ""
+    post: ""
+  tests: ""
+  settings:
+    timeoutMs: 30000
+    tls:
+      verify: true
+      caCertPaths: []
+  docs: ""
+environments:
+- version: 1
+  name: Local
+  variables:
+  - name: host
+    value: http://localhost:8080
+  - name: localhost
+    value: http://localhost:8081
+  - name: echo-host
+    value: https://echo.usebruno.com
+  - name: typed_env_num
+    value: "300"
+  - name: typed_env_bool
+    value: "true"
+  - name: typed_env_obj
+    value: "{\"scope\":\"env\"}"
+- version: 1
+  name: Prod
+  variables:
+  - name: host
+    value: https://testbench-sanity.usebruno.com
+  - name: localhost
+    value: http://localhost:8081
+  - name: echo-host
+    value: https://echo.usebruno.com
+  - name: typed_env_num
+    value: "300"
+  - name: typed_env_bool
+    value: "true"
+  - name: typed_env_obj
+    value: "{\"scope\":\"env\"}"
+root:
+  folder: null
+  items:
+  - folder:
+      folder:
+        version: 1
+        name: response-time
+        seq: 0
+        vars: []
+        headers: []
+        auth:
+          mode: none
+        scripts:
+          pre: ""
+          post: ""
+        tests: ""
+        settings:
+          timeoutMs: null
+        docs: ""
+      items:
+      - request:
+          version: 1
+          name: delayed headers
+          seq: 0
+          method: GET
+          url: "{{localhost}}/api/wait-for/headers?time=1000"
+          params:
+            query:
+            - name: time
+              value: "1000"
+              enabled: true
+            path: []
+          headers: []
+          body:
+            mode: none
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: none
+          vars: []
+          scripts:
+            pre: ""
+            post: ""
+          tests: |-
+            const WAIT_MS = 1000;
+            // The server's timer can fire a few ms before `time` has elapsed by the client's clock.
+            const TIMER_SLACK_MS = 50;
+            
+            test("response time covers the full wait when headers are held back", () => {
+              expect(res.getResponseTime()).to.be.at.least(WAIT_MS - TIMER_SLACK_MS);
+            });
+            
+            // Converted from Bruno assertions.
+            test("res.status: eq 200", () => expect(res.status).to.eql(200));
+          settings:
+            timeoutMs: null
+          docs: ""
+      - request:
+          version: 1
+          name: delayed body
+          seq: 0
+          method: GET
+          url: "{{localhost}}/api/wait-for/body?time=1000"
+          params:
+            query:
+            - name: time
+              value: "1000"
+              enabled: true
+            path: []
+          headers: []
+          body:
+            mode: none
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: none
+          vars: []
+          scripts:
+            pre: ""
+            post: ""
+          tests: |-
+            const WAIT_MS = 1000;
+            // The server's timer can fire a few ms before `time` has elapsed by the client's clock.
+            const TIMER_SLACK_MS = 50;
+            
+            test("response time covers the full wait when the body streams slowly after immediate headers", () => {
+              expect(res.getResponseTime()).to.be.at.least(WAIT_MS - TIMER_SLACK_MS);
+            });
+            
+            // Converted from Bruno assertions.
+            test("res.status: eq 200", () => expect(res.status).to.eql(200));
+          settings:
+            timeoutMs: null
+          docs: ""
+  - folder:
+      folder:
+        version: 1
+        name: variable-datatypes
+        seq: 0
+        vars:
+        - name: fold_str
+          value: folder_string
+          enabled: true
+        - name: fold_num
+          value: "200"
+          enabled: true
+        - name: fold_bool
+          value: "true"
+          enabled: true
+        - name: fold_obj
+          value: "{\"scope\":\"folder\"}"
+          enabled: true
+        headers: []
+        auth:
+          mode: none
+        scripts:
+          pre: ""
+          post: ""
+        tests: ""
+        settings:
+          timeoutMs: null
+        docs: ""
+      items:
+      - request:
+          version: 1
+          name: typed vars
+          seq: 0
+          method: POST
+          url: "{{echo-host}}"
+          params:
+            query: []
+            path: []
+          headers:
+          - name: x-h-str
+            value: "{{req_str}}"
+            enabled: true
+          - name: x-h-num
+            value: "{{req_num}}"
+            enabled: true
+          - name: x-h-bool
+            value: "{{req_bool}}"
+            enabled: true
+          - name: x-h-obj
+            value: "{{req_obj}}"
+            enabled: true
+          body:
+            mode: json
+            json: |-
+              {
+                "coll_num": {{coll_num}},
+                "coll_bool": {{coll_bool}},
+                "coll_obj": {{coll_obj}},
+                "fold_num": {{fold_num}},
+                "fold_bool": {{fold_bool}},
+                "fold_obj": {{fold_obj}},
+                "req_num": {{req_num}},
+                "req_bool": {{req_bool}},
+                "req_obj": {{req_obj}},
+                "req_obj_precision": {{req_obj_precision}},
+                "req_obj_empty": {{req_obj_empty}},
+                "typed_env_num": {{typed_env_num}},
+                "typed_env_bool": {{typed_env_bool}},
+                "typed_env_obj": {{typed_env_obj}},
+                "runtime_num": {{runtime_num}},
+                "runtime_bool": {{runtime_bool}},
+                "runtime_obj": {{runtime_obj}},
+                "inferred_env_num": {{inferred_env_num}},
+                "inferred_env_bool": {{inferred_env_bool}},
+                "inferred_env_obj": {{inferred_env_obj}}
+              }
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: none
+          vars:
+          - name: req_str
+            value: request_string
+            enabled: true
+          - name: req_num
+            value: "42"
+            enabled: true
+          - name: req_bool
+            value: "true"
+            enabled: true
+          - name: req_obj
+            value: "{\"key\":\"value\"}"
+            enabled: true
+          - name: req_obj_precision
+            value: "{\"integer\":123,\"negativeInteger\":-99,\"zero\":0,\"float\":2.718,\"negativeFloat\":-1.618,\"largeDouble\":12345.678901234567,\"smallDouble\":9.876e-12,\"booleanTrue\":true,\"booleanFalse\":false}"
+            enabled: true
+          - name: req_obj_empty
+            value: "{}"
+            enabled: true
+          - name: mismatched_num
+            value: not-a-number
+            enabled: true
+          scripts:
+            pre: |-
+              bru.setVar("runtime_str", "runtime_string");
+              bru.setVar("runtime_num", 999);
+              bru.setVar("runtime_bool", true);
+              bru.setVar("runtime_obj", { nested: "yes" });
+              
+              bru.setEnvVar("inferred_env_num", 700);
+              bru.setEnvVar("inferred_env_bool", true);
+              bru.setEnvVar("inferred_env_obj", { from: "script" });
+              
+              bru.setEnvVar("strict_num_str", "42");
+              bru.setEnvVar("strict_bool_str", "true");
+              bru.setEnvVar("strict_obj_str", JSON.stringify({ k: 1 }));
+              bru.setVar("strict_runtime_num_str", "42");
+            post: ""
+          tests: |-
+            test("collection vars carry their declared types", () => {
+              expect(typeof bru.getCollectionVar("coll_str")).to.equal("string");
+              expect(typeof bru.getCollectionVar("coll_num")).to.equal("number");
+              expect(bru.getCollectionVar("coll_num")).to.equal(100);
+              expect(typeof bru.getCollectionVar("coll_bool")).to.equal("boolean");
+              expect(bru.getCollectionVar("coll_bool")).to.equal(false);
+              expect(bru.getCollectionVar("coll_obj")).to.deep.equal({ scope: "collection" });
+            });
+            
+            test("folder vars carry their declared types", () => {
+              expect(typeof bru.getFolderVar("fold_str")).to.equal("string");
+              expect(typeof bru.getFolderVar("fold_num")).to.equal("number");
+              expect(bru.getFolderVar("fold_num")).to.equal(200);
+              expect(typeof bru.getFolderVar("fold_bool")).to.equal("boolean");
+              expect(bru.getFolderVar("fold_bool")).to.equal(true);
+              expect(bru.getFolderVar("fold_obj")).to.deep.equal({ scope: "folder" });
+            });
+            
+            test("request vars carry their declared types", () => {
+              expect(typeof bru.getRequestVar("req_str")).to.equal("string");
+              expect(typeof bru.getRequestVar("req_num")).to.equal("number");
+              expect(bru.getRequestVar("req_num")).to.equal(42);
+              expect(typeof bru.getRequestVar("req_bool")).to.equal("boolean");
+              expect(bru.getRequestVar("req_bool")).to.equal(true);
+              expect(bru.getRequestVar("req_obj")).to.deep.equal({ key: "value" });
+            
+              expect(typeof bru.getRequestVar("req_obj_empty")).to.equal("object");
+              expect(bru.getRequestVar("req_obj_empty")).to.deep.equal({});
+            
+              // @number with non-numeric data falls through to the raw string —
+              // same signal the env editor uses to surface its warning icon.
+              expect(typeof bru.getRequestVar("mismatched_num")).to.equal("string");
+              expect(bru.getRequestVar("mismatched_num")).to.equal("not-a-number");
+            });
+            
+            test("typed object var preserves number precision through file → parse round-trip", () => {
+              const v = bru.getRequestVar("req_obj_precision");
+              expect(v.integer).to.equal(123);
+              expect(v.negativeInteger).to.equal(-99);
+              expect(v.zero).to.equal(0);
+              expect(v.float).to.equal(2.718);
+              expect(v.negativeFloat).to.equal(-1.618);
+              expect(v.largeDouble).to.equal(12345.678901234567);
+              expect(v.smallDouble).to.equal(9.876e-12);
+              expect(v.booleanTrue).to.equal(true);
+              expect(v.booleanFalse).to.equal(false);
+            });
+            
+            test("collection environment vars carry their declared types", () => {
+              expect(typeof bru.getEnvVar("typed_env_num")).to.equal("number");
+              expect(bru.getEnvVar("typed_env_num")).to.equal(300);
+              expect(typeof bru.getEnvVar("typed_env_bool")).to.equal("boolean");
+              expect(bru.getEnvVar("typed_env_bool")).to.equal(true);
+              expect(bru.getEnvVar("typed_env_obj")).to.deep.equal({ scope: "env" });
+            });
+            
+            test("runtime vars set via bru.setVar preserve types", () => {
+              expect(typeof bru.getVar("runtime_str")).to.equal("string");
+              expect(typeof bru.getVar("runtime_num")).to.equal("number");
+              expect(bru.getVar("runtime_num")).to.equal(999);
+              expect(typeof bru.getVar("runtime_bool")).to.equal("boolean");
+              expect(bru.getVar("runtime_obj")).to.deep.equal({ nested: "yes" });
+            });
+            
+            test("setEnvVar infers dataType from the JS value", () => {
+              expect(typeof bru.getEnvVar("inferred_env_num")).to.equal("number");
+              expect(bru.getEnvVar("inferred_env_num")).to.equal(700);
+              expect(typeof bru.getEnvVar("inferred_env_bool")).to.equal("boolean");
+              expect(bru.getEnvVar("inferred_env_bool")).to.equal(true);
+              expect(bru.getEnvVar("inferred_env_obj")).to.deep.equal({ from: "script" });
+            });
+            
+            test("bru.set* identifies type via the value's runtime type, not string content", () => {
+              expect(typeof bru.getEnvVar("strict_num_str")).to.equal("string");
+              expect(bru.getEnvVar("strict_num_str")).to.equal("42");
+              expect(typeof bru.getEnvVar("strict_bool_str")).to.equal("string");
+              expect(bru.getEnvVar("strict_bool_str")).to.equal("true");
+              expect(typeof bru.getEnvVar("strict_obj_str")).to.equal("string");
+              expect(bru.getEnvVar("strict_obj_str")).to.equal('{"k":1}');
+              expect(typeof bru.getVar("strict_runtime_num_str")).to.equal("string");
+            });
+            
+            test("response body echoes typed values from every scope", () => {
+              const json = res.getBody();
+              expect(json.coll_num).to.equal(100);
+              expect(json.coll_bool).to.equal(false);
+              expect(json.coll_obj).to.deep.equal({ scope: "collection" });
+              expect(json.fold_num).to.equal(200);
+              expect(json.fold_bool).to.equal(true);
+              expect(json.fold_obj).to.deep.equal({ scope: "folder" });
+              expect(json.req_num).to.equal(42);
+              expect(json.req_bool).to.equal(true);
+              expect(json.req_obj).to.deep.equal({ key: "value" });
+            
+              expect(json.req_obj_precision.integer).to.equal(123);
+              expect(json.req_obj_precision.negativeInteger).to.equal(-99);
+              expect(json.req_obj_precision.zero).to.equal(0);
+              expect(json.req_obj_precision.float).to.equal(2.718);
+              expect(json.req_obj_precision.negativeFloat).to.equal(-1.618);
+              expect(json.req_obj_precision.largeDouble).to.equal(12345.678901234567);
+              expect(json.req_obj_precision.smallDouble).to.equal(9.876e-12);
+              expect(json.req_obj_precision.booleanTrue).to.equal(true);
+              expect(json.req_obj_precision.booleanFalse).to.equal(false);
+              expect(json.req_obj_empty).to.deep.equal({});
+            
+              expect(json.typed_env_num).to.equal(300);
+              expect(json.typed_env_bool).to.equal(true);
+              expect(json.typed_env_obj).to.deep.equal({ scope: "env" });
+              expect(json.runtime_num).to.equal(999);
+              expect(json.runtime_bool).to.equal(true);
+              expect(json.runtime_obj).to.deep.equal({ nested: "yes" });
+              expect(json.inferred_env_num).to.equal(700);
+              expect(json.inferred_env_bool).to.equal(true);
+              expect(json.inferred_env_obj).to.deep.equal({ from: "script" });
+            });
+            
+            test("typed vars in request headers stringify on the wire", () => {
+              // echo-host reflects request headers as response headers (lowercased).
+              const headers = res.getHeaders();
+              expect(headers["x-h-str"]).to.equal("request_string");
+              expect(headers["x-h-num"]).to.equal("42");
+              expect(headers["x-h-bool"]).to.equal("true");
+              expect(headers["x-h-obj"]).to.equal('{"key":"value"}');
+            });
+          settings:
+            timeoutMs: null
+          docs: ""
+      - request:
+          version: 1
+          name: form-urlencoded
+          seq: 0
+          method: POST
+          url: "{{echo-host}}"
+          params:
+            query: []
+            path: []
+          headers: []
+          body:
+            mode: form-urlencoded
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded:
+            - name: fu_str
+              value: "{{fu_str}}"
+              enabled: true
+            - name: fu_num
+              value: "{{fu_num}}"
+              enabled: true
+            - name: fu_bool
+              value: "{{fu_bool}}"
+              enabled: true
+            - name: fu_obj
+              value: "{{fu_obj}}"
+              enabled: true
+            multipart: []
+            binaryPath: ""
+          auth:
+            mode: none
+          vars:
+          - name: fu_str
+            value: form_string
+            enabled: true
+          - name: fu_num
+            value: "42"
+            enabled: true
+          - name: fu_bool
+            value: "true"
+            enabled: true
+          - name: fu_obj
+            value: "{\"key\":\"value\"}"
+            enabled: true
+          scripts:
+            pre: ""
+            post: ""
+          tests: |-
+            test("form-urlencoded values stringify typed vars on the wire", () => {
+              const raw = res.getBody();
+              expect(raw).to.contain("fu_str=form_string");
+              expect(raw).to.contain("fu_num=42");
+              expect(raw).to.contain("fu_bool=true");
+              expect(raw).to.contain("fu_obj=%7B%22key%22%3A%22value%22%7D");
+            });
+          settings:
+            timeoutMs: null
+          docs: ""
+      - request:
+          version: 1
+          name: multipart
+          seq: 0
+          method: POST
+          url: "{{echo-host}}"
+          params:
+            query: []
+            path: []
+          headers: []
+          body:
+            mode: multipart
+            json: ""
+            xml: ""
+            text: ""
+            formUrlEncoded: []
+            multipart:
+            - name: mp_str
+              type: text
+              value: "{{mp_str}}"
+              enabled: true
+            - name: mp_num
+              type: text
+              value: "{{mp_num}}"
+              enabled: true
+            - name: mp_bool
+              type: text
+              value: "{{mp_bool}}"
+              enabled: true
+            - name: mp_obj
+              type: text
+              value: "{{mp_obj}}"
+              enabled: true
+            binaryPath: ""
+          auth:
+            mode: none
+          vars:
+          - name: mp_str
+            value: form_string
+            enabled: true
+          - name: mp_num
+            value: "42"
+            enabled: true
+          - name: mp_bool
+            value: "true"
+            enabled: true
+          - name: mp_obj
+            value: "{\"key\":\"value\"}"
+            enabled: true
+          scripts:
+            pre: ""
+            post: ""
+          tests: |-
+            test("multipart text fields stringify typed values on the wire", () => {
+              const raw = res.getBody();
+              expect(raw).to.contain("form_string");
+              expect(raw).to.match(/name="mp_num"[\s\S]*?\r?\n\r?\n42/);
+              expect(raw).to.match(/name="mp_bool"[\s\S]*?\r?\n\r?\ntrue/);
+              expect(raw).to.contain('{"key":"value"}');
+            });
+          settings:
+            timeoutMs: null
+          docs: ""
+summary:
+  collectionName: bruno-yml-testbench
+  requests: 5
+  folders: 2
+  environments: 2
+  baseUrl: ""
+  secretsToFill: []
+  warnings: []

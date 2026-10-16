@@ -166,6 +166,7 @@ summary:
   collectionName: Tic Tac Toe
   requests: 3
   folders: 1
+  environments: 1
   baseUrl: http://localhost
   secretsToFill:
   - defaultApiKey
