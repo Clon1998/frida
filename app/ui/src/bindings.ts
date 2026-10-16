@@ -28,6 +28,13 @@ export const commands = {
 	addCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("add_collection", { dir })),
 	/**  Removes a collection from the workspace list. Its files are not deleted. */
 	removeCollection: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("remove_collection", { dir })),
+	/**  What importing the OpenAPI spec at `file` would create (counts, base URL, warnings). */
+	previewOpenapi: (file: string) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file })),
+	/**
+	 *  Imports the OpenAPI spec at `file` as a new collection, in `target` or by default in
+	 *  `<workspace>/collections/<title>`, and adds it to the workspace.
+	 */
+	importOpenapi: (file: string, target: string | null) => typedError<OpenApiImported, ApiError>(__TAURI_INVOKE("import_openapi", { file, target })),
 	/**  The collection's own settings file (`collection.yaml`). */
 	readCollection: (dir: string) => typedError<Collection, ApiError>(__TAURI_INVOKE("read_collection", { dir })),
 	saveCollection: (dir: string, collection: Collection) => typedError<null, ApiError>(__TAURI_INVOKE("save_collection", { dir, collection })),
@@ -469,6 +476,18 @@ export type HistorySummary = {
 	error: string | null,
 };
 
+/**  What the import created, shown to the user afterwards. */
+export type ImportSummary = {
+	collectionName: string,
+	requests: number,
+	folders: number,
+	/**  The `baseUrl` of the created `default` environment. */
+	baseUrl: string,
+	/**  Secret variables created without a value, for the user to fill in. */
+	secretsToFill: string[],
+	warnings: string[],
+};
+
 /**  A `name: value` row that can be switched off, used for headers, query params, vars and form fields. */
 export type KeyValue = {
 	name: string,
@@ -509,6 +528,13 @@ export type OAuth2Config = {
 };
 
 export type OAuth2Grant = "client_credentials" | "authorization_code" | "password";
+
+/**  The result of an import: the updated workspace, the new collection's folder and the summary. */
+export type OpenApiImported = {
+	overview: WorkspaceOverview,
+	dir: string,
+	summary: ImportSummary,
+};
 
 export type Params = {
 	/**  Kept in sync with the query string of `url` by the UI. */

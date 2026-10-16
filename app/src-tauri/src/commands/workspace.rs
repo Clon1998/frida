@@ -2,10 +2,11 @@
 
 use std::path::{Path, PathBuf};
 
+use frida_core::import::{self, ImportSummary};
 use frida_core::storage::{self, WorkspaceOverview};
 use tauri::State;
 
-use crate::error::ApiResult;
+use crate::error::{ApiResult, blocking};
 use crate::state::AppState;
 
 /// Creates a new workspace in `dir` and opens it.
@@ -95,4 +96,50 @@ pub fn remove_collection(state: State<'_, AppState>, dir: String) -> ApiResult<W
     let ws = state.workspace_dir()?;
     storage::remove_collection(&ws, Path::new(&dir))?;
     state.refresh_workspace(&ws)
+}
+
+/// What importing the OpenAPI spec at `file` would create (counts, base URL, warnings).
+#[tauri::command]
+#[specta::specta]
+pub async fn preview_openapi(file: String) -> ApiResult<ImportSummary> {
+    blocking(move || Ok(import::preview_openapi_file(Path::new(&file))?)).await
+}
+
+/// The result of an import: the updated workspace, the new collection's folder and the summary.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenApiImported {
+    pub overview: WorkspaceOverview,
+    pub dir: String,
+    pub summary: ImportSummary,
+}
+
+/// Imports the OpenAPI spec at `file` as a new collection, in `target` or by default in
+/// `<workspace>/collections/<title>`, and adds it to the workspace.
+#[tauri::command]
+#[specta::specta]
+pub async fn import_openapi(
+    state: State<'_, AppState>,
+    file: String,
+    target: Option<String>,
+) -> ApiResult<OpenApiImported> {
+    let ws = state.workspace_dir()?;
+    let ws_for_import = ws.clone();
+    let (dir, summary) = blocking(move || {
+        let target = target.map(PathBuf::from);
+        Ok(import::import_openapi_file(
+            &ws_for_import,
+            Path::new(&file),
+            target.as_deref(),
+        )?)
+    })
+    .await?;
+    let overview = state.refresh_workspace(&ws)?;
+    // The overview lists canonical folders, so return the same form for the UI to select it.
+    let dir = dir.canonicalize().unwrap_or(dir);
+    Ok(OpenApiImported {
+        overview,
+        dir: dir.to_string_lossy().to_string(),
+        summary,
+    })
 }

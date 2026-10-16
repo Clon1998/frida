@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { type AppSettings, commands, type TreeNode, type WorkspaceOverview } from "@/bindings";
+import {
+  type AppSettings,
+  commands,
+  type ImportSummary,
+  type TreeNode,
+  type WorkspaceOverview,
+} from "@/bindings";
 import { showError, unwrap } from "@/lib/api";
 
 interface WorkspaceState {
@@ -17,6 +23,11 @@ interface WorkspaceState {
   /** Creates a collection named `name` in the workspace's `collections/` folder. */
   createCollection: (name: string) => Promise<void>;
   addCollection: (dir: string) => Promise<void>;
+  /**
+   * Imports an OpenAPI file as a new collection (in `target`, or the workspace's
+   * `collections/` folder) and selects it. Throws on failure, so the dialog can show it.
+   */
+  importOpenApi: (file: string, target: string | null) => Promise<ImportSummary>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
   reloadTree: (dir: string) => Promise<void>;
@@ -90,6 +101,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       } catch (e) {
         showError(e);
       }
+    },
+
+    importOpenApi: async (file, target) => {
+      const result = await unwrap(commands.importOpenapi(file, target));
+      set({ activeCollectionDir: result.dir });
+      await applyOverview(result.overview);
+      return result.summary;
     },
 
     removeCollection: async (dir) => {

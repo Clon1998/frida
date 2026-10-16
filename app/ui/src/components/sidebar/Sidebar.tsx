@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { ChevronsUpDown, FolderPlus, Plus, Settings } from "lucide-react";
+import { ChevronsUpDown, FileUp, FolderPlus, Plus, Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { HistoryPanel } from "@/components/history/HistoryPanel";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollectionTree } from "./CollectionTree";
+import { OpenApiImportDialog } from "./OpenApiImportDialog";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export function Sidebar() {
@@ -27,6 +28,7 @@ export function Sidebar() {
   const createCollection = useWorkspace((s) => s.createCollection);
   const removeCollection = useWorkspace((s) => s.removeCollection);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [view, setView] = useState<"tree" | "history">("tree");
   const [removing, setRemoving] = useState(false);
   const openTab = useTabs((s) => s.openTab);
@@ -72,6 +74,9 @@ export function Sidebar() {
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void pickExistingCollection()}>
               <FolderPlus /> Add existing collection…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setImporting(true)}>
+              <FileUp /> Import OpenAPI…
             </DropdownMenuItem>
             {active && (
               <DropdownMenuItem onSelect={() => void openTab(active.dir, "")}>
@@ -126,9 +131,13 @@ export function Sidebar() {
           <Button size="sm" variant="outline" onClick={() => void pickExistingCollection()}>
             Add existing…
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
+            Import OpenAPI…
+          </Button>
         </div>
       )}
 
+      <OpenApiImportDialog open={importing} onOpenChange={setImporting} />
       <NameDialog
         open={creating}
         title="New collection"
