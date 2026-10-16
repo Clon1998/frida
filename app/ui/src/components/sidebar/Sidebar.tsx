@@ -19,6 +19,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollectionTree } from "./CollectionTree";
 import { ImportCollectionDialog } from "./ImportCollectionDialog";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { GitPanel } from "@/components/git/GitPanel";
+import { useUi } from "@/stores/ui";
 
 export function Sidebar() {
   const workspace = useWorkspace((s) => s.workspace);
@@ -29,7 +31,8 @@ export function Sidebar() {
   const removeCollection = useWorkspace((s) => s.removeCollection);
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState<ImportKind | null>(null);
-  const [view, setView] = useState<"tree" | "history">("tree");
+  const view = useUi((s) => s.sidebarView);
+  const setView = useUi((s) => s.setSidebarView);
   const [removing, setRemoving] = useState(false);
   const openTab = useTabs((s) => s.openTab);
 
@@ -110,16 +113,21 @@ export function Sidebar() {
       {active && (
         <Tabs
           value={view}
-          onValueChange={(v) => setView(v as "tree" | "history")}
+          onValueChange={(v) => setView(v as "tree" | "history" | "git")}
           className="px-2 pt-2"
         >
           <TabsList className="w-full">
             <TabsTrigger value="tree">Requests</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="git">Git</TabsTrigger>
           </TabsList>
         </Tabs>
       )}
-      {active && view === "history" ? (
+      {active && view === "git" ? (
+        <div className="flex min-h-0 flex-1 flex-col pt-2">
+          <GitPanel key={active.dir} dir={active.dir} />
+        </div>
+      ) : active && view === "history" ? (
         <div className="flex min-h-0 flex-1 flex-col pt-2">
           <HistoryPanel key={active.dir} dir={active.dir} />
         </div>

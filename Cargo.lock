@@ -1626,6 +1626,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "frida-core",
+ "frida-git",
  "frida-secrets",
  "serde",
  "serde_json",

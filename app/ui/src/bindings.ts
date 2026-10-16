@@ -35,6 +35,22 @@ export const commands = {
 	 *  `<workspace>/collections/<title>`, and adds it to the workspace.
 	 */
 	importOpenapi: (file: string, target: string | null) => typedError<CollectionImported, ApiError>(__TAURI_INVOKE("import_openapi", { file, target })),
+	gitInfo: (dir: string) => typedError<GitInfo, ApiError>(__TAURI_INVOKE("git_info", { dir })),
+	/**  `git init` in the collection folder. */
+	gitInit: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_init", { dir })),
+	/**  Stages `paths` (relative to the collection), or everything when `paths` is empty. */
+	gitStage: (dir: string, paths: string[]) => typedError<null, ApiError>(__TAURI_INVOKE("git_stage", { dir, paths })),
+	/**  Unstages `paths`, or everything when `paths` is empty. Files on disk are not touched. */
+	gitUnstage: (dir: string, paths: string[]) => typedError<null, ApiError>(__TAURI_INVOKE("git_unstage", { dir, paths })),
+	gitDiff: (dir: string, path: string, staged: boolean) => typedError<string, ApiError>(__TAURI_INVOKE("git_diff", { dir, path, staged })),
+	gitCommit: (dir: string, message: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_commit", { dir, message })),
+	gitFetch: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_fetch", { dir })),
+	gitPull: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_pull", { dir })),
+	gitPush: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_push", { dir })),
+	gitBranches: (dir: string) => typedError<Branch[], ApiError>(__TAURI_INVOKE("git_branches", { dir })),
+	/**  Switches branches; refused while there are uncommitted changes. */
+	gitSwitch: (dir: string, branch: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_switch", { dir, branch })),
+	gitCreateBranch: (dir: string, name: string) => typedError<null, ApiError>(__TAURI_INVOKE("git_create_branch", { dir, name })),
 	/**  What importing the Bruno collection in `dir` (`.bru` or YAML format) would create. */
 	previewBruno: (dir: string) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_bruno", { dir })),
 	/**
@@ -274,6 +290,13 @@ export type Body = {
 
 export type BodyMode = "none" | "json" | "xml" | "text" | "form-urlencoded" | "multipart" | "binary";
 
+export type Branch = {
+	name: string,
+	current: boolean,
+	/**  A remote-tracking branch (`origin/feature`) without a local branch yet. */
+	remote: boolean,
+};
+
 /**  The root of a collection: the folder that contains `collection.yaml`. */
 export type Collection = {
 	version: number,
@@ -460,7 +483,22 @@ export type Environment_Serialize = {
 	variables: EnvVariable_Serialize[],
 };
 
-export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script";
+export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script" | "git";
+
+/**  One changed file. Status letters as in `git status --short` (`M`, `A`, `D`, `R`, ...). */
+export type FileChange = {
+	/**  Relative to the folder the repo was opened for (the collection). */
+	path: string,
+	/**  The old path of a rename. */
+	origPath: string | null,
+	/**  Change in the index (staged), if any. */
+	staged: string | null,
+	/**  Change in the working tree (not staged), if any. */
+	unstaged: string | null,
+	untracked: boolean,
+	/**  Has merge conflicts. */
+	conflicted: boolean,
+};
 
 /**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
 export type Folder = {
@@ -484,6 +522,13 @@ export type FsChanged = {
 	/**  Absolute paths of the changed files and folders. */
 	paths: string[],
 };
+
+/**  The git state of a collection folder, for the panel and the status bar. */
+export type GitInfo = 
+/**  `git` isn't installed. */
+{ kind: "noGit" } | 
+/**  The collection isn't in a repository (the panel offers `git init`). */
+{ kind: "noRepo" } | { kind: "repo"; status: Status };
 
 /**  A full entry, opened read-only. */
 export type HistoryEntry = {
@@ -718,6 +763,19 @@ export type Shell =
  *  PowerShell, `curl` is an alias for `Invoke-WebRequest`).
  */
 "powershell";
+
+export type Status = {
+	/**  `None` when HEAD is detached. */
+	branch: string | null,
+	/**  e.g. `origin/main`. */
+	upstream: string | null,
+	/**  Commits not pushed / not pulled yet (as of the last fetch). */
+	ahead: number,
+	behind: number,
+	/**  The repository has no commits yet. */
+	noCommits: boolean,
+	files: FileChange[],
+};
 
 /**  One `test(...)` call. */
 export type TestResult = {

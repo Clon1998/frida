@@ -8,6 +8,7 @@ import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { ConsolePanel } from "@/components/console/ConsolePanel";
+import { GitStatusIndicator } from "@/components/git/GitStatusIndicator";
 import { HistoryView } from "@/components/history/HistoryView";
 import { useConsole } from "@/stores/console";
 import { InspectorPanel } from "@/components/inspector/InspectorPanel";
@@ -123,6 +124,7 @@ export function AppShell() {
       <CurlImportDialog />
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
+        {collection && <GitStatusIndicator dir={collection.dir} />}
         <div className="flex-1" />
         <Button
           variant={consoleOpen ? "secondary" : "ghost"}

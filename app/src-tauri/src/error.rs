@@ -39,6 +39,7 @@ pub enum ErrorCode {
     Secret,
     Auth,
     Script,
+    Git,
 }
 
 impl ApiError {
@@ -104,6 +105,45 @@ impl From<SendError> for ApiError {
             ),
             SendError::File { .. } => ApiError::new(ErrorCode::Io, message),
             SendError::Other(_) => ApiError::new(ErrorCode::Http, message),
+        }
+    }
+}
+
+impl From<frida_git::GitError> for ApiError {
+    fn from(error: frida_git::GitError) -> Self {
+        use frida_git::GitError;
+        let message = error.to_string();
+        match &error {
+            GitError::NotInstalled => ApiError::new(ErrorCode::Git, message)
+                .with_hint("Install git (https://git-scm.com) and restart Frida."),
+            GitError::NotARepo(_) => ApiError::new(ErrorCode::Git, message)
+                .with_hint("Initialize a repository from the Git panel."),
+            GitError::Command { message: text, .. }
+                if text.contains("fast-forward") || text.contains("diverg") =>
+            {
+                ApiError::new(ErrorCode::Git, message).with_hint(
+                    "Your branch and the remote have both changed. Merge or rebase in a terminal or your git tool, then refresh.",
+                )
+            }
+            GitError::Command { message: text, .. }
+                if text.contains("Please tell me who you are") =>
+            {
+                ApiError::new(ErrorCode::Git, message).with_hint(
+                    "Set your name and email once with git config --global user.name / user.email.",
+                )
+            }
+            GitError::Command { message: text, .. }
+                if text.contains("Authentication failed")
+                    || text.contains("Permission denied")
+                    || text.contains("could not read Username") =>
+            {
+                ApiError::new(ErrorCode::Git, message).with_hint(
+                    "Git couldn't log in to the remote. Check your SSH key or credential helper in a terminal.",
+                )
+            }
+            GitError::Timeout(_) => ApiError::new(ErrorCode::Git, message)
+                .with_hint("Check your network connection and the remote URL."),
+            _ => ApiError::new(ErrorCode::Git, message),
         }
     }
 }

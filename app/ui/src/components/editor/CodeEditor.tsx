@@ -6,6 +6,7 @@ import { autocompletion, completionStatus } from "@codemirror/autocomplete";
 import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
 import { basicSetup, minimalSetup } from "codemirror";
 import { useContext, useEffect, useRef } from "react";
+import { diffHighlight } from "./diff";
 import {
   setVariables,
   type VariableContext,
@@ -13,7 +14,7 @@ import {
   variablesExtension,
 } from "./variables";
 
-export type CodeLanguage = "json" | "xml" | "javascript" | "text";
+export type CodeLanguage = "json" | "xml" | "javascript" | "diff" | "text";
 
 interface CodeEditorProps {
   value: string;
@@ -46,6 +47,8 @@ const languageExtension = (language: CodeLanguage): Extension => {
       return xml();
     case "javascript":
       return javascript();
+    case "diff":
+      return diffHighlight();
     case "text":
       return [];
   }

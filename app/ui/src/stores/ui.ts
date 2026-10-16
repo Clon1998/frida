@@ -13,6 +13,9 @@ interface UiState {
   toggleInspector: () => void;
   setInspectorOpen: (open: boolean) => void;
   setUnresolved: (count: number) => void;
+  /** What the sidebar shows below the collection picker. */
+  sidebarView: "tree" | "history" | "git";
+  setSidebarView: (view: "tree" | "history" | "git") => void;
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -24,4 +27,6 @@ export const useUi = create<UiState>((set) => ({
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
   setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
   setUnresolved: (unresolved) => set({ unresolved }),
+  sidebarView: "tree",
+  setSidebarView: (sidebarView) => set({ sidebarView }),
 }));
