@@ -6,7 +6,7 @@ import { type FolderTab, useTabs } from "@/stores/tabs";
 import { ConflictBanner } from "./ConflictBanner";
 import type { Auth } from "@/bindings";
 import { AuthEditor } from "./AuthEditor";
-import { ScriptsSection, TextSection, VarsSection } from "./sections";
+import { ScriptsSection, TestsNote, TextSection, VarsSection } from "./sections";
 
 /** Folder settings, opened as a tab: inherited by every request in the folder. */
 export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
@@ -58,7 +58,8 @@ export function FolderEditor({ dir, tab }: { dir: string; tab: FolderTab }) {
         <TabsContent value="tests" className="min-h-0 p-3">
           <TextSection
             value={folder.tests}
-            note="Saved now; tests run once the scripting milestone is done."
+            note={<TestsNote />}
+            language="javascript"
             onChange={(tests) => update((f) => ({ ...f, tests }))}
           />
         </TabsContent>

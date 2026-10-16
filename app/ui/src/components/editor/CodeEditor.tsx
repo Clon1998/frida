@@ -1,3 +1,4 @@
+import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { Annotation, Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
@@ -6,7 +7,7 @@ import { basicSetup, minimalSetup } from "codemirror";
 import { useEffect, useRef } from "react";
 import { setVariables, type VariableMap, variablesExtension } from "./variables";
 
-export type CodeLanguage = "json" | "xml" | "text";
+export type CodeLanguage = "json" | "xml" | "javascript" | "text";
 
 interface CodeEditorProps {
   value: string;
@@ -24,8 +25,18 @@ interface CodeEditorProps {
   onPasteText?: (text: string) => boolean;
 }
 
-const languageExtension = (language: CodeLanguage): Extension =>
-  language === "json" ? json() : language === "xml" ? xml() : [];
+const languageExtension = (language: CodeLanguage): Extension => {
+  switch (language) {
+    case "json":
+      return json();
+    case "xml":
+      return xml();
+    case "javascript":
+      return javascript();
+    case "text":
+      return [];
+  }
+};
 
 /** Uses the app's CSS variables so the editor matches the light and dark theme. */
 const theme = EditorView.theme({

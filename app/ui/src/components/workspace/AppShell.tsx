@@ -147,14 +147,15 @@ export function AppShell() {
   );
 }
 
-/** Collects the console entries Rust emits after every send. */
+/** Collects what Rust emits for the console: every send, and every script `console.log`. */
 function useConsoleEvents() {
   useEffect(() => {
-    const unlisten = events.consoleLogged.listen(({ payload }) =>
-      useConsole.getState().add(payload.entry),
-    );
+    const unlisteners = [
+      events.consoleLogged.listen(({ payload }) => useConsole.getState().add(payload.entry)),
+      events.scriptLogged.listen(({ payload }) => useConsole.getState().addLog(payload.log)),
+    ];
     return () => {
-      void unlisten.then((stop) => stop());
+      for (const unlisten of unlisteners) void unlisten.then((stop) => stop());
     };
   }, []);
 }

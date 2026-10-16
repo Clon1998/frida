@@ -14,7 +14,7 @@ import { ConflictBanner } from "./ConflictBanner";
 import { CookiesSection } from "./CookiesSection";
 import type { Auth } from "@/bindings";
 import { AuthEditor } from "./AuthEditor";
-import { ScriptsSection, TextSection, VarsSection } from "./sections";
+import { ScriptsSection, TestsNote, TextSection, VarsSection } from "./sections";
 
 /** Collection settings, opened as a tab. Saved in `collection.yaml`, shared through git. */
 export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab }) {
@@ -78,10 +78,10 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
             variant="outline"
             size="sm"
             className="mt-4"
-            title="Variables set by scripts (bru.setVar) during this session"
+            title="Variables (bru.setVar) and in-memory environment changes (bru.setEnvVar) that scripts made during this session"
             onClick={() =>
               void unwrap(commands.clearRuntimeVars(dir)).then(
-                () => toast.success("Runtime variables cleared"),
+                () => toast.success("Script variables cleared"),
                 showError,
               )
             }
@@ -101,7 +101,8 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
         <TabsContent value="tests" className="min-h-0 p-3">
           <TextSection
             value={collection.tests}
-            note="Saved now; tests run once the scripting milestone is done."
+            note={<TestsNote />}
+            language="javascript"
             onChange={(tests) => update((c) => ({ ...c, tests }))}
           />
         </TabsContent>

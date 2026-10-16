@@ -16,7 +16,7 @@ import { queryParamsFromUrl, syncPathParams, urlWithQueryParams } from "@/lib/ur
 import { type RequestTab, useTabs } from "@/stores/tabs";
 import { ConflictBanner } from "@/components/doc/ConflictBanner";
 import { AuthEditor } from "@/components/doc/AuthEditor";
-import { ScriptsSection, TextSection, VarsSection } from "@/components/doc/sections";
+import { ScriptsSection, TestsNote, TextSection, VarsSection } from "@/components/doc/sections";
 import type { Auth } from "@/bindings";
 import { BodyEditor } from "./BodyEditor";
 import { KeyValueTable } from "./KeyValueTable";
@@ -204,7 +204,8 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
           <TabsContent value="tests" className="min-h-0 p-3">
             <TextSection
               value={request.tests}
-              note="Saved now; tests run once the scripting milestone is done."
+              note={<TestsNote />}
+              language="javascript"
               onChange={(tests) => update((r) => ({ ...r, tests }))}
             />
           </TabsContent>

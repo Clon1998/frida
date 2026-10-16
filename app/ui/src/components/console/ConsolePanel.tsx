@@ -1,13 +1,13 @@
 import { ChevronRight, Copy, Search, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ConsoleBody, ConsoleEntry } from "@/bindings";
+import type { ConsoleBody, ConsoleEntry, ScriptLog } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { methodColor } from "@/lib/methods";
 import { prettyBody, rawExchange } from "@/lib/rawHttp";
-import { type ConsoleView, useConsole } from "@/stores/console";
+import { type ConsoleItem, type ConsoleView, useConsole } from "@/stores/console";
 import { cn } from "cn";
 
 /**
@@ -16,7 +16,7 @@ import { cn } from "cn";
  * raw HTTP text ("Raw"). Secret values arrive masked.
  */
 export function ConsolePanel() {
-  const entries = useConsole((s) => s.entries);
+  const items = useConsole((s) => s.items);
   const clear = useConsole((s) => s.clear);
   const setOpen = useConsole((s) => s.setOpen);
   const view = useConsole((s) => s.view);
@@ -26,25 +26,21 @@ export function ConsolePanel() {
   const list = useRef<HTMLDivElement>(null);
 
   const needle = filter.trim().toLowerCase();
-  const shown = needle
-    ? entries.filter((e) =>
-        [e.method, e.url, e.requestName, String(e.response?.status ?? "error")].some((t) =>
-          t.toLowerCase().includes(needle),
-        ),
-      )
-    : entries;
+  const shown = needle ? items.filter((item) => matches(item, needle)) : items;
 
   // Follow new entries, like a terminal.
   useEffect(() => {
     const el = list.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [entries.length]);
+  }, [items.length]);
 
   return (
     <section className="flex h-full flex-col border-t bg-background">
       <div className="flex h-8 shrink-0 items-center gap-2 border-b px-3 text-xs">
         <span className="font-medium">Console</span>
-        <span className="text-muted-foreground">{entries.length} requests</span>
+        <span className="text-muted-foreground">
+          {items.filter((i) => i.kind === "http").length} requests
+        </span>
         <div className="flex-1" />
         <ViewToggle view={view} onChange={setView} />
         <div className="relative w-56">
@@ -80,22 +76,62 @@ export function ConsolePanel() {
       <div ref={list} className="min-h-0 flex-1 overflow-auto font-mono text-xs">
         {shown.length === 0 && (
           <p className="p-3 font-sans text-muted-foreground">
-            {entries.length === 0
-              ? "Send a request to see its raw request and response here."
+            {items.length === 0
+              ? "Send a request to see its raw request and response, and script logs, here."
               : "No entries match the filter."}
           </p>
         )}
-        {shown.map((e) => (
-          <ConsoleRow
-            key={e.id}
-            entry={e}
-            view={view}
-            open={expanded === e.id}
-            onToggle={() => setExpanded(expanded === e.id ? null : e.id)}
-          />
-        ))}
+        {shown.map((item) =>
+          item.kind === "http" ? (
+            <ConsoleRow
+              key={item.id}
+              entry={item.entry}
+              view={view}
+              open={expanded === item.id}
+              onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+            />
+          ) : (
+            <LogRow key={item.id} log={item.log} />
+          ),
+        )}
       </div>
     </section>
+  );
+}
+
+function matches(item: ConsoleItem, needle: string): boolean {
+  const fields =
+    item.kind === "http"
+      ? [
+          item.entry.method,
+          item.entry.url,
+          item.entry.requestName,
+          String(item.entry.response?.status ?? "error"),
+        ]
+      : [item.log.message, item.log.location, item.log.requestName, item.log.level];
+  return fields.some((t) => t.toLowerCase().includes(needle));
+}
+
+const LOG_COLORS: Record<ScriptLog["level"], string> = {
+  log: "",
+  info: "text-sky-700 dark:text-sky-400",
+  debug: "text-muted-foreground",
+  warn: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  error: "bg-destructive/10 text-destructive",
+};
+
+/** A script's `console.log` line, with where it came from. */
+function LogRow({ log }: { log: ScriptLog }) {
+  return (
+    <div className={cn("flex gap-2 border-b px-3 py-1 pl-8", LOG_COLORS[log.level])}>
+      <span className="shrink-0 text-muted-foreground">
+        {new Date(log.timestamp).toLocaleTimeString()}
+      </span>
+      <pre className="min-w-0 flex-1 break-all whitespace-pre-wrap select-text">{log.message}</pre>
+      <span className="shrink-0 truncate font-sans text-muted-foreground" title={log.location}>
+        {log.location}
+      </span>
+    </div>
   );
 }
 

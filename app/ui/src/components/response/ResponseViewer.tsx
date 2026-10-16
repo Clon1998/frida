@@ -1,8 +1,8 @@
 import { save } from "@tauri-apps/plugin-dialog";
-import { AlertCircle, Copy, Download, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Copy, Download, Loader2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { commands, type ResponseView } from "@/bindings";
+import { commands, type ResponseView, type ScriptOutcome } from "@/bindings";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,9 @@ export function ResponsePanel({ response }: { response: ResponseView }) {
   const text = response.bodyText ?? "";
   const shown = pretty && kind === "json" ? prettyJson(text) : text;
   const hasPreview = kind === "image" || kind === "html";
+  const { tests, errors } = response.scripts;
+  const passed = tests.filter((t) => t.passed).length;
+  const testsFailed = passed < tests.length || errors.length > 0;
 
   const copy = async () => {
     await navigator.clipboard.writeText(shown);
@@ -78,6 +81,18 @@ export function ResponsePanel({ response }: { response: ResponseView }) {
         </Badge>
         <span className="text-muted-foreground">{formatDuration(response.timeMs)}</span>
         <span className="text-muted-foreground">{formatBytes(response.sizeBytes)}</span>
+        {(tests.length > 0 || errors.length > 0) && (
+          <span
+            className={cn(
+              "font-medium",
+              testsFailed
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-emerald-600 dark:text-emerald-400",
+            )}
+          >
+            Tests {passed}/{tests.length}
+          </span>
+        )}
         <div className="flex-1" />
         <Button variant="ghost" size="sm" onClick={() => void copy()} disabled={!response.bodyText}>
           <Copy /> Copy
@@ -98,6 +113,12 @@ export function ResponsePanel({ response }: { response: ResponseView }) {
           <TabsTrigger value="body">Body</TabsTrigger>
           {hasPreview && <TabsTrigger value="preview">Preview</TabsTrigger>}
           <TabsTrigger value="headers">Headers ({response.headers.length})</TabsTrigger>
+          <TabsTrigger
+            value="tests"
+            className={cn(testsFailed && "text-rose-600 dark:text-rose-400")}
+          >
+            Tests{tests.length > 0 && ` (${passed}/${tests.length})`}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="body" className="flex min-h-0 flex-col p-2">
@@ -174,7 +195,51 @@ export function ResponsePanel({ response }: { response: ResponseView }) {
             </p>
           )}
         </TabsContent>
+        <TabsContent value="tests" className="overflow-auto p-3">
+          <TestResults scripts={response.scripts} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/** Test results and post-response script errors. */
+export function TestResults({ scripts }: { scripts: ScriptOutcome }) {
+  if (scripts.tests.length === 0 && scripts.errors.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No tests ran. Add some in the Tests tab of the request, its folders or the collection.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-3 text-sm">
+      {scripts.errors.map((e, i) => (
+        <div key={i} className="rounded-md border border-destructive/40 bg-destructive/5 p-2">
+          <p className="font-medium text-destructive">
+            Error in {e.location}
+            {e.line !== null && `, line ${e.line}`}
+          </p>
+          <p className="font-mono text-xs break-all">{e.message}</p>
+        </div>
+      ))}
+      <ul className="space-y-1">
+        {scripts.tests.map((t, i) => (
+          <li key={i} className="flex items-start gap-2">
+            {t.passed ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+            ) : (
+              <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+            )}
+            <div className="min-w-0">
+              <p>{t.name}</p>
+              {t.error && (
+                <p className="font-mono text-xs break-all text-muted-foreground">{t.error}</p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

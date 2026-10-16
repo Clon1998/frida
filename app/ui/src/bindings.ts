@@ -73,7 +73,10 @@ export const commands = {
 	secretBackendStatus: () => __TAURI_INVOKE<SecretBackendStatus>("secret_backend_status"),
 	/**  Unlocks (or, the first time, creates) the encrypted secret file. */
 	unlockSecretFile: (password: string) => typedError<null, ApiError>(__TAURI_INVOKE("unlock_secret_file", { password })),
-	/**  Clears the runtime variables (`bru.setVar`) of a collection. */
+	/**
+	 *  Clears what scripts set in this session: the collection's runtime variables (`bru.setVar`)
+	 *  and the in-memory environment changes (`bru.setEnvVar`, `bru.setGlobalEnvVar`).
+	 */
 	clearRuntimeVars: (dir: string) => typedError<null, ApiError>(__TAURI_INVOKE("clear_runtime_vars", { dir })),
 	listCookies: (dir: string) => typedError<CookieView[], ApiError>(__TAURI_INVOKE("list_cookies", { dir })),
 	/**  Removes the cookies of `domain`, or all of the collection's cookies when `domain` is `None`. */
@@ -159,6 +162,7 @@ export const commands = {
 export const events = {
 	consoleLogged: makeEvent<ConsoleLogged>("console-logged"),
 	fsChanged: makeEvent<FsChanged>("fs-changed"),
+	scriptLogged: makeEvent<ScriptLogged>("script-logged"),
 };
 
 /* Types */
@@ -415,7 +419,7 @@ export type Environment_Serialize = {
 	variables: EnvVariable_Serialize[],
 };
 
-export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth";
+export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script";
 
 /**  Folder metadata. A directory inside a collection is a folder when it contains `folder.yaml`. */
 export type Folder = {
@@ -472,6 +476,8 @@ export type KeyValue = {
 	/**  Disabled rows stay in the file but are ignored when sending (PLAN.md §5.2). */
 	enabled?: boolean,
 };
+
+export type LogLevel = "log" | "info" | "warn" | "error" | "debug";
 
 export type MultipartField = {
 	name: string,
@@ -575,6 +581,39 @@ export type ResponseView = {
 	bodyBase64: string | null,
 	/**  `true` when the body was larger than [`MAX_DISPLAY_BYTES`] and only the start is shown. */
 	truncated: boolean,
+	/**  Test results and post-response script errors (filled in after the scripts ran). */
+	scripts: ScriptOutcome,
+};
+
+/**  A script failed: threw, timed out or ran out of memory. */
+export type ScriptError = {
+	/**  Where the script lives, e.g. `request "Login", pre-request script`. */
+	location: string,
+	message: string,
+	/**  1-based line in the script, when known. */
+	line: number | null,
+};
+
+/**  One `console.log` from a script, for the console panel. Secret values are masked. */
+export type ScriptLog = {
+	timestamp: string,
+	level: LogLevel,
+	message: string,
+	/**  e.g. `folder "Orders", pre-request script`. */
+	location: string,
+	requestName: string,
+};
+
+/**  Emitted for every `console.log` of a script, as it happens. Secret values are masked. */
+export type ScriptLogged = {
+	log: ScriptLog,
+};
+
+/**  What the post-response scripts and tests produced, shown with the response. */
+export type ScriptOutcome = {
+	tests: TestResult[],
+	/**  Failures of post-response scripts and tests (the response is still shown). */
+	errors: ScriptError[],
 };
 
 /**  Pre- and post-request scripts. Empty strings mean "no script". */
@@ -620,6 +659,14 @@ export type Shell =
  *  PowerShell, `curl` is an alias for `Invoke-WebRequest`).
  */
 "powershell";
+
+/**  One `test(...)` call. */
+export type TestResult = {
+	name: string,
+	passed: boolean,
+	/**  Why it failed (the assertion message). */
+	error: string | null,
+};
 
 export type ThemePreference = "system" | "light" | "dark";
 
