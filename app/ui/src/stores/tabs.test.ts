@@ -122,3 +122,19 @@ describe("preview tabs", () => {
     expect(paths()).toEqual(["a", "b"]);
   });
 });
+
+describe("preview tabs and no-op updates", () => {
+  beforeEach(() => {
+    useTabs.setState({ byCollection: {} });
+    mockIPC((cmd) => (cmd === "read_folder" ? folder : null));
+  });
+  afterEach(() => clearMocks());
+
+  it("an update that changes nothing does not pin a preview tab", async () => {
+    await useTabs.getState().openTab("/col", "a", { preview: true });
+    useTabs.getState().updateDraft<FolderTab>("/col", "a", (f) => ({ ...f }));
+    expect(useTabs.getState().byCollection["/col"]?.preview).toBe("a");
+    await useTabs.getState().openTab("/col", "b", { preview: true });
+    expect(useTabs.getState().byCollection["/col"]?.tabs.map((t) => t.path)).toEqual(["b"]);
+  });
+});

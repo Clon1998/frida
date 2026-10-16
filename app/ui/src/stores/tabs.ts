@@ -332,10 +332,20 @@ export const useTabs = create<TabsState>((set, get) => {
     setActive: (dir, path) => setCollection(dir, (c) => activate(c, path)),
 
     updateDraft: (dir, path, update) => {
+      const before = findTab(dir, path);
       // `as never`: the caller chose `T` to match the tab at `path`; TS can't check that link.
       updateTab(dir, path, (t) => ({ ...t, draft: update(t.draft as never) }) as DocumentTab);
-      // Editing a preview tab keeps it open.
-      get().pin(dir, path);
+      const after = findTab(dir, path);
+      // A real edit keeps a preview tab open; a no-op update (same content) must not.
+      if (
+        before &&
+        after &&
+        isDocument(before) &&
+        isDocument(after) &&
+        !same(before.draft, after.draft)
+      ) {
+        get().pin(dir, path);
+      }
     },
 
     save: async (dir, path) => {

@@ -1,6 +1,6 @@
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
-import { Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
+import { Annotation, Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
 import { basicSetup, minimalSetup } from "codemirror";
 import { useEffect, useRef } from "react";
@@ -70,6 +70,12 @@ const singleLineTheme = EditorView.theme({
   "&:not(.cm-focused) .cm-content": { whiteSpace: "pre" },
   "&:not(.cm-focused) .cm-line": { overflow: "hidden", textOverflow: "ellipsis" },
 });
+
+/**
+ * Marks text replaced from outside (switching tabs, reload from disk). Such changes are not user
+ * edits, so they must not call `onChange`: that would mark tabs as edited (and pin preview tabs).
+ */
+const externalChange = Annotation.define<boolean>();
 
 /** Keeps a single-line editor on one line: pasted newlines become spaces. */
 const singleLineFilter = EditorState.transactionFilter.of((tr) => {
@@ -145,7 +151,10 @@ export function CodeEditor({
             },
           }),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
+            const fromOutside = update.transactions.some((tr) => tr.annotation(externalChange));
+            if (update.docChanged && !fromOutside) {
+              onChangeRef.current?.(update.state.doc.toString());
+            }
           }),
         ],
       }),
@@ -160,7 +169,10 @@ export function CodeEditor({
   useEffect(() => {
     const editor = view.current;
     if (editor && editor.state.doc.toString() !== value) {
-      editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: value } });
+      editor.dispatch({
+        changes: { from: 0, to: editor.state.doc.length, insert: value },
+        annotations: externalChange.of(true),
+      });
     }
   }, [value]);
 
