@@ -9,23 +9,32 @@ const newId = () => `row-${nextId++}`;
  * `key`s and drag ids: when a row moves, its id moves with it, so React moves the row's element
  * instead of reusing elements by position (which made dropped rows jump back and animate again).
  *
+ * `addId` is the key for the trailing "add" row. It is the id that row keeps once typing turns it
+ * into a real row, so React keeps the same element (and the focused input) instead of mounting a
+ * new one; the next "add" row gets a fresh id.
+ *
  * `move` and `remove` must be called alongside the matching change to the rows.
  */
 export function useRowIds(count: number) {
-  const [ids, setIds] = useState<string[]>(() => Array.from({ length: count }, newId));
-  let current = ids;
-  if (ids.length !== count) {
+  // One id per row plus one for the "add" row at the end.
+  const [all, setAll] = useState<string[]>(() => Array.from({ length: count + 1 }, newId));
+  let current = all;
+  if (all.length !== count + 1) {
     // Rows were added (typing into the "add" row) or the list was replaced: adjust the length.
-    // Setting state while rendering is React's documented way to derive state from props.
+    // New rows take over the reserved "add" id first. Setting state while rendering is React's
+    // documented way to derive state from props.
     current =
-      ids.length < count
-        ? [...ids, ...Array.from({ length: count - ids.length }, newId)]
-        : ids.slice(0, count);
-    setIds(current);
+      all.length < count + 1
+        ? [...all, ...Array.from({ length: count + 1 - all.length }, newId)]
+        : [...all.slice(0, count), all[all.length - 1] ?? newId()];
+    setAll(current);
   }
+  const ids = current.slice(0, count);
+  const addId = current[count] ?? "add";
   return {
-    ids: current,
-    move: (from: number, to: number) => setIds(arrayMove(current, from, to)),
-    remove: (index: number) => setIds(current.filter((_, i) => i !== index)),
+    ids,
+    addId,
+    move: (from: number, to: number) => setAll([...arrayMove(ids, from, to), addId]),
+    remove: (index: number) => setAll([...ids.filter((_, i) => i !== index), addId]),
   };
 }

@@ -93,7 +93,7 @@ export function KeyValueTable({
             const isNew = index === rows.length;
             return (
               <GridRow
-                key={isNew ? "new" : rowIds.ids[index]}
+                key={isNew ? rowIds.addId : rowIds.ids[index]}
                 muted={!row.enabled}
                 sortIndex={isNew ? undefined : index}
               >

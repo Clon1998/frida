@@ -509,7 +509,7 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
           const shown = revealed[v.name];
           return (
             <GridRow
-              key={isNew ? "new" : rowIds.ids[rowIndex]}
+              key={isNew ? rowIds.addId : rowIds.ids[rowIndex]}
               muted={!v.enabled}
               sortIndex={isNew ? undefined : rowIndex}
             >

@@ -129,14 +129,9 @@ export function GridRow({
   const className = cn("border-b bg-background last:border-b-0", muted && "text-muted-foreground");
   if (!ids) return <tr className={className}>{children}</tr>;
   const id = sortIndex === undefined ? undefined : ids[sortIndex];
-  if (id === undefined) {
-    return (
-      <tr className={className}>
-        <td className="border-r" />
-        {children}
-      </tr>
-    );
-  }
+  // The "add" row uses the same component with dragging off: if it rendered a plain <tr>, the
+  // element type would change when typing turns it into a real row, and React would remount it
+  // (losing the focused input).
   return (
     <SortableRow id={id} className={className}>
       {children}
@@ -144,12 +139,16 @@ export function GridRow({
   );
 }
 
+/** Id of the non-draggable "add" row; each reorderable table has its own DndContext. */
+const ADD_ROW_ID = "__add-row";
+
 function SortableRow({
   id,
   className,
   children,
 }: {
-  id: string;
+  /** `undefined` for the "add" row, which gets an empty handle cell and can't be dragged. */
+  id: string | undefined;
   className: string;
   children: ReactNode;
 }) {
@@ -161,7 +160,7 @@ function SortableRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id });
+  } = useSortable({ id: id ?? ADD_ROW_ID, disabled: id === undefined });
   return (
     <tr
       ref={setNodeRef}
@@ -169,17 +168,19 @@ function SortableRow({
       style={{ transform: CSS.Translate.toString(transform), transition }}
     >
       <td className="border-r p-0 text-center align-middle">
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          className="flex h-8 w-full cursor-grab items-center justify-center text-muted-foreground/60 hover:text-foreground active:cursor-grabbing"
-          aria-label="Drag to reorder"
-          title="Drag to reorder"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="size-3.5" />
-        </button>
+        {id !== undefined && (
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            className="flex h-8 w-full cursor-grab items-center justify-center text-muted-foreground/60 hover:text-foreground active:cursor-grabbing"
+            aria-label="Drag to reorder"
+            title="Drag to reorder"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-3.5" />
+          </button>
+        )}
       </td>
       {children}
     </tr>

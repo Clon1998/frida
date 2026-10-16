@@ -60,7 +60,7 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
         const isNew = index === fields.length;
         return (
           <GridRow
-            key={isNew ? "new" : rowIds.ids[index]}
+            key={isNew ? rowIds.addId : rowIds.ids[index]}
             muted={!field.enabled}
             sortIndex={isNew ? undefined : index}
           >
