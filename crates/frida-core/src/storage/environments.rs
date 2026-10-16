@@ -150,6 +150,7 @@ mod tests {
             value: value.map(Into::into),
             secret,
             source: None,
+            enabled: true,
         }
     }
 
@@ -228,6 +229,7 @@ mod duplicate_tests {
             value: Some("x".into()),
             secret: false,
             source: None,
+            enabled: true,
         });
         save_environment(dir.path(), "dev", &env).unwrap();
 

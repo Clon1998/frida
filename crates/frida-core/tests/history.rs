@@ -30,6 +30,7 @@ async fn a_send_with_secrets_leaves_no_trace_in_history_or_curl() {
         value: Some(SECRET.into()),
         secret: true,
         source: None,
+        enabled: true,
     }];
     let mut request = Request::new("Echo");
     request.method = "POST".into();

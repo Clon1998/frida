@@ -135,7 +135,7 @@ fn key_values(rows: &[KeyValue]) -> Vec<VarDef> {
 fn env_vars(env: &Environment) -> Vec<VarDef> {
     env.variables
         .iter()
-        .filter(|var| !var.name.trim().is_empty())
+        .filter(|var| var.enabled && !var.name.trim().is_empty())
         .map(|var| VarDef {
             name: var.name.trim().to_string(),
             value: var.value.clone(),

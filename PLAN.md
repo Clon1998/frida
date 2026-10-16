@@ -744,6 +744,13 @@ Deviations from and clarifications of this plan, newest last.
   respected). The Cognito preset is a UI helper that fills token/auth URLs from domain + region (stored only as
   `preset: cognito` and the URLs). Added crates: aws-config, aws-sdk-secretsmanager (planned in §2).
 
+- **2026-10-16 Disabled environment variables (on-disk change, requested by Patrick).** Environment variables and
+  secrets can be disabled like other rows: `enabled: false` in the environment file (only written when false, so
+  existing files are unchanged); disabled variables are ignored when resolving and never fetched from the keychain or
+  AWS. Bruno imports keep disabled environment variables (disabled) instead of dropping them. All key/value tables
+  (params, headers, form and multipart fields, variables at every level, environment variables/secrets) can be
+  reordered by dragging (or with the keyboard); editing the URL keeps disabled query params at their position.
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.

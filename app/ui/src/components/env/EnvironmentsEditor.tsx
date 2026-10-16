@@ -1,3 +1,4 @@
+import { arrayMove } from "@dnd-kit/sortable";
 import { Ban, Copy, Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -5,6 +6,7 @@ import { commands, type EnvScope } from "@/bindings";
 import { CellInput, GridCell, GridRow, GridTable } from "@/components/request/GridTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -296,7 +298,14 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
   const updateVar = (index: number, patch: Partial<EnvVar>) =>
     setDraft((d) => {
       if (index === d.variables.length) {
-        const added: EnvVar = { name: "", value: "", secret: false, source: null, ...patch };
+        const added: EnvVar = {
+          name: "",
+          value: "",
+          secret: false,
+          source: null,
+          enabled: true,
+          ...patch,
+        };
         return { ...d, variables: [...d.variables, added] };
       }
       return { ...d, variables: d.variables.map((v, i) => (i === index ? { ...v, ...patch } : v)) };
@@ -331,10 +340,11 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
       for (const variable of ops.delete) {
         await unwrap(commands.deleteSecret(scope, cleaned.name, variable));
       }
-      setStored(draftKey, null);
-      setRevealed({});
       if (cleaned.name !== original.name) onRenamed(cleaned.name);
       await useEnvs.getState().load(dir);
+      // Only now: dropping the draft before the reload would briefly show the old values.
+      setStored(draftKey, null);
+      setRevealed({});
       toast.success(`Saved "${cleaned.name}"`);
     } catch (e) {
       showError(e);
@@ -376,7 +386,13 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
   const rows = [
     ...draft.variables.map((v, index) => ({ v, index })).filter(({ v }) => v.secret === secrets),
     {
-      v: { name: "", value: secrets ? null : "", secret: secrets, source: null } as EnvVar,
+      v: {
+        name: "",
+        value: secrets ? null : "",
+        secret: secrets,
+        source: null,
+        enabled: true,
+      } as EnvVar,
       index: draft.variables.length,
     },
   ];
@@ -478,19 +494,48 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
       )}
 
       <GridTable
+        reorder={{
+          count: rows.length - 1,
+          onMove: (from, to) =>
+            // Rows are this tab's variables only; move within them, keep the others in place.
+            setDraft((d) => {
+              const positions = rows.slice(0, -1).map((r) => r.index);
+              const moved = arrayMove(
+                positions.map((i) => d.variables[i]),
+                from,
+                to,
+              );
+              const variables = [...d.variables];
+              positions.forEach((pos, k) => {
+                const v = moved[k];
+                if (v) variables[pos] = v;
+              });
+              return { ...d, variables };
+            }),
+        }}
         columns={[
+          { label: "", width: "2.25rem" },
           { label: secrets ? "Secret" : "Variable", width: "30%" },
           ...(secrets ? [{ label: "Source", width: "7.5rem" }] : []),
           { label: "Value" },
           { label: "", width: "2.25rem" },
         ]}
       >
-        {rows.map(({ v, index }) => {
+        {rows.map(({ v, index }, rowIndex) => {
           const isNew = index === draft.variables.length;
           const wasSet = entry.setSecrets.includes(v.name);
           const shown = revealed[v.name];
           return (
-            <GridRow key={index}>
+            <GridRow key={index} muted={!v.enabled} sortIndex={isNew ? undefined : rowIndex}>
+              <GridCell center>
+                <Checkbox
+                  className="align-middle"
+                  checked={v.enabled}
+                  disabled={isNew}
+                  onCheckedChange={(checked) => updateVar(index, { enabled: checked === true })}
+                  aria-label="Enabled"
+                />
+              </GridCell>
               <GridCell>
                 <CellInput
                   placeholder={isNew ? (secrets ? "Add secret" : "Add variable") : "name"}

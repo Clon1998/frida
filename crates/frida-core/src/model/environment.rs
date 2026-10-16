@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::common::{FORMAT_VERSION, is_false};
+use super::common::{FORMAT_VERSION, default_true, is_false, is_true};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct Environment {
@@ -55,6 +55,10 @@ pub struct EnvVariable {
     /// Where a secret value comes from when it isn't in the keychain.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<SecretSource>,
+    /// Disabled variables stay in the file but are ignored, like disabled rows elsewhere.
+    /// Only `enabled: false` is written, so existing files don't change.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]

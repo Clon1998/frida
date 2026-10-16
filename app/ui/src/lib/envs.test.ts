@@ -7,6 +7,7 @@ const v = (name: string, value: string | null, secret = false): EnvVar => ({
   value,
   secret,
   source: null,
+  enabled: true,
 });
 const env = (...variables: EnvVar[]): EnvModel => ({
   version: 1,

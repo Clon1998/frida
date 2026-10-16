@@ -117,13 +117,6 @@ pub fn map_bruno(dir: &Path) -> Result<BrunoPlan> {
         .map(|env| {
             let mut variables = Vec::new();
             for var in &env.vars {
-                if !var.enabled {
-                    mapper.warnings.push(format!(
-                        "Environment {:?}: the disabled variable {:?} was left out.",
-                        env.name, var.name
-                    ));
-                    continue;
-                }
                 if var.secret {
                     secrets.push(format!("{}: {}", env.name, var.name));
                 }
@@ -132,6 +125,7 @@ pub fn map_bruno(dir: &Path) -> Result<BrunoPlan> {
                     value: (!var.secret).then(|| var.value.clone()),
                     secret: var.secret,
                     source: None,
+                    enabled: var.enabled,
                 });
             }
             Environment {

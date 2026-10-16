@@ -106,7 +106,7 @@ pub async fn fill_aws_secrets(
         };
     };
     let env_name = env.name.clone();
-    for var in env.variables.iter_mut().filter(|v| v.secret) {
+    for var in env.variables.iter_mut().filter(|v| v.secret && v.enabled) {
         let Some(SecretSource::AwsSecretsManager {
             secret_id,
             json_key,
@@ -214,12 +214,14 @@ mod tests {
                 value: None,
                 secret: true,
                 source: None,
+                enabled: true,
             },
             EnvVariable {
                 name: "plain".into(),
                 value: Some("x".into()),
                 secret: false,
                 source: None,
+                enabled: true,
             },
         ];
         env

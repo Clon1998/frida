@@ -31,6 +31,7 @@ fn env(name: &str, vars: &[(&str, Option<&str>, bool)]) -> Environment {
             value: v.map(str::to_string),
             secret: *secret,
             source: None,
+            enabled: true,
         })
         .collect();
     env
@@ -358,4 +359,17 @@ fn resolves_every_part_of_a_request_and_inherited_headers() {
     assert!(id.used_in.contains(&UsageLocation::Header {
         name: "X-Folder".into()
     }));
+}
+
+#[test]
+fn disabled_environment_variables_are_ignored() {
+    let mut collection_env = env("dev", &[("host", Some("dev.local"), false)]);
+    collection_env.variables[0].enabled = false;
+    let layers = Layers {
+        collection: vec![kv("host", "fallback")],
+        collection_env: Some(collection_env),
+        ..Default::default()
+    };
+    let (out, _, _) = layers.resolve("{{host}}");
+    assert_eq!(out, "fallback");
 }

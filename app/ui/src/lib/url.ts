@@ -42,13 +42,24 @@ export function parseQuery(url: string): { name: string; value: string }[] {
 }
 
 /**
- * New query rows after the user edited the URL. Enabled rows come from the URL; disabled rows
- * aren't part of the URL, so they are kept from `previous`.
+ * New query rows after the user edited the URL. Enabled rows come from the URL, in its order;
+ * disabled rows aren't part of the URL, so they are kept from `previous` at their position
+ * (the user may have ordered them). Extra URL params are added at the end.
  */
 export function queryParamsFromUrl(url: string, previous: KeyValue[]): KeyValue[] {
   const fromUrl = parseQuery(url).map((p) => ({ ...p, enabled: true }));
-  const disabled = previous.filter((p) => !p.enabled);
-  return [...fromUrl, ...disabled];
+  const rows: KeyValue[] = [];
+  let next = 0;
+  for (const row of previous) {
+    if (!row.enabled) {
+      rows.push(row);
+    } else if (next < fromUrl.length) {
+      const fromUrlRow = fromUrl[next++];
+      if (fromUrlRow) rows.push(fromUrlRow);
+    }
+  }
+  rows.push(...fromUrl.slice(next));
+  return rows;
 }
 
 /** New URL after the user edited the query rows. Only enabled rows with a name are included. */

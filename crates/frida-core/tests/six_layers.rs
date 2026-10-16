@@ -98,6 +98,7 @@ fn every_defined_variable_is_offered_and_secrets_stay_masked() {
         value: Some("s3cr3t".into()),
         secret: true,
         source: None,
+        enabled: true,
     });
     let report = inspect(&ExecuteInput {
         collection_dir: &collection,

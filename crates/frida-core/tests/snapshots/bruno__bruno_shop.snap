@@ -40,6 +40,9 @@ environments:
     value: http://localhost:8787
   - name: user
     value: ann
+  - name: legacyHost
+    value: http://old
+    enabled: false
   - name: password
     secret: true
 root:
@@ -301,7 +304,6 @@ summary:
   - >-
     request "Digest protected" uses digest auth, which Frida doesn't support; its
     auth was set to none.
-  - "Environment \"local\": the disabled variable \"legacyHost\" was left out."
   - >-
     1 GraphQL request(s) were imported as JSON POST requests ({"query",
     "variables"}).

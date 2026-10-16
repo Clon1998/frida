@@ -20,12 +20,12 @@ describe("query params", () => {
     expect(parseQuery("http://x/a")).toEqual([]);
   });
 
-  it("keeps disabled rows when the URL changes", () => {
+  it("keeps disabled rows (at their position) when the URL changes", () => {
     const previous = [row("a", "1"), row("off", "x", false)];
     expect(queryParamsFromUrl("http://x?a=2&b=3", previous)).toEqual([
       row("a", "2"),
-      row("b", "3"),
       row("off", "x", false),
+      row("b", "3"),
     ]);
   });
 
@@ -60,5 +60,30 @@ describe("path params", () => {
       { name: "orderId", value: "42" },
       { name: "itemId", value: "" },
     ]);
+  });
+});
+
+describe("query params keep their order", () => {
+  it("keeps disabled rows where they were when the URL changes", () => {
+    const previous = [
+      { name: "a", value: "1", enabled: true },
+      { name: "off", value: "x", enabled: false },
+      { name: "b", value: "2", enabled: true },
+    ];
+    const rows = queryParamsFromUrl("http://x/?a=1&b=3&c=4", previous);
+    expect(rows.map((r) => `${r.name}=${r.value}:${r.enabled}`)).toEqual([
+      "a=1:true",
+      "off=x:false",
+      "b=3:true",
+      "c=4:true",
+    ]);
+  });
+
+  it("writes reordered rows into the URL in their new order", () => {
+    const rows = [
+      { name: "b", value: "2", enabled: true },
+      { name: "a", value: "1", enabled: true },
+    ];
+    expect(urlWithQueryParams("http://x/?a=1&b=2", rows)).toBe("http://x/?b=2&a=1");
   });
 });

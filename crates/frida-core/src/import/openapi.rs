@@ -227,6 +227,7 @@ impl<'a> Mapper<'a> {
             value: Some(base_url.clone()),
             secret: false,
             source: None,
+            enabled: true,
         });
         environment.variables.append(&mut self.env_vars);
 
@@ -890,6 +891,7 @@ impl<'a> Mapper<'a> {
             value: if secret { None } else { Some(String::new()) },
             secret,
             source: None,
+            enabled: true,
         });
     }
 }

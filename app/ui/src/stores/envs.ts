@@ -41,6 +41,7 @@ export function normalizeEnv(env: Environment): EnvModel {
       value: v.value ?? null,
       secret: v.secret ?? false,
       source: (v.source ?? null) as EnvVar["source"],
+      enabled: v.enabled ?? true,
     })),
   };
 }

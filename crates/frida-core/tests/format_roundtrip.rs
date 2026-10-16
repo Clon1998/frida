@@ -146,3 +146,30 @@ fn secret_values_never_reach_yaml() {
     let yaml = to_yaml_string(&env.without_secret_values()).unwrap();
     assert!(!yaml.contains("super-secret-value"));
 }
+
+#[test]
+fn only_disabled_environment_variables_store_the_flag() {
+    let mut env = frida_core::model::Environment::new("dev");
+    env.variables = vec![
+        frida_core::model::EnvVariable {
+            name: "on".into(),
+            value: Some("1".into()),
+            secret: false,
+            source: None,
+            enabled: true,
+        },
+        frida_core::model::EnvVariable {
+            name: "off".into(),
+            value: Some("2".into()),
+            secret: false,
+            source: None,
+            enabled: false,
+        },
+    ];
+    let yaml = frida_core::yaml::to_yaml_string(&env).unwrap();
+    assert_eq!(yaml.matches("enabled").count(), 1, "{yaml}");
+    assert!(yaml.contains("enabled: false"));
+    let back: frida_core::model::Environment =
+        frida_core::yaml::from_yaml_str(&yaml, std::path::Path::new("dev.yaml")).unwrap();
+    assert_eq!(back, env);
+}

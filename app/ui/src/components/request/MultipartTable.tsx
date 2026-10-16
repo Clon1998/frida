@@ -1,3 +1,4 @@
+import { arrayMove } from "@dnd-kit/sortable";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, Trash2 } from "lucide-react";
 import type { MultipartField as RawMultipartField, MultipartKind } from "@/bindings";
@@ -38,6 +39,10 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
 
   return (
     <GridTable
+      reorder={{
+        count: fields.length,
+        onMove: (from, to) => onChange(arrayMove(fields, from, to)),
+      }}
       columns={[
         { label: "", width: "2.25rem" },
         { label: "Name", width: "30%" },
@@ -49,7 +54,7 @@ export function MultipartTable({ fields, onChange }: MultipartTableProps) {
       {shown.map((field, index) => {
         const isNew = index === fields.length;
         return (
-          <GridRow key={index} muted={!field.enabled}>
+          <GridRow key={index} muted={!field.enabled} sortIndex={isNew ? undefined : index}>
             <GridCell center>
               <Checkbox
                 className="align-middle"

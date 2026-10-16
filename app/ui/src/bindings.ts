@@ -464,6 +464,11 @@ export type EnvVariable_Deserialize = {
 	secret?: boolean,
 	/**  Where a secret value comes from when it isn't in the keychain. */
 	source?: SecretSource_Deserialize | null,
+	/**
+	 *  Disabled variables stay in the file but are ignored, like disabled rows elsewhere.
+	 *  Only `enabled: false` is written, so existing files don't change.
+	 */
+	enabled?: boolean,
 };
 
 export type EnvVariable_Serialize = {
@@ -473,6 +478,11 @@ export type EnvVariable_Serialize = {
 	secret?: boolean,
 	/**  Where a secret value comes from when it isn't in the keychain. */
 	source?: SecretSource_Serialize | null,
+	/**
+	 *  Disabled variables stay in the file but are ignored, like disabled rows elsewhere.
+	 *  Only `enabled: false` is written, so existing files don't change.
+	 */
+	enabled?: boolean,
 };
 
 export type Environment = Environment_Serialize | Environment_Deserialize;

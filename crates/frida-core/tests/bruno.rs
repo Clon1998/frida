@@ -111,7 +111,13 @@ fn shop_maps_the_tricky_parts() {
     let warnings = s.warnings.join("\n");
     assert!(warnings.contains("digest auth"), "{warnings}");
     assert!(warnings.contains("bru.cwd"), "{warnings}");
-    assert!(warnings.contains("legacyHost"), "{warnings}");
+    // Disabled environment variables are kept, disabled.
+    let legacy = plan.environments[0]
+        .variables
+        .iter()
+        .find(|v| v.name == "legacyHost")
+        .unwrap();
+    assert!(!legacy.enabled);
     assert!(warnings.contains("GraphQL"), "{warnings}");
 
     assert!(

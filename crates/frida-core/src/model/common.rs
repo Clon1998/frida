@@ -13,6 +13,11 @@ pub(crate) fn default_true() -> bool {
 }
 
 /// serde's `skip_serializing_if` also needs a function. `&bool` because serde passes a reference.
+/// For `skip_serializing_if`: fields that default to `true` are only written when `false`.
+pub(crate) fn is_true(value: &bool) -> bool {
+    *value
+}
+
 pub(crate) fn is_false(value: &bool) -> bool {
     !*value
 }

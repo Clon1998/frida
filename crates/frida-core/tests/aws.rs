@@ -50,12 +50,14 @@ fn env() -> Environment {
                 json_key: Some("password".into()),
                 region: Some("eu-central-1".into()),
             }),
+            enabled: true,
         },
         EnvVariable {
             name: "keychainToken".into(),
             value: Some("from-keychain".into()),
             secret: true,
             source: None,
+            enabled: true,
         },
     ];
     env

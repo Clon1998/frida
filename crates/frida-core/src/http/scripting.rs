@@ -54,6 +54,7 @@ impl EnvOverrides {
                             value: Some(value.clone()),
                             secret: false,
                             source: None,
+                            enabled: true,
                         }),
                     },
                     None => env.variables.retain(|v| &v.name != name),
@@ -621,6 +622,7 @@ fn persist_env_var(
                 value: Some(value.to_string()),
                 secret: false,
                 source: None,
+                enabled: true,
             }),
         },
         None => env.variables.retain(|v| v.name != name || v.secret),
@@ -713,6 +715,7 @@ impl ScriptHost for CoreHost {
                             value: Some(value.clone()),
                             secret: false,
                             source: None,
+                            enabled: true,
                         }),
                     }
                 }
@@ -769,6 +772,7 @@ mod tests {
             value: Some("1".into()),
             secret: false,
             source: None,
+            enabled: true,
         });
         let overrides = EnvOverrides::default();
         overrides.set("dev", "a", None);

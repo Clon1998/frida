@@ -1,3 +1,4 @@
+import { arrayMove } from "@dnd-kit/sortable";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { KeyValue as RawKeyValue } from "@/bindings";
@@ -69,6 +70,10 @@ export function KeyValueTable({
         />
       ) : (
         <GridTable
+          reorder={{
+            count: rows.length,
+            onMove: (from, to) => onChange(arrayMove(rows, from, to)),
+          }}
           columns={[
             { label: "", width: "2.25rem" },
             { label: namePlaceholder, width: "35%" },
@@ -79,7 +84,7 @@ export function KeyValueTable({
           {shown.map((row, index) => {
             const isNew = index === rows.length;
             return (
-              <GridRow key={index} muted={!row.enabled}>
+              <GridRow key={index} muted={!row.enabled} sortIndex={isNew ? undefined : index}>
                 <GridCell center>
                   <Checkbox
                     className="align-middle"
