@@ -1,5 +1,38 @@
 # Changelog
 
+## After M11: feedback round 2 (2026-10-16)
+
+### What was built
+- **Tables keep focus while adding a row**: typing into the empty "add" row of any table (environment variables and
+  secrets, headers, params, multipart) no longer creates one row per keystroke.
+- **OpenAPI import**: folders come from the URL paths by default (`/legs/resolve/{n}` → `legs/resolve`), with
+  "Folders from: tags" as the alternative. A requirement like `api_key + OAuth2` now imports as OAuth2 (primary) plus an
+  API key, as the auth editor shows it.
+- **History** keeps its list when switching sidebar tabs, loads in the background as soon as a collection is active,
+  and shows a spinner while it refreshes.
+- **Save response** suggests a file name: the `Content-Disposition` name, else `response.<ext>` from the content type.
+- **Environment editor** marks the active environment; right-click sets or clears it.
+- **Tab** accepts the highlighted autocomplete suggestion.
+- **Tabs**: the close button sits at the right edge; closing unsaved tabs (button, menu, Cmd/Ctrl+W) asks
+  *Save / Don't save / Cancel* in one in-app dialog.
+- **Cancel** while sending shows only the spinner and its label.
+- **Workspaces**: pinned workspaces come first, then at most 5 recent ones; pin/unpin and "Remove from list" on hover
+  in the workspace menu and by right-click on the start screen.
+- M12 is planned for the larger items: body search, git diffs in tabs, Frida archives and Playwright UI tests.
+
+### Rust things worth understanding in this round
+1. **`Iterator::partition`** (`import/openapi.rs` `auth_for`). It splits one iterator into two collections by a
+   predicate and keeps the order inside each half, like `Collectors.partitioningBy` in Java. `matches!` is a
+   pattern test that returns a `bool`, here used to ask "is this the `ApiKey` variant?" without pulling out its fields.
+2. **Recursion instead of juggling `&mut`** (`import/openapi.rs` `insert_at_path`). Walking a tree you are building
+   with one `&mut` variable that moves deeper each loop iteration is possible, but the borrow checker makes it fiddly.
+   A recursive function holds one `&mut Vec<PlannedFolder>` per level and passes a `&mut` to the child's list down,
+   so every borrow ends when its call returns.
+3. **Additive serde changes** (`local_state.rs` `pinned_workspaces`, `PlannedFolder::folders`). `#[serde(default)]`
+   on the struct lets older `settings.json` files without the new field load, and
+   `#[serde(skip_serializing_if = "Vec::is_empty")]` leaves the field out of the output when it's empty, which is
+   why the existing OpenAPI snapshots didn't change.
+
 ## M11: Collection runner (2026-10-16)
 
 ### What was built
