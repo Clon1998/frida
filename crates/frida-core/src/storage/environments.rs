@@ -53,6 +53,29 @@ pub fn create_environment(dir: &Path, name: &str) -> Result<Environment> {
     Ok(env)
 }
 
+/// Copies the environment `name` as "<name> copy" (or "<name> copy 2", ...). Returns the copy.
+/// Secret values live outside the file; the caller copies them (`secrets::copy_env_secrets`).
+pub fn duplicate_environment(dir: &Path, name: &str) -> Result<Environment> {
+    let Some(original) = find_environment(dir, name)? else {
+        return Err(CoreError::NotFound {
+            path: dir.join(ENVIRONMENTS_DIR).join(name),
+        });
+    };
+    let mut copy_name = format!("{name} copy");
+    let mut n = 2;
+    while find_environment(dir, &copy_name)?.is_some() {
+        copy_name = format!("{name} copy {n}");
+        n += 1;
+    }
+    let created = create_environment(dir, &copy_name)?;
+    let copy = Environment {
+        name: created.name,
+        ..original
+    };
+    save_environment(dir, &copy.name, &copy)?;
+    Ok(copy)
+}
+
 /// Saves `env`, which was loaded as `original_name`. A changed name renames the file.
 /// Secret values are always stripped before writing (PLAN.md §6).
 pub fn save_environment(dir: &Path, original_name: &str, env: &Environment) -> Result<()> {
@@ -187,5 +210,35 @@ mod tests {
     fn missing_environments_folder_means_no_environments() {
         let dir = tempfile::tempdir().unwrap();
         assert!(list_environments(dir.path()).unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod duplicate_tests {
+    use super::*;
+
+    #[test]
+    fn duplicates_get_unique_names_and_the_same_variables() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(ENVIRONMENTS_DIR)).unwrap();
+        let mut env = create_environment(dir.path(), "dev").unwrap();
+        env.color = Some("red".into());
+        env.variables.push(crate::model::EnvVariable {
+            name: "host".into(),
+            value: Some("x".into()),
+            secret: false,
+            source: None,
+        });
+        save_environment(dir.path(), "dev", &env).unwrap();
+
+        let first = duplicate_environment(dir.path(), "dev").unwrap();
+        let second = duplicate_environment(dir.path(), "dev").unwrap();
+        assert_eq!(
+            (first.name.as_str(), second.name.as_str()),
+            ("dev copy", "dev copy 2")
+        );
+        let loaded = find_environment(dir.path(), "dev copy").unwrap().unwrap();
+        assert_eq!(loaded.variables, env.variables);
+        assert_eq!(loaded.color.as_deref(), Some("red"));
     }
 }

@@ -11,7 +11,8 @@ pub use collection::{
     save_collection, save_folder, save_request, scan_tree,
 };
 pub use environments::{
-    create_environment, delete_environment, find_environment, list_environments, save_environment,
+    create_environment, delete_environment, duplicate_environment, find_environment,
+    list_environments, save_environment,
 };
 pub use paths::{COLLECTION_FILE, FOLDER_FILE, WORKSPACE_FILE, slugify};
 pub use workspace::{

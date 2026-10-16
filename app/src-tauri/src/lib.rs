@@ -85,6 +85,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             env::list_environments,
             env::create_environment,
             env::save_environment,
+            env::duplicate_environment,
             env::delete_environment,
             env::set_secret,
             env::delete_secret,

@@ -94,6 +94,22 @@ pub fn rename_env_secrets(
     Ok(())
 }
 
+/// Copies the secrets of the environment `from` to `to` (used when duplicating it). `env` is
+/// the copy; its secret variables decide what is copied.
+pub fn copy_env_secrets(
+    env: &Environment,
+    from: &str,
+    scope_id: &str,
+    store: &dyn SecretStore,
+) -> Result<()> {
+    for var in env.variables.iter().filter(|v| v.secret) {
+        if let Some(value) = store.get(&SecretKey::new(scope_id, from, &var.name))? {
+            store.set(&SecretKey::new(scope_id, &env.name, &var.name), &value)?;
+        }
+    }
+    Ok(())
+}
+
 /// Deletes all secrets of `env` (used when the environment is deleted).
 pub fn delete_env_secrets(
     env: &Environment,
@@ -173,5 +189,25 @@ mod tests {
         assert_eq!(workspace_scope_id(a.path()), workspace_scope_id(a.path()));
         assert_ne!(workspace_scope_id(a.path()), workspace_scope_id(b.path()));
         assert!(workspace_scope_id(a.path()).starts_with("ws-"));
+    }
+
+    #[test]
+    fn duplicates_copy_secret_values_and_keep_the_original() {
+        let store = MemoryStore::default();
+        store
+            .set(&SecretKey::new("col", "dev", "token"), "s3cr3t")
+            .unwrap();
+        let mut copy = secret_env();
+        copy.name = "dev copy".into();
+        copy_env_secrets(&copy, "dev", "col", &store).unwrap();
+        for env in ["dev", "dev copy"] {
+            assert_eq!(
+                store
+                    .get(&SecretKey::new("col", env, "token"))
+                    .unwrap()
+                    .as_deref(),
+                Some("s3cr3t")
+            );
+        }
     }
 }

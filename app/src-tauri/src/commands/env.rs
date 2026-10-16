@@ -86,6 +86,25 @@ pub async fn save_environment(
 }
 
 /// Deletes an environment file and its secrets.
+/// Copies an environment, including its secret values (copied inside Rust, never via the UI).
+/// Returns the copy's name.
+#[tauri::command]
+#[specta::specta]
+pub async fn duplicate_environment(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    name: String,
+) -> ApiResult<String> {
+    let (dir, scope_id) = state.env_location(&scope)?;
+    let store = state.secrets.store();
+    blocking(move || {
+        let copy = storage::duplicate_environment(&dir, &name)?;
+        secrets::copy_env_secrets(&copy, &name, &scope_id, store.as_ref())?;
+        Ok(copy.name)
+    })
+    .await
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_environment(

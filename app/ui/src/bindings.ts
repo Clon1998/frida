@@ -67,7 +67,12 @@ export const commands = {
 	 *  are ignored (they never go to disk); use [`set_secret`] for those. Renaming moves secrets.
 	 */
 	saveEnvironment: (scope: EnvScope, originalName: string, environment: Environment_Deserialize) => typedError<null, ApiError>(__TAURI_INVOKE("save_environment", { scope, originalName, environment })),
-	/**  Deletes an environment file and its secrets. */
+	/**
+	 *  Deletes an environment file and its secrets.
+	 *  Copies an environment, including its secret values (copied inside Rust, never via the UI).
+	 *  Returns the copy's name.
+	 */
+	duplicateEnvironment: (scope: EnvScope, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("duplicate_environment", { scope, name })),
 	deleteEnvironment: (scope: EnvScope, name: string) => typedError<null, ApiError>(__TAURI_INVOKE("delete_environment", { scope, name })),
 	/**  Stores a secret value in the keychain (never in YAML). */
 	setSecret: (scope: EnvScope, environment: string, variable: string, value: string) => typedError<null, ApiError>(__TAURI_INVOKE("set_secret", { scope, environment, variable, value })),

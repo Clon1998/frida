@@ -1,10 +1,16 @@
-import { Ban, Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Ban, Copy, Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { commands, type EnvScope } from "@/bindings";
 import { CellInput, GridCell, GridRow, GridTable } from "@/components/request/GridTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
@@ -45,6 +51,18 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
     }
   };
 
+  /** Copies the saved environment `name` (with its secret values) and selects the copy. */
+  const duplicate = async (name: string) => {
+    try {
+      const copy = await unwrap(commands.duplicateEnvironment(scope, name));
+      await useEnvs.getState().load(dir);
+      setSelected(copy);
+      toast.success(`Duplicated as "${copy}"`);
+    } catch (e) {
+      showError(e);
+    }
+  };
+
   const locked = backend !== null && !backend.keychain && !backend.unlocked;
 
   return (
@@ -68,25 +86,33 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
         <div className="flex min-h-0 flex-1">
           <aside className="flex w-52 shrink-0 flex-col gap-1 border-r p-2">
             {entries.map((e) => (
-              <button
-                key={e.environment.name}
-                type="button"
-                onClick={() => setSelected(e.environment.name)}
-                className={cn(
-                  "truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent",
-                  current?.environment.name === e.environment.name && "bg-accent font-medium",
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <span
+              <ContextMenu key={e.environment.name}>
+                <ContextMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(e.environment.name)}
                     className={cn(
-                      "size-2 shrink-0 rounded-full",
-                      envColor(e.environment.color)?.dot ?? "border border-muted-foreground/60",
+                      "truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent",
+                      current?.environment.name === e.environment.name && "bg-accent font-medium",
                     )}
-                  />
-                  <span className="truncate">{e.environment.name}</span>
-                </span>
-              </button>
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "size-2 shrink-0 rounded-full",
+                          envColor(e.environment.color)?.dot ?? "border border-muted-foreground/60",
+                        )}
+                      />
+                      <span className="truncate">{e.environment.name}</span>
+                    </span>
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => void duplicate(e.environment.name)}>
+                    <Copy /> Duplicate
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
             {entries.length === 0 && (
               <p className="px-2 py-1 text-xs text-muted-foreground">No environments yet.</p>
@@ -105,6 +131,7 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
                 scope={scope}
                 entry={current}
                 onRenamed={setSelected}
+                onDuplicate={() => void duplicate(current.environment.name)}
               />
             )}
           </div>
@@ -157,10 +184,11 @@ interface EnvFormProps {
   scope: EnvScope;
   entry: EnvEntry;
   onRenamed: (name: string) => void;
+  onDuplicate: () => void;
 }
 
 /** Edits one environment. Changes are kept here until "Save". */
-function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
+function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
   const original = entry.environment;
   const [draft, setDraft] = useState<EnvModel>(original);
   /** Secret values typed in this session, by variable name. */
@@ -222,6 +250,25 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
       showError(e);
     }
   };
+
+  // Ctrl/Cmd+S saves, like in request tabs. A ref so the listener always calls the latest
+  // `save` (which sees the current draft) without re-registering on every keystroke.
+  const saveRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    saveRef.current = () => {
+      if (dirty) void save();
+    };
+  });
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        saveRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const remove = async () => {
     try {
@@ -298,8 +345,18 @@ function EnvForm({ dir, scope, entry, onRenamed }: EnvFormProps) {
         >
           Revert
         </Button>
-        <Button size="sm" disabled={!dirty} onClick={() => void save()}>
+        <Button size="sm" disabled={!dirty} title="Save (Ctrl/Cmd+S)" onClick={() => void save()}>
           Save
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          title={dirty ? "Duplicate (copies the saved version)" : "Duplicate"}
+          aria-label="Duplicate environment"
+          onClick={onDuplicate}
+        >
+          <Copy />
         </Button>
         <Button
           variant="ghost"
