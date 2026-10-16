@@ -45,7 +45,8 @@ pub fn save_collection_state(
     collection_id: String,
     collection_state: CollectionState,
 ) -> ApiResult<()> {
+    // Only the UI's view state (tabs, folders); the active environment is kept as it is.
     Ok(state
         .local
-        .save_collection_state(&collection_id, &collection_state)?)
+        .save_view_state(&collection_id, &collection_state)?)
 }

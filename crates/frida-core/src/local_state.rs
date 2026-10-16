@@ -98,6 +98,20 @@ impl LocalStore {
         save_json(&self.collection_state_path(collection_id)?, state)
     }
 
+    /// Saves what the UI owns (open tabs, expanded folders) and keeps the rest, such as the
+    /// active environment, which is set separately. Overwriting it here used to "forget" the
+    /// selected environment whenever a tab was opened, switched or closed.
+    pub fn save_view_state(&self, collection_id: &str, view: &CollectionState) -> Result<()> {
+        let current = self.load_collection_state(collection_id)?;
+        self.save_collection_state(
+            collection_id,
+            &CollectionState {
+                active_environment: current.active_environment,
+                ..view.clone()
+            },
+        )
+    }
+
     fn collection_state_path(&self, collection_id: &str) -> Result<PathBuf> {
         // The id comes from collection.yaml, which anyone can edit. Only allow UUID-like ids
         // so it can't be used to write outside the state folder.
@@ -204,5 +218,34 @@ mod tests {
                 .save_collection_state("", &CollectionState::default())
                 .is_err()
         );
+    }
+
+    #[test]
+    fn saving_tabs_keeps_the_active_environment() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalStore::new(dir.path());
+        let id = "0d6c2a4e-8f1b-4c3d-9e5a-7b8c9d0e1f2a";
+        store
+            .save_collection_state(
+                id,
+                &CollectionState {
+                    active_environment: Some("dev".into()),
+                    ..CollectionState::default()
+                },
+            )
+            .unwrap();
+        // The UI sends its tab state without the environment.
+        store
+            .save_view_state(
+                id,
+                &CollectionState {
+                    open_tabs: vec!["a.yaml".into()],
+                    ..CollectionState::default()
+                },
+            )
+            .unwrap();
+        let loaded = store.load_collection_state(id).unwrap();
+        assert_eq!(loaded.active_environment.as_deref(), Some("dev"));
+        assert_eq!(loaded.open_tabs, vec!["a.yaml"]);
     }
 }
