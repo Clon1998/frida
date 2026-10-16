@@ -655,6 +655,10 @@ Deviations from and clarifications of this plan, newest last.
   files only produce warnings. Export puts method and URL on the first line and uses `curl.exe` for PowerShell. History
   is per collection in the sidebar, masks resolved secrets *and* auth values (tokens, keys, Basic credentials), records
   failed sends (with the typed request) but not cancelled ones, and keeps 500 entries (`historySize` in settings).
+- **2026-10-16 Console panel (addition, requested by Patrick).** A bottom panel (Ctrl/Cmd+J, status bar) logs every
+  send of the session like Postman's/Bruno's console: the raw request as sent and the raw response, or the error.
+  Secrets are masked (same masking as history), bodies capped at 64 KB, 300 entries kept in memory. Script
+  `console.log` output (M5) will go to the same panel.
 
 ## 17. Testing strategy
 

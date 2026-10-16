@@ -1,5 +1,5 @@
 import { ask } from "@tauri-apps/plugin-dialog";
-import { Columns2, Rows2 } from "lucide-react";
+import { Columns2, Rows2, SquareChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
 import { CurlExportDialog } from "@/components/curl/CurlExportDialog";
@@ -7,7 +7,9 @@ import { CurlImportDialog } from "@/components/curl/CurlImportDialog";
 import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
+import { ConsolePanel } from "@/components/console/ConsolePanel";
 import { HistoryView } from "@/components/history/HistoryView";
+import { useConsole } from "@/stores/console";
 import { InspectorPanel } from "@/components/inspector/InspectorPanel";
 import { useUi } from "@/stores/ui";
 import { RequestEditor } from "@/components/request/RequestEditor";
@@ -33,9 +35,13 @@ export function AppShell() {
   const inspectorOpen = useUi((s) => s.inspectorOpen);
   const setInspectorOpen = useUi((s) => s.setInspectorOpen);
   const report = useUi((s) => s.report);
+  const consoleOpen = useConsole((s) => s.open);
+  const consoleUnseen = useConsole((s) => s.entries.length - s.seen);
+  const toggleConsole = useConsole((s) => s.toggle);
   const showInspector = inspectorOpen && dir !== null && tab?.kind === "request";
 
   useRestoreTabs();
+  useConsoleEvents();
   useLoadEnvs();
   usePersistTabs();
   useFileWatcher();
@@ -49,46 +55,59 @@ export function AppShell() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel id="main">
-          <main className="flex h-full min-w-0 flex-col">
-            {dir && <TabBar dir={dir} />}
-            {dir && <RequestHeader dir={dir} tab={tab} />}
-            {dir && tab?.kind === "request" && (
-              <ResizablePanelGroup key={split} orientation={split} className="min-h-0 flex-1">
-                <ResizablePanel defaultSize="50" minSize={200}>
-                  <RequestEditor dir={dir} tab={tab} />
-                </ResizablePanel>
+          {/* The work area above, the console below (when open). */}
+          <ResizablePanelGroup orientation="vertical" className="h-full">
+            <ResizablePanel id="work" minSize={200}>
+              <main className="flex h-full min-w-0 flex-col">
+                {dir && <TabBar dir={dir} />}
+                {dir && <RequestHeader dir={dir} tab={tab} />}
+                {dir && tab?.kind === "request" && (
+                  <ResizablePanelGroup key={split} orientation={split} className="min-h-0 flex-1">
+                    <ResizablePanel defaultSize="50" minSize={200}>
+                      <RequestEditor dir={dir} tab={tab} />
+                    </ResizablePanel>
+                    <ResizableHandle />
+                    <ResizablePanel defaultSize="50" minSize={150}>
+                      <ResponseViewer tab={tab} />
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
+                )}
+                {dir && tab?.kind === "folder" && (
+                  <div className="min-h-0 flex-1">
+                    <FolderEditor dir={dir} tab={tab} />
+                  </div>
+                )}
+                {dir && tab?.kind === "collection" && (
+                  <div className="min-h-0 flex-1">
+                    <CollectionEditor dir={dir} tab={tab} />
+                  </div>
+                )}
+                {dir && tab?.kind === "environments" && (
+                  <div className="min-h-0 flex-1">
+                    <EnvironmentsEditor dir={dir} />
+                  </div>
+                )}
+                {dir && tab?.kind === "history" && (
+                  <div className="min-h-0 flex-1">
+                    <HistoryView key={tab.path} dir={dir} path={tab.path} />
+                  </div>
+                )}
+                {!tab && (
+                  <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                    Open a request from the sidebar, or right-click it to create one.
+                  </div>
+                )}
+              </main>
+            </ResizablePanel>
+            {consoleOpen && (
+              <>
                 <ResizableHandle />
-                <ResizablePanel defaultSize="50" minSize={150}>
-                  <ResponseViewer tab={tab} />
+                <ResizablePanel id="console" defaultSize="30" minSize={100}>
+                  <ConsolePanel />
                 </ResizablePanel>
-              </ResizablePanelGroup>
+              </>
             )}
-            {dir && tab?.kind === "folder" && (
-              <div className="min-h-0 flex-1">
-                <FolderEditor dir={dir} tab={tab} />
-              </div>
-            )}
-            {dir && tab?.kind === "collection" && (
-              <div className="min-h-0 flex-1">
-                <CollectionEditor dir={dir} tab={tab} />
-              </div>
-            )}
-            {dir && tab?.kind === "environments" && (
-              <div className="min-h-0 flex-1">
-                <EnvironmentsEditor dir={dir} />
-              </div>
-            )}
-            {dir && tab?.kind === "history" && (
-              <div className="min-h-0 flex-1">
-                <HistoryView key={tab.path} dir={dir} path={tab.path} />
-              </div>
-            )}
-            {!tab && (
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                Open a request from the sidebar, or right-click it to create one.
-              </div>
-            )}
-          </main>
+          </ResizablePanelGroup>
         </ResizablePanel>
         {showInspector && (
           // The variables drawer: full height on the right of the window (PLAN.md §14).
@@ -107,6 +126,20 @@ export function AppShell() {
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
         <div className="flex-1" />
         <Button
+          variant={consoleOpen ? "secondary" : "ghost"}
+          size="sm"
+          className="h-5 gap-1 px-1.5 text-xs"
+          title="Console (Ctrl/Cmd+J)"
+          onClick={toggleConsole}
+        >
+          <SquareChevronUp className="size-3.5" /> Console
+          {!consoleOpen && consoleUnseen > 0 && (
+            <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
+              {consoleUnseen}
+            </span>
+          )}
+        </Button>
+        <Button
           variant="ghost"
           size="icon"
           className="size-5"
@@ -118,6 +151,18 @@ export function AppShell() {
       </footer>
     </div>
   );
+}
+
+/** Collects the console entries Rust emits after every send. */
+function useConsoleEvents() {
+  useEffect(() => {
+    const unlisten = events.consoleLogged.listen(({ payload }) =>
+      useConsole.getState().add(payload.entry),
+    );
+    return () => {
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
 }
 
 /** Loads the environments (and the active selection) when the active collection changes. */
@@ -195,6 +240,11 @@ function useShortcuts() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === "j") {
+        e.preventDefault();
+        useConsole.getState().toggle();
+        return;
+      }
       const dir = useWorkspace.getState().activeCollectionDir;
       if (!dir) return;
       const tabs = useTabs.getState();
