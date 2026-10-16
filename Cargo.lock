@@ -1586,6 +1586,7 @@ dependencies = [
  "brotli",
  "cookie_store",
  "flate2",
+ "frida-script",
  "frida-secrets",
  "frida-testserver",
  "getrandom 0.4.3",

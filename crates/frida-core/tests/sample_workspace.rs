@@ -60,18 +60,18 @@ async fn every_sample_request_succeeds_against_the_test_server() {
         let mut request = storage::read_request(&collection, path).unwrap();
         request.url = port(&request.url);
 
-        let runtime = std::collections::HashMap::new();
+        let session = http::SessionStore::default();
         let input = http::ExecuteInput {
             collection_dir: &collection,
             request_rel: path,
             request: &request,
             collection_env: Some(&local_env),
             global_env: Some(&shared_env),
-            runtime: &runtime,
+            session: session.session(None),
             cookies: None,
             oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
         };
-        let response = http::execute(input, CancellationToken::new())
+        let response = http::execute(input, CancellationToken::new(), &|_| {})
             .await
             .unwrap_or_else(|e| panic!("{path} failed: {e}"))
             .response;
@@ -102,7 +102,7 @@ async fn variables_sample_resolves_every_layer() {
         .unwrap();
     let path = "variables/get-with-variables.yaml";
     let request = storage::read_request(&collection, path).unwrap();
-    let runtime = std::collections::HashMap::new();
+    let session = http::SessionStore::default();
 
     let executed = http::execute(
         http::ExecuteInput {
@@ -111,11 +111,12 @@ async fn variables_sample_resolves_every_layer() {
             request: &request,
             collection_env: Some(&local_env),
             global_env: Some(&shared_env),
-            runtime: &runtime,
+            session: session.session(None),
             cookies: None,
             oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
         },
         CancellationToken::new(),
+        &|_| {},
     )
     .await
     .unwrap();

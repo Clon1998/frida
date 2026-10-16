@@ -1,0 +1,12 @@
+version: 1
+name: Orders
+seq: 2
+headers:
+- name: Authorization
+  value: "Bearer {{token}}"
+  enabled: true
+scripts:
+  pre: |
+    // bru.sendRequest from a script, awaited.
+    const ping = await bru.sendRequest({ url: bru.interpolate("{{baseUrl}}/ping?from=script") });
+    bru.setVar("pinged", ping.data.query);

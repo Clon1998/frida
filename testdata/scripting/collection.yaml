@@ -1,0 +1,14 @@
+version: 1
+id: 5b0f3c1e-2d4a-4e6b-8c9d-1a2b3c4d5e6f
+name: Scripting
+headers:
+- name: X-Client
+  value: frida
+  enabled: true
+scripts:
+  pre: |
+    // Runs before every request in the collection.
+    req.setHeader("X-Request-Name", req.getName());
+  post: ""
+tests: |
+  test("no server error", () => expect(res.status).to.be.below(500));

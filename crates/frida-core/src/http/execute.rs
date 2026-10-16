@@ -1,19 +1,21 @@
 //! The whole send pipeline for one request (PLAN.md §7). Steps: load the inherited context,
-//! build the variable scope, resolve variables, prepare and send. Scripts (M5), auth (M3) and
-//! history (M4) are added here in later milestones.
+//! run pre-request scripts, build the variable scope, resolve variables, prepare, apply auth,
+//! send, then run post-response scripts and tests.
 
-use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tokio_util::sync::CancellationToken;
 
 use super::cookies::CookieJar;
 use super::prepare::{PreparedRequest, RequestContext, prepare};
+use super::scripting::{
+    EnvOverrides, Pipeline, RuntimeVars, ScriptContext, ScriptLog, ScriptOutcome, runtime_strings,
+};
 use super::send::{HttpResponse, SendError, build_client, send};
 use crate::auth::{OAuth2Manager, TokenInfo, apply_auth, effective_auth};
 use crate::codegen::{CurlOptions, curl_request, render_curl};
-use crate::error::Result;
+use crate::error::{CoreError, Result};
 use crate::model::AuthScheme;
 use crate::model::{Environment, Request};
 use crate::storage;
@@ -29,10 +31,54 @@ pub struct ExecuteInput<'a> {
     /// Active environments, with secret values already filled in.
     pub collection_env: Option<&'a Environment>,
     pub global_env: Option<&'a Environment>,
-    pub runtime: &'a HashMap<String, String>,
+    /// What scripts changed earlier in this session.
+    pub session: Session<'a>,
     pub cookies: Option<Arc<CookieJar>>,
     /// Holds OAuth2 tokens across sends.
     pub oauth: &'a OAuth2Manager,
+}
+
+/// The session state scripts read and change: runtime variables and environment overrides.
+/// Held by the app (one per collection, plus the global overrides) and shared by all sends.
+#[derive(Clone, Copy)]
+pub struct Session<'a> {
+    pub runtime: &'a Mutex<RuntimeVars>,
+    pub env_overrides: &'a EnvOverrides,
+    pub global_overrides: &'a EnvOverrides,
+    /// Where global environments live (for `setGlobalEnvVar(..., { persist: true })`).
+    pub workspace_dir: Option<&'a Path>,
+}
+
+/// Owns the session state for one collection (the app keeps one per collection; tests and a
+/// future CLI can simply create one).
+#[derive(Debug, Default)]
+pub struct SessionStore {
+    pub runtime: Mutex<RuntimeVars>,
+    pub env_overrides: EnvOverrides,
+    pub global_overrides: EnvOverrides,
+}
+
+impl SessionStore {
+    /// With these runtime variables already set.
+    pub fn with_runtime(vars: &[(&str, &str)]) -> Self {
+        let runtime = vars
+            .iter()
+            .map(|(k, v)| (k.to_string(), serde_json::Value::String(v.to_string())))
+            .collect();
+        Self {
+            runtime: Mutex::new(runtime),
+            ..Self::default()
+        }
+    }
+
+    pub fn session<'a>(&'a self, workspace_dir: Option<&'a Path>) -> Session<'a> {
+        Session {
+            runtime: &self.runtime,
+            env_overrides: &self.env_overrides,
+            global_overrides: &self.global_overrides,
+            workspace_dir,
+        }
+    }
 }
 
 /// A response plus what produced it.
@@ -43,6 +89,8 @@ pub struct Executed {
     pub sent: PreparedRequest,
     /// Every secret value in the sent request (resolved secrets and auth values), to mask.
     pub sensitive: Vec<String>,
+    /// Test results and post-response script errors.
+    pub scripts: ScriptOutcome,
 }
 
 /// Resolves variables in the request without sending it, for the inspector.
@@ -50,8 +98,50 @@ pub fn inspect(input: &ExecuteInput<'_>) -> Result<ResolveReport> {
     Ok(load_and_resolve(input)?.report)
 }
 
-pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Result<Executed> {
-    let resolved = load_and_resolve(&input)?;
+/// Sends the request. Script `console.log` output goes to `on_log` as it happens, so it is
+/// shown even when the send fails later.
+pub async fn execute(
+    input: ExecuteInput<'_>,
+    cancel: CancellationToken,
+    on_log: &(dyn Fn(ScriptLog) + Send + Sync),
+) -> Result<Executed> {
+    let session = input.session;
+    let script_ctx = ScriptContext {
+        runtime: session.runtime,
+        env_overrides: session.env_overrides,
+        global_overrides: session.global_overrides,
+        workspace_dir: session.workspace_dir,
+        on_log,
+        limits: frida_script::ScriptLimits::default(),
+    };
+    let mut pipeline = Pipeline {
+        collection_dir: input.collection_dir,
+        collection: storage::load_collection(input.collection_dir)?,
+        folders: storage::load_folder_chain(input.collection_dir, input.request_rel)?,
+        request: input.request.clone(),
+        collection_env: input.collection_env.map(|e| session.env_overrides.apply(e)),
+        global_env: input.global_env.map(|e| session.global_overrides.apply(e)),
+        cookies: input.cookies.clone(),
+        cancel: cancel.clone(),
+        ctx: &script_ctx,
+    };
+
+    let pre = pipeline.run_pre().await.map_err(CoreError::Script)?;
+    if pre.skip {
+        return Err(CoreError::InvalidInput(
+            "the pre-request script skipped this request (bru.runner.skipRequest())".into(),
+        ));
+    }
+
+    let runtime = runtime_strings(&session.runtime.lock().expect("runtime lock poisoned"));
+    let resolved = resolve_context(&ScopeInput {
+        runtime: &runtime,
+        request: &pipeline.request,
+        folders: &pipeline.folders,
+        collection_env: pipeline.collection_env.as_ref(),
+        collection: &pipeline.collection,
+        global_env: pipeline.global_env.as_ref(),
+    });
     for name in resolved.report.unresolved() {
         tracing::debug!(variable = name, "unresolved variable");
     }
@@ -81,11 +171,13 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
     // The URL may contain secrets, so it is only logged at debug level (CLAUDE.md).
     tracing::debug!(method = %prepared.method, "sending request");
     let response = send(&prepared, input.cookies.clone(), cancel).await?;
+    let scripts = pipeline.run_post(&prepared, &response).await;
     Ok(Executed {
         response,
         report: resolved.report,
         sent: prepared,
         sensitive,
+        scripts,
     })
 }
 
@@ -153,15 +245,20 @@ pub fn export_curl(input: &ExecuteInput<'_>, options: CurlOptions) -> Result<Str
     }
 }
 
+/// Resolves without running scripts (inspector, curl export), using what scripts set earlier.
 fn load_and_resolve(input: &ExecuteInput<'_>) -> Result<ResolvedContext> {
     let collection = storage::load_collection(input.collection_dir)?;
     let folders = storage::load_folder_chain(input.collection_dir, input.request_rel)?;
+    let session = input.session;
+    let runtime = runtime_strings(&session.runtime.lock().expect("runtime lock poisoned"));
+    let collection_env = input.collection_env.map(|e| session.env_overrides.apply(e));
+    let global_env = input.global_env.map(|e| session.global_overrides.apply(e));
     Ok(resolve_context(&ScopeInput {
-        runtime: input.runtime,
+        runtime: &runtime,
         request: input.request,
         folders: &folders,
-        collection_env: input.collection_env,
+        collection_env: collection_env.as_ref(),
         collection: &collection,
-        global_env: input.global_env,
+        global_env: global_env.as_ref(),
     }))
 }

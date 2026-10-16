@@ -345,7 +345,7 @@ async fn execute_applies_collection_and_folder_headers_and_timeouts() {
     let req = request("GET", format!("http://{addr}/echo"));
     let rel = storage::create_request(root, &folder_rel, &req).unwrap();
 
-    let runtime = std::collections::HashMap::new();
+    let session = http::SessionStore::default();
     let oauth = frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(())));
     let input = |request| http::ExecuteInput {
         collection_dir: root,
@@ -353,11 +353,11 @@ async fn execute_applies_collection_and_folder_headers_and_timeouts() {
         request,
         collection_env: None,
         global_env: None,
-        runtime: &runtime,
+        session: session.session(None),
         cookies: None,
         oauth: &oauth,
     };
-    let response = http::execute(input(&req), CancellationToken::new())
+    let response = http::execute(input(&req), CancellationToken::new(), &|_| {})
         .await
         .unwrap()
         .response;
@@ -367,7 +367,7 @@ async fn execute_applies_collection_and_folder_headers_and_timeouts() {
 
     // The folder's 150 ms timeout applies to requests inside it.
     let slow = request("GET", format!("http://{addr}/slow?ms=1000"));
-    let err = http::execute(input(&slow), CancellationToken::new())
+    let err = http::execute(input(&slow), CancellationToken::new(), &|_| {})
         .await
         .err()
         .expect("should time out");

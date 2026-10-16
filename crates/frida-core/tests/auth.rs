@@ -2,7 +2,6 @@
 //! (client credentials, password, and authorization code with the browser step simulated),
 //! token caching and refresh, and OAuth2 + API key sending both.
 
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
@@ -67,7 +66,7 @@ fn collection_with(
 
 /// Sends the request and returns the echoed headers.
 async fn send(dir: &Path, rel: &str, request: &Request, oauth: &OAuth2Manager) -> Value {
-    let runtime = HashMap::new();
+    let session = http::SessionStore::default();
     let executed = http::execute(
         ExecuteInput {
             collection_dir: dir,
@@ -75,11 +74,12 @@ async fn send(dir: &Path, rel: &str, request: &Request, oauth: &OAuth2Manager) -
             request,
             collection_env: None,
             global_env: None,
-            runtime: &runtime,
+            session: session.session(None),
             cookies: None,
             oauth,
         },
         CancellationToken::new(),
+        &|_| {},
     )
     .await
     .unwrap_or_else(|e| panic!("send failed: {e}"));
@@ -301,7 +301,7 @@ async fn rejected_credentials_give_a_clear_error() {
         },
         addr,
     );
-    let runtime = HashMap::new();
+    let session = http::SessionStore::default();
     let oauth = OAuth2Manager::new(simulated_browser());
     let err = http::execute(
         ExecuteInput {
@@ -310,11 +310,12 @@ async fn rejected_credentials_give_a_clear_error() {
             request: &request,
             collection_env: None,
             global_env: None,
-            runtime: &runtime,
+            session: session.session(None),
             cookies: None,
             oauth: &oauth,
         },
         CancellationToken::new(),
+        &|_| {},
     )
     .await
     .err()

@@ -48,6 +48,10 @@ pub enum CoreError {
 
     #[error(transparent)]
     Auth(#[from] crate::auth::OAuth2Error),
+
+    /// A pre-request script failed, so the request was not sent.
+    #[error("{0}")]
+    Script(frida_script::ScriptError),
 }
 
 impl CoreError {

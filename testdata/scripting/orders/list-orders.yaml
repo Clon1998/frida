@@ -1,0 +1,13 @@
+version: 1
+name: List orders
+seq: 1
+method: GET
+url: "{{baseUrl}}/orders"
+tests: |
+  test("uses the token from login", () => {
+    expect(res.body.headers.authorization).to.equal("Bearer t-123");
+  });
+  test("collection header and script header", () => {
+    expect(res.body.headers).to.include({ "x-client": "frida", "x-request-name": "List orders" });
+  });
+  test("sendRequest ran", () => expect(bru.getVar("pinged")).to.equal("from=script"));

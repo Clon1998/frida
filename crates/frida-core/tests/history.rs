@@ -1,6 +1,5 @@
 //! M4 acceptance (PLAN.md §15): history entries contain no secret values, end to end.
 
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -47,7 +46,7 @@ async fn a_send_with_secrets_leaves_no_trace_in_history_or_curl() {
     };
     let rel = storage::create_request(dir.path(), "", &request).unwrap();
 
-    let runtime = HashMap::new();
+    let session = http::SessionStore::default();
     let oauth = OAuth2Manager::new(Arc::new(|_| Ok(())));
     let input = || ExecuteInput {
         collection_dir: dir.path(),
@@ -55,12 +54,12 @@ async fn a_send_with_secrets_leaves_no_trace_in_history_or_curl() {
         request: &request,
         collection_env: Some(&env),
         global_env: None,
-        runtime: &runtime,
+        session: session.session(None),
         cookies: None,
         oauth: &oauth,
     };
 
-    let executed = http::execute(input(), CancellationToken::new())
+    let executed = http::execute(input(), CancellationToken::new(), &|_| {})
         .await
         .unwrap();
     // The echo server reflects the secrets back in the response body, so they appear in the

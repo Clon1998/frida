@@ -20,6 +20,7 @@ shell-words = { workspace = true }
 rusqlite = { workspace = true }
 cookie_store = { workspace = true }
 frida-secrets = { workspace = true }
+frida-script = { workspace = true }
 sha2 = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

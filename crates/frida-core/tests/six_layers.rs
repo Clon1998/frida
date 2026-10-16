@@ -1,7 +1,6 @@
 //! M2 acceptance (PLAN.md §15): the inspector shows the correct source and shadowing for a
 //! fixture that defines the same variable in all six layers (`testdata/six-layers`).
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use frida_core::http::{ExecuteInput, inspect};
@@ -12,7 +11,8 @@ fn workspace() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/six-layers")
 }
 
-fn inspect_x(runtime: &HashMap<String, String>) -> ResolvedVar {
+fn inspect_x(runtime: &[(&str, &str)]) -> ResolvedVar {
+    let session = frida_core::http::SessionStore::with_runtime(runtime);
     let ws = workspace();
     let collection = ws.join("collections/api");
     let request_rel = "orders/eu/get-x.yaml";
@@ -28,7 +28,7 @@ fn inspect_x(runtime: &HashMap<String, String>) -> ResolvedVar {
         request: &request,
         collection_env: Some(&collection_env),
         global_env: Some(&global_env),
-        runtime,
+        session: session.session(None),
         cookies: None,
         oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
     })
@@ -45,8 +45,7 @@ fn folder(path: &str, name: &str) -> VarSource {
 
 #[test]
 fn runtime_wins_and_every_other_layer_is_shadowed_in_order() {
-    let runtime = HashMap::from([("x".to_string(), "runtime".to_string())]);
-    let x = inspect_x(&runtime);
+    let x = inspect_x(&[("x", "runtime")]);
 
     assert_eq!(x.value.as_deref(), Some("runtime"));
     assert_eq!(x.source, Some(VarSource::Runtime));
@@ -78,7 +77,7 @@ fn runtime_wins_and_every_other_layer_is_shadowed_in_order() {
 
 #[test]
 fn without_runtime_vars_the_request_layer_wins() {
-    let x = inspect_x(&HashMap::new());
+    let x = inspect_x(&[]);
     assert_eq!(x.source, Some(VarSource::Request));
     assert_eq!(x.value.as_deref(), Some("request"));
     assert_eq!(x.shadowed.len(), 5);
