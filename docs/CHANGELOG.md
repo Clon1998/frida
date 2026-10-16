@@ -1,5 +1,39 @@
 # Changelog
 
+## After M10: feedback round (2026-10-16)
+
+### What was built
+- **Settings dialog** (gear in the footer and on the start screen, Cmd/Ctrl+,): theme (system/light/dark), accent
+  color, UI size, editor font size, git program, AWS config/credentials files and secret cache time, history size.
+  Saved as `preferences` in `settings.json` and applied at once.
+- **Environments**: variables and secrets can be disabled (`enabled: false`), every table's rows can be reordered by
+  dragging, and environments themselves can be reordered (optional `seq` in the environment file).
+- **Response pane** only appears once a request is sent; it can be closed (✕) and reopened from the footer, and the
+  next send opens it again.
+- **Variables everywhere**: auth fields and folder/collection tabs highlight `{{variables}}` and autocomplete them.
+  Auth fields are a shadcn input box with a one-line editor inside (`VariableInput`); literal secrets are hidden with
+  CSS while not focused.
+- **Layout and colors**: checked at the minimum window size (800×500); rows wrap, grid columns shrink, pane-dependent
+  layouts use container queries. Status colors are theme variables (`success`, `warning`, `info`).
+- **CI**: "Run workflow" has checkboxes for the platforms to build and for lint & test; pushes no longer cancel a
+  running manual build (that was the "failed" Windows build).
+- **Fixes**: no console windows flashing up on Windows when Frida runs git; the window no longer scrolls below the
+  footer (editor popup containers had `height: 100%`); secret auth fields accept typing again.
+
+### Things worth understanding in this round
+1. **Conditional compilation** (`crates/frida-git/src/run.rs`, `hide_console_window`): `#[cfg(windows)]` compiles a
+   function only for Windows, and `std::os::windows::process::CommandExt` is an *extension trait*: importing it adds
+   `creation_flags` to `Command`, a bit like a Kotlin extension function. The `#[cfg(not(windows))]` twin is empty.
+2. **A process-wide setting** (`run.rs`, `static EXECUTABLE: RwLock<Option<PathBuf>>`): Rust only allows mutable
+   statics behind a lock. `RwLock::new` is a `const fn`, so the static needs no lazy initialisation; many git calls
+   read it at once, changing the setting writes it.
+3. **Settings that change at runtime** (`crates/frida-secrets/src/aws.rs`, `AwsSecrets::configure`): the cache time and
+   file locations sit in `RwLock`s inside a struct shared as `Arc<AwsSecrets>`, so `&self` methods can change them.
+   This is *interior mutability*: the Rust way to change something through a shared reference.
+4. **Serde defaults for evolving files** (`crates/frida-core/src/local_state.rs`, `Preferences`;
+   `model/environment.rs`, `seq`): `#[serde(default)]` lets older files load, and
+   `skip_serializing_if = "is_zero"` keeps new fields out of files that don't use them, so existing YAML doesn't change.
+
 ## M10: Release polish (2026-10-16)
 
 ### What was built
