@@ -235,7 +235,7 @@ const LETTER_COLORS: Record<string, string> = {
   R: "text-info",
 };
 
-export function FileSection({
+function FileSection({
   title,
   files,
   letter,

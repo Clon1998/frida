@@ -35,14 +35,6 @@ const versions = (v: Partial<FileVersions>): FileVersions => ({
   ...v,
 });
 
-// jsdom has no ResizeObserver; the resizable panels need one (they only measure, nothing here
-// depends on the sizes).
-globalThis.ResizeObserver ??= class {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-} as unknown as typeof ResizeObserver;
-
 describe("changes tab", () => {
   afterEach(() => {
     cleanup();
@@ -75,14 +67,39 @@ describe("changes tab", () => {
     fireEvent.click(screen.getByText("Side by side"));
     await waitFor(() => expect(document.querySelector(".cm-mergeView")).not.toBeNull());
 
-    fireEvent.click(screen.getByText("logo.png"));
+    // The header steps to the next changed file (the list itself is in the sidebar's git panel).
+    expect(screen.getByText("1/2")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Next file"));
     await screen.findByText(/Binary file/);
     expect(useGit.getState().selected["/col"]).toEqual({ path: "logo.png", staged: false });
+    expect((screen.getByLabelText("Next file") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("stages the shown file and keeps showing it", async () => {
+    const calls: [string, unknown][] = [];
+    mockIPC((cmd, args) => {
+      calls.push([cmd, args]);
+      if (cmd === "git_file_versions") return versions({ old: "a\n", new: "b\n" });
+      if (cmd === "git_info") return info;
+      return null;
+    });
+    useGit.setState({
+      byCollection: { "/col": { info, branches: [], busy: null } },
+      selected: { "/col": { path: "orders/get.yaml", staged: false } },
+    });
+    render(<ChangesView dir="/col" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Stage" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual(["git_stage", { dir: "/col", paths: ["orders/get.yaml"] }]),
+    );
+    await waitFor(() =>
+      expect(useGit.getState().selected["/col"]).toEqual({ path: "orders/get.yaml", staged: true }),
+    );
   });
 
   it("asks to pick a file when nothing is selected", () => {
     useGit.setState({ byCollection: { "/col": { info, branches: [], busy: null } }, selected: {} });
     render(<ChangesView dir="/col" />);
-    expect(screen.getByText("Select a file to see its changes.")).toBeTruthy();
+    expect(screen.getByText("Select a file in the git panel to see its changes.")).toBeTruthy();
   });
 });

@@ -123,7 +123,10 @@ test("git: a saved change shows up in the changes tab and can be committed", asy
   await app.getByRole("button", { name: "Side by side" }).click();
   await expect(app.locator(".cm-mergeView")).toBeVisible();
 
-  await app.locator("aside").getByLabel("Stage health.yaml").click();
+  // Feedback: one file list (the sidebar's); the tab stages the file it shows.
+  await expect(app.getByRole("main").getByText("health.yaml", { exact: true })).toHaveCount(1);
+  await app.getByRole("main").getByRole("button", { name: "Stage", exact: true }).click();
+  await expect(app.getByRole("main").getByText("staged", { exact: true })).toBeVisible();
   await app.getByPlaceholder(/Commit message/).fill("Use /healthz");
   await app.getByRole("button", { name: /^Commit/ }).click();
   await expect(app.locator("aside").getByText("No changes.")).toBeVisible();

@@ -620,6 +620,8 @@ Decided with Patrick on 2026-10-16 (see the decisions log).
   Added/deleted/binary files get a clear placeholder. The raw `git diff` text view is dropped.
   *Done 2026-10-16:* `Repo::file_versions` + `git_file_versions` (replaces `git_diff`; `diff` left the allow-list,
   `show` joined it), `ChangesView`/`DiffView` with `@codemirror/merge` 6.12.2 and `@codemirror/lang-yaml` 6.1.3.
+  Revised after feedback: the tab has no file list of its own (the sidebar's git panel is the one list); its
+  header steps through the changed files (previous/next, "2/5") and stages or unstages the shown file.
 - [x] **Frida archive export/import** (feedback #13): export a workspace, a collection, a folder or a single request
   as a `.zip` that contains the on-disk files in their §4 layout plus `frida-export.yaml`
   (`format: 1`, `kind: workspace|collection|folder|request`, Frida version, export time). Secret values are never

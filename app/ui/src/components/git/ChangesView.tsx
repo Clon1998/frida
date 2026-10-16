@@ -1,13 +1,11 @@
-import { FileWarning, Loader2, Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, FileWarning, Loader2, Minus, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { commands, type FileChange, type FileVersions } from "@/bindings";
+import { commands, type FileVersions } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toApiError, unwrap } from "@/lib/api";
 import { useGit } from "@/stores/git";
 import { useSubTab } from "@/stores/subTabs";
 import { type DiffMode, DiffView } from "./DiffView";
-import { FileSection } from "./GitPanel";
 
 type Loaded =
   | { state: "loading" }
@@ -18,9 +16,9 @@ type Loaded =
 const changeKey = (c: { path: string; staged: boolean }) => `${c.staged ? "S" : "W"}:${c.path}`;
 
 /**
- * The changes tab (PLAN.md M12): the collection's changed files on the left, the selected
- * file's diff on the right. Clicking another file only swaps the diff. Stage/unstage work from
- * here too; branch, commit and push stay in the sidebar's git panel.
+ * The changes tab (PLAN.md M12): the diff of the file selected in the sidebar's git panel
+ * (the one file list). Clicking another file there only swaps the diff. The header steps
+ * through the changed files and stages or unstages the shown one.
  */
 export function ChangesView({ dir }: { dir: string }) {
   const info = useGit((s) => s.byCollection[dir]?.info ?? null);
@@ -81,79 +79,102 @@ export function ChangesView({ dir }: { dir: string }) {
     );
   }
 
-  const open = (f: FileChange, isStaged: boolean) =>
-    select(dir, { path: f.path, staged: isStaged });
+  // Every change in the order of the git panel: staged first, then the rest.
+  const changes = [
+    ...staged.map((f) => ({ path: f.path, staged: true })),
+    ...unstaged.map((f) => ({ path: f.path, staged: false })),
+  ];
+  const index = current
+    ? changes.findIndex((c) => c.path === current.path && c.staged === current.staged)
+    : -1;
+  const go = (offset: number) => {
+    const next = changes[index + offset];
+    if (next) select(dir, next);
+  };
+  /** Stage or unstage the shown file, then keep showing it on its new side. */
+  const toggleStaged = async () => {
+    if (!current) return;
+    const kind = current.staged ? "unstage" : "stage";
+    if (await run(dir, { kind, paths: [current.path] }))
+      select(dir, { path: current.path, staged: !current.staged });
+  };
+
+  if (!current) {
+    return (
+      <p className="p-4 text-sm text-muted-foreground">
+        {status.files.length > 0
+          ? "Select a file in the git panel to see its changes."
+          : "Nothing changed."}
+      </p>
+    );
+  }
 
   return (
-    <ResizablePanelGroup orientation="horizontal" className="h-full">
-      <ResizablePanel id="files" defaultSize="28" minSize={180}>
-        <div className="h-full overflow-auto py-1 text-sm">
-          <FileSection
-            title="Staged changes"
-            files={staged}
-            letter={(f) => f.staged ?? ""}
-            action={{ label: "Unstage", icon: <Minus /> }}
-            onAction={(paths) => void run(dir, { kind: "unstage", paths })}
-            onOpen={(f) => open(f, true)}
-            selected={current?.staged ? current.path : null}
-          />
-          <FileSection
-            title="Changes"
-            files={unstaged}
-            letter={(f) => (f.untracked ? "U" : (f.unstaged ?? ""))}
-            action={{ label: "Stage", icon: <Plus /> }}
-            onAction={(paths) => void run(dir, { kind: "stage", paths })}
-            onOpen={(f) => open(f, false)}
-            selected={current && !current.staged ? current.path : null}
-          />
-          {status.files.length === 0 && (
-            <p className="px-3 py-2 text-xs text-muted-foreground">No changes.</p>
-          )}
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          title="Previous file"
+          aria-label="Previous file"
+          disabled={index <= 0}
+          onClick={() => go(-1)}
+        >
+          <ChevronUp />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          title="Next file"
+          aria-label="Next file"
+          disabled={index < 0 || index >= changes.length - 1}
+          onClick={() => go(1)}
+        >
+          <ChevronDown />
+        </Button>
+        <span className="text-muted-foreground tabular-nums">
+          {index + 1}/{changes.length}
+        </span>
+        <span className="min-w-0 truncate font-mono font-medium" title={current.path}>
+          {loaded?.state === "ready" && loaded.versions.oldPath
+            ? `${loaded.versions.oldPath} → ${current.path}`
+            : current.path}
+        </span>
+        <span className="text-muted-foreground">{current.staged ? "staged" : "not staged"}</span>
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-xs"
+            onClick={() => void toggleStaged()}
+          >
+            {current.staged ? <Minus /> : <Plus />}
+            {current.staged ? "Unstage" : "Stage"}
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === "unified" ? "secondary" : "ghost"}
+            className="h-6 text-xs"
+            onClick={() => setMode("unified")}
+          >
+            Unified
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === "split" ? "secondary" : "ghost"}
+            className="h-6 text-xs"
+            onClick={() => setMode("split")}
+          >
+            Side by side
+          </Button>
         </div>
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel id="diff" minSize={240}>
-        {current ? (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs">
-              <span className="min-w-0 truncate font-mono font-medium" title={current.path}>
-                {loaded?.state === "ready" && loaded.versions.oldPath
-                  ? `${loaded.versions.oldPath} → ${current.path}`
-                  : current.path}
-              </span>
-              <span className="text-muted-foreground">
-                {current.staged ? "staged" : "not staged"}
-              </span>
-              <div className="ml-auto flex">
-                <Button
-                  size="sm"
-                  variant={mode === "unified" ? "secondary" : "ghost"}
-                  className="h-6 text-xs"
-                  onClick={() => setMode("unified")}
-                >
-                  Unified
-                </Button>
-                <Button
-                  size="sm"
-                  variant={mode === "split" ? "secondary" : "ghost"}
-                  className="h-6 text-xs"
-                  onClick={() => setMode("split")}
-                >
-                  Side by side
-                </Button>
-              </div>
-            </div>
-            <div className="min-h-0 flex-1">
-              <DiffBody path={current.path} loaded={loaded} mode={mode as DiffMode} />
-            </div>
-          </div>
-        ) : (
-          <p className="p-4 text-sm text-muted-foreground">
-            {status.files.length > 0 ? "Select a file to see its changes." : "Nothing changed."}
-          </p>
-        )}
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+      <div className="min-h-0 flex-1">
+        <DiffBody path={current.path} loaded={loaded} mode={mode as DiffMode} />
+      </div>
+    </div>
   );
 }
 
