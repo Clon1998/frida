@@ -769,6 +769,13 @@ Deviations from and clarifications of this plan, newest last.
   allowed ranges. The git path is a process-wide setting in `frida-git`; AWS files go to the SDK via
   `EnvConfigFiles` (`aws-runtime`, already a dependency of aws-config, now listed directly).
 
+- **2026-10-16 Remaining §14 response viewer items.** The JSONPath filter is built: a field next to Pretty/Raw,
+  filtered in Rust (`frida_core::jsonpath`, crate `serde_json_path`, RFC 9535; filter expressions are parsed, never
+  run as code) on the cached full body, so typing doesn't send megabytes through IPC. One match shows the value,
+  several or none an array; Copy copies what is shown. The **Timeline** tab is not built: the console panel shows the
+  request as sent (resolved headers, body) and the response, which covers it. The **network status** in the status
+  bar is dropped: a failed send already says what went wrong, and online/offline says nothing about a given API.
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.

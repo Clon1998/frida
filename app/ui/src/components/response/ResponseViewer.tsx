@@ -1,11 +1,21 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { useSubTab } from "@/stores/subTabs";
-import { AlertCircle, CheckCircle2, Copy, Download, Loader2, X, XCircle } from "lucide-react";
-import { useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  Download,
+  Filter,
+  Loader2,
+  X,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { commands, type ResponseView, type ScriptOutcome } from "@/bindings";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showError, unwrap } from "@/lib/api";
@@ -62,22 +72,72 @@ function CloseButton({ className, onClick }: { className?: string; onClick: () =
   );
 }
 
+/** How long to wait after the last keystroke before filtering (large bodies take a moment). */
+const FILTER_DEBOUNCE_MS = 250;
+
+/**
+ * The JSONPath filter of a JSON body (filtered in Rust, `filter_json`). `result` is the
+ * filtered JSON while a valid filter is set, else `null` (show the whole body). While a new
+ * filter is being checked, the last result stays, so the body doesn't flicker.
+ */
+function useJsonFilter(response: ResponseView, enabled: boolean, uncached: boolean) {
+  const [path, setPath] = useState("");
+  const [outcome, setOutcome] = useState<{
+    path: string;
+    result: string | null;
+    error: string | null;
+  } | null>(null);
+  const active = enabled && path.trim() !== "";
+
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      unwrap(commands.filterResponse(response.id, uncached ? response.bodyText : null, path)).then(
+        (result) => !cancelled && setOutcome({ path, result, error: null }),
+        (e: { message?: string }) =>
+          !cancelled &&
+          setOutcome((last) => ({
+            path,
+            result: last?.result ?? null,
+            error: e.message ?? String(e),
+          })),
+      );
+    }, FILTER_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [active, path, response.id, response.bodyText, uncached]);
+
+  return {
+    path,
+    setPath,
+    result: active ? (outcome?.result ?? null) : null,
+    error: active && outcome?.path === path ? outcome.error : null,
+  };
+}
+
 /** A response: status chips, body (pretty/raw/preview), headers, copy and save. */
 export function ResponsePanel({
   response,
   viewKey,
   onClose,
+  uncached = false,
 }: {
   response: ResponseView;
   /** Remembers the open sub-tab under this key (e.g. per request tab). */
   viewKey: string;
   /** Shows a close button (request tabs; not the read-only history view). */
   onClose?: () => void;
+  /** The body isn't in Rust's response cache (history): the filter sends the text along. */
+  uncached?: boolean;
 }) {
   const [pretty, setPretty] = useState(true);
   const kind = bodyKind(response.contentType, response.bodyText);
   const text = response.bodyText ?? "";
-  const shown = pretty && kind === "json" ? prettyJson(text) : text;
+  const jsonFilter = useJsonFilter(response, kind === "json", uncached);
+  const shown = jsonFilter.result ?? (pretty && kind === "json" ? prettyJson(text) : text);
   const hasPreview = kind === "image" || kind === "html";
   const [stored, setSubTab] = useSubTab(`response:${viewKey}`, hasPreview ? "preview" : "body");
   const subTab = stored === "preview" && !hasPreview ? "body" : stored;
@@ -149,10 +209,11 @@ export function ResponsePanel({
 
         <TabsContent value="body" className="flex min-h-0 flex-col p-2">
           {kind === "json" && (
-            <div className="mb-2 flex gap-1">
+            <div className="mb-2 flex flex-wrap items-center gap-1">
               <Button
                 size="sm"
                 variant={pretty ? "secondary" : "ghost"}
+                disabled={jsonFilter.result !== null}
                 onClick={() => setPretty(true)}
               >
                 Pretty
@@ -160,10 +221,25 @@ export function ResponsePanel({
               <Button
                 size="sm"
                 variant={pretty ? "ghost" : "secondary"}
+                disabled={jsonFilter.result !== null}
                 onClick={() => setPretty(false)}
               >
                 Raw
               </Button>
+              <div className="relative min-w-40 flex-1">
+                <Filter className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
+                <Input
+                  className="h-8 pl-7 font-mono text-xs md:text-xs"
+                  placeholder="Filter: $.items[*].id"
+                  aria-label="JSONPath filter"
+                  spellCheck={false}
+                  value={jsonFilter.path}
+                  onChange={(e) => jsonFilter.setPath(e.target.value)}
+                />
+              </div>
+              {jsonFilter.error && (
+                <p className="w-full text-xs text-destructive">{jsonFilter.error}</p>
+              )}
             </div>
           )}
           {response.bodyText !== null ? (

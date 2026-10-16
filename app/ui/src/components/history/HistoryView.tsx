@@ -99,7 +99,7 @@ export function HistoryView({ dir, path }: { dir: string; path: string }) {
         <ResizableHandle />
         <ResizablePanel defaultSize="55" minSize={200}>
           {entry.response ? (
-            <ResponsePanel response={entry.response} viewKey={`history:${dir}:${path}`} />
+            <ResponsePanel response={entry.response} viewKey={`history:${dir}:${path}`} uncached />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-sm text-destructive">
               {summary.error ?? "No response."}

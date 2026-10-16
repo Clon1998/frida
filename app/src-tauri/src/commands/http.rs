@@ -356,6 +356,33 @@ pub fn cancel_request(state: State<'_, AppState>, request_id: String) {
     }
 }
 
+/// Applies the JSONPath `path` to a response body (the filter in the response viewer).
+/// Uses the full body of a recent response from the cache; `body_text` is the fallback for
+/// bodies that aren't cached (history entries).
+#[tauri::command]
+#[specta::specta]
+pub async fn filter_response(
+    state: State<'_, AppState>,
+    response_id: String,
+    body_text: Option<String>,
+    path: String,
+) -> ApiResult<String> {
+    let cached = state
+        .responses
+        .lock()
+        .expect("responses lock poisoned")
+        .get(&response_id)
+        .map(<[u8]>::to_vec);
+    let body = cached
+        .or_else(|| body_text.map(String::into_bytes))
+        .ok_or_else(|| {
+            ApiError::new(ErrorCode::NotFound, "this response is no longer available")
+                .with_hint("Send the request again, then filter.")
+        })?;
+    // Parsing a large body takes a moment: keep it off the async runtime threads.
+    blocking(move || Ok(frida_core::jsonpath::filter_json(&body, &path)?)).await
+}
+
 /// Writes the full body of a recent response to `target` (chosen in a save dialog).
 #[tauri::command]
 #[specta::specta]

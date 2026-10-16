@@ -131,6 +131,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             http::clear_oauth2_tokens,
             http::cancel_request,
             http::save_response_body,
+            http::filter_response,
         ])
         .events(collect_events![FsChanged, ConsoleLogged, ScriptLogged])
 }

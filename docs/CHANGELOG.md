@@ -15,6 +15,8 @@
   CSS while not focused.
 - **Layout and colors**: checked at the minimum window size (800×500); rows wrap, grid columns shrink, pane-dependent
   layouts use container queries. Status colors are theme variables (`success`, `warning`, `info`).
+- **JSONPath filter** for JSON responses (`$.items[*].id`, filters like `$.items[?@.price < 10]`), filtered in Rust
+  (`crates/frida-core/src/jsonpath.rs`) on the cached body.
 - **CI**: "Run workflow" has checkboxes for the platforms to build and for lint & test; pushes no longer cancel a
   running manual build (that was the "failed" Windows build).
 - **Fixes**: no console windows flashing up on Windows when Frida runs git; the window no longer scrolls below the

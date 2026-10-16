@@ -11,6 +11,7 @@ pub mod error;
 pub mod history;
 pub mod http;
 pub mod import;
+pub mod jsonpath;
 pub mod local_state;
 mod mask;
 pub mod model;

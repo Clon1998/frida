@@ -239,6 +239,12 @@ export const commands = {
 	cancelRequest: (requestId: string) => __TAURI_INVOKE<void>("cancel_request", { requestId }),
 	/**  Writes the full body of a recent response to `target` (chosen in a save dialog). */
 	saveResponseBody: (responseId: string, target: string) => typedError<null, ApiError>(__TAURI_INVOKE("save_response_body", { responseId, target })),
+	/**
+	 *  Applies the JSONPath `path` to a response body (the filter in the response viewer).
+	 *  Uses the full body of a recent response from the cache; `body_text` is the fallback for
+	 *  bodies that aren't cached (history entries).
+	 */
+	filterResponse: (responseId: string, bodyText: string | null, path: string) => typedError<string, ApiError>(__TAURI_INVOKE("filter_response", { responseId, bodyText, path })),
 };
 
 /** Events */
