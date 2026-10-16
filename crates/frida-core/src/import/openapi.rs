@@ -744,10 +744,22 @@ impl<'a> Mapper<'a> {
             }
         }
         if schemes.is_empty() {
-            Auth::None
-        } else {
-            Auth::Custom { schemes }
+            return Auth::None;
         }
+        // The auth editor shows the first scheme as the "primary" one and only API keys after it
+        // (PLAN.md §4.5), so put the primary scheme first, whatever order the spec lists them in.
+        // `partition` keeps the original order inside both halves.
+        let (api_keys, mut primary): (Vec<AuthScheme>, Vec<AuthScheme>) = schemes
+            .into_iter()
+            .partition(|s| matches!(s, AuthScheme::ApiKey { .. }));
+        if primary.len() > 1 {
+            self.warnings.push(format!(
+                "{where_} combines several non-API-key schemes; only the first one was used."
+            ));
+            primary.truncate(1);
+        }
+        primary.extend(api_keys);
+        Auth::Custom { schemes: primary }
     }
 
     /// No API-wide `security`: use the only scheme, if there is exactly one.
@@ -1027,6 +1039,50 @@ components:
                 .iter()
                 .any(|w| w.contains("other.yaml"))
         );
+    }
+
+    #[test]
+    fn oauth2_plus_api_key_puts_oauth2_first() {
+        // The API key is listed first in each alternative, as in many real specs.
+        let plan = map_openapi(
+            r#"
+openapi: 3.0.3
+info: { title: T, version: "1" }
+security:
+  - api_key: []
+    OAuth2Dev: []
+  - api_key: []
+    OAuth2Prod: []
+paths: {}
+components:
+  securitySchemes:
+    api_key: { type: apiKey, in: header, name: X-Api-Key }
+    OAuth2Dev:
+      type: oauth2
+      flows:
+        clientCredentials: { tokenUrl: "https://auth.dev.example.com/oauth2/token", scopes: {} }
+    OAuth2Prod:
+      type: oauth2
+      flows:
+        clientCredentials: { tokenUrl: "https://auth.example.com/oauth2/token", scopes: {} }
+"#,
+        )
+        .unwrap();
+        let Auth::Custom { schemes } = &plan.collection.auth else {
+            panic!("expected custom auth, got {:?}", plan.collection.auth);
+        };
+        assert_eq!(schemes.len(), 2);
+        let AuthScheme::OAuth2(config) = &schemes[0] else {
+            panic!(
+                "expected OAuth2 as the primary scheme, got {:?}",
+                schemes[0]
+            );
+        };
+        assert_eq!(
+            config.token_url,
+            "https://auth.dev.example.com/oauth2/token"
+        );
+        assert!(matches!(&schemes[1], AuthScheme::ApiKey { name, .. } if name == "X-Api-Key"));
     }
 
     #[test]
