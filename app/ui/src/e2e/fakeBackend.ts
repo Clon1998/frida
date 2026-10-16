@@ -9,10 +9,12 @@
  *
  * The real backend is covered by the Rust integration tests; this checks the UI around it.
  */
+import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import type {
   AppSettings,
   Collection,
+  CollectionState,
   EnvironmentInfo_Serialize,
   Environment_Serialize,
   EnvScope,
@@ -118,6 +120,16 @@ function initialState() {
     active: { global: null as string | null, collection: null as string | null },
     secrets: new Map<string, string>(),
     history: [] as HistorySummary[],
+    /** Full history entries (request and response), by id. */
+    historyResponses: new Map<number, ResponseView>(),
+    /** Open tabs etc. per collection id, as `save_collection_state` stored them. */
+    collectionStates: new Map<string, CollectionState>(),
+    branch: "main",
+    branches: ["main", "feature/login"],
+    /** Running sends and runs that can be cancelled, by request/run id. */
+    cancelled: new Set<string>(),
+    /** Files written by "Save response" (path → response id). */
+    savedBodies: new Map<string, string>(),
   };
 }
 
@@ -217,7 +229,7 @@ function gitInfo(): GitInfo {
   return {
     kind: "repo",
     status: {
-      branch: "main",
+      branch: state.branch,
       upstream: "origin/main",
       ahead: 0,
       behind: 0,
@@ -227,26 +239,20 @@ function gitInfo(): GitInfo {
   };
 }
 
-function send(args: { dir: string; path: string; request: Request }): ResponseView {
-  const url = resolve(args.request.url ?? "");
-  const body = JSON.stringify({ method: args.request.method, url, echo: true }, null, 2);
-  state.history.unshift({
-    id: state.history.length + 1,
-    timestamp: new Date().toISOString(),
-    collectionId: state.collection.id,
-    requestPath: args.path,
-    requestName: args.request.name,
-    method: args.request.method,
-    url,
-    status: 200,
-    timeMs: 12,
-    error: null,
-  });
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** A response that echoes the request as JSON. */
+function echo(r: Request, id: string): ResponseView {
+  const url = resolve(r.url ?? "");
+  const body = JSON.stringify({ method: r.method, url, echo: true }, null, 2);
   return {
-    id: `response-${state.history.length}`,
+    id,
     status: 200,
     statusText: "OK",
-    headers: [{ name: "content-type", value: "application/json", enabled: true }],
+    headers: [
+      { name: "content-type", value: "application/json", enabled: true },
+      { name: "x-request-id", value: id, enabled: true },
+    ],
     contentType: "application/json",
     sizeBytes: body.length,
     timeMs: 12,
@@ -257,6 +263,130 @@ function send(args: { dir: string; path: string; request: Request }): ResponseVi
     scripts: { tests: [], errors: [] },
   };
 }
+
+/** Echoes the request. URLs containing "slow" take 10 s, unless cancelled. */
+async function send(args: { requestId: string; path: string; request: Request }) {
+  if ((args.request.url ?? "").includes("slow")) {
+    for (let waited = 0; waited < 10_000; waited += 50) {
+      if (state.cancelled.has(args.requestId))
+        throw { code: "cancelled", message: "The request was cancelled.", hint: null };
+      await sleep(50);
+    }
+  }
+  const id = state.history.length + 1;
+  const response = echo(args.request, `response-${id}`);
+  state.history.unshift({
+    id,
+    timestamp: new Date().toISOString(),
+    collectionId: state.collection.id,
+    requestPath: args.path,
+    requestName: args.request.name,
+    method: args.request.method,
+    url: response.finalUrl,
+    status: 200,
+    timeMs: 12,
+    error: null,
+  });
+  state.historyResponses.set(id, response);
+  return response;
+}
+
+/** The requests of `folder` in tree order, like the real `plan_run`. */
+function plan(folder: string) {
+  const items: { path: string; name: string; method: string }[] = [];
+  const walk = (nodes: TreeNode[]) => {
+    for (const node of nodes) {
+      if (node.kind === "folder") walk(node.children);
+      else if (node.kind === "request")
+        items.push({ path: node.path, name: node.name, method: node.method });
+    }
+  };
+  walk(tree(folder));
+  return items;
+}
+
+/** Runs the plan, one request every 400 ms, sending `run-progress` events; stoppable. */
+async function runCollection(args: { runId: string; folder: string }) {
+  const started = Date.now();
+  const summary = (passed: number, stopped: { kind: "cancelled" } | null) => ({
+    passed,
+    failed: 0,
+    errors: 0,
+    skipped: 0,
+    durationMs: Date.now() - started,
+    stopped,
+  });
+  let passed = 0;
+  for (const [step, item] of plan(args.folder).entries()) {
+    await sleep(400);
+    if (state.cancelled.has(args.runId)) return summary(passed, { kind: "cancelled" });
+    const r = state.requests.get(item.path) ?? request(item.name, item.method, "", 0);
+    await emit("run-progress", {
+      runId: args.runId,
+      result: {
+        step,
+        item,
+        outcome: "passed",
+        status: 200,
+        timeMs: 12,
+        testsPassed: 0,
+        testsTotal: 0,
+        message: null,
+      },
+      response: echo(r, `run-${step}`),
+    });
+    passed++;
+  }
+  return summary(passed, null);
+}
+
+/** Just enough curl parsing for the tests: `-X`, `-H`, `--data`, and the URL. */
+function parseCurl(command: string) {
+  const words =
+    command.match(/'[^']*'|"[^"]*"|\S+/g)?.map((w) => w.replace(/^['"]|['"]$/g, "")) ?? [];
+  if (words[0] !== "curl")
+    throw { code: "invalid_input", message: "not a curl command", hint: null };
+  const r = request("New request", "GET", "", 99);
+  const headers = [];
+  for (let i = 1; i < words.length; i++) {
+    const w = words[i] ?? "";
+    if (w === "-X" || w === "--request") r.method = (words[++i] ?? "GET").toUpperCase();
+    else if (w === "-H" || w === "--header") {
+      const [name = "", ...rest] = (words[++i] ?? "").split(":");
+      headers.push({ name: name.trim(), value: rest.join(":").trim(), enabled: true });
+    } else if (w === "-d" || w === "--data" || w === "--data-raw") {
+      r.body = { mode: "text", text: words[++i] ?? "" };
+      if (r.method === "GET") r.method = "POST";
+    } else if (!w.startsWith("-")) r.url = w;
+  }
+  r.headers = headers;
+  return { request: r, warnings: [] };
+}
+
+/** `$.a.b` and `$.a[0]` only: the real filter is RFC 9535 JSONPath in Rust. */
+function filterJson(text: string, path: string) {
+  if (!path.startsWith("$"))
+    throw { code: "invalid_input", message: "invalid JSONPath: must start with $", hint: null };
+  let value: unknown = JSON.parse(text);
+  for (const part of path.slice(1).match(/\.\w+|\[\d+\]/g) ?? []) {
+    const key = part.startsWith(".") ? part.slice(1) : Number(part.slice(1, -1));
+    value = (value as Record<string | number, unknown> | undefined)?.[key];
+  }
+  return JSON.stringify(value ?? null, null, 2);
+}
+
+/** What the fake "picked" archive contains: one request. */
+const archiveSummary = {
+  manifest: {
+    format: 1,
+    kind: "request",
+    name: "Imported request",
+    fridaVersion: "e2e",
+    exportedAt: "2026-10-16T10:00:00Z",
+  },
+  files: 1,
+  warnings: [],
+};
 
 /** One handler per command; `args` are the command's arguments by name. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -282,14 +412,18 @@ const handlers: Record<string, (args: any) => unknown> = {
     state.workspaceOpen = false;
     return null;
   },
-  get_collection_state: () => ({
-    openTabs: [],
-    activeTab: null,
-    expandedFolders: [],
-    activeEnvironment: null,
-    awsProfiles: {},
-  }),
-  save_collection_state: () => null,
+  get_collection_state: ({ collectionId }) =>
+    state.collectionStates.get(collectionId) ?? {
+      openTabs: [],
+      activeTab: null,
+      expandedFolders: [],
+      activeEnvironment: null,
+      awsProfiles: {},
+    },
+  save_collection_state: ({ collectionId, collectionState }) => {
+    state.collectionStates.set(collectionId, collectionState);
+    return null;
+  },
   read_collection: () => state.collection,
   save_collection: ({ collection }) => {
     state.collection = collection;
@@ -411,10 +545,73 @@ const handlers: Record<string, (args: any) => unknown> = {
     };
   },
   send_request: send,
-  cancel_request: () => null,
-  filter_response: () => null,
+  cancel_request: ({ requestId }) => {
+    state.cancelled.add(requestId);
+    return null;
+  },
+  filter_response: ({ responseId, bodyText, path }) => {
+    const cached = [...state.historyResponses.values()].find((r) => r.id === responseId);
+    return filterJson(bodyText ?? cached?.bodyText ?? "{}", path);
+  },
+  save_response_body: ({ responseId, target }) => {
+    state.savedBodies.set(target, responseId);
+    return null;
+  },
+  get_history_entry: ({ id }) => ({
+    summary: state.history.find((h) => h.id === id),
+    requestHeaders: [],
+    requestBody: null,
+    requestBodyTruncated: false,
+    response: state.historyResponses.get(id) ?? null,
+  }),
+  restore_history_entry: ({ id }) => {
+    const entry = state.history.find((h) => h.id === id);
+    const name = entry?.requestName ?? "Restored";
+    const path = freePath("", name, false);
+    state.requests.set(path, request(name, entry?.method ?? "GET", entry?.url ?? "", 99));
+    return path;
+  },
+  duplicate_request: ({ path }) => {
+    const original = state.requests.get(path) ?? request("Copy", "GET", "", 99);
+    const copy = { ...structuredClone(original), name: `${original.name} copy` };
+    const next = freePath(parentOf(path), copy.name, false);
+    state.requests.set(next, copy);
+    return next;
+  },
+  create_request_from: ({ parent, request: r }) => {
+    const path = freePath(parent, r.name, false);
+    state.requests.set(path, r);
+    return path;
+  },
+  import_curl: ({ command }) => parseCurl(command),
+  export_curl: ({ request: r }) => {
+    const headers = (r.headers ?? [])
+      .map((h: { name: string; value: string }) => ` \\\n  -H '${h.name}: ${h.value}'`)
+      .join("");
+    return `curl -X ${r.method} '${resolve(r.url ?? "")}'${headers}`;
+  },
+  plan_run: ({ folder }) => plan(folder),
+  run_collection: runCollection,
+
   git_info: () => gitInfo(),
-  git_branches: () => [{ name: "main", current: true, remote: false }],
+  git_branches: () =>
+    state.branches.map((name) => ({ name, current: name === state.branch, remote: false })),
+  git_switch: ({ branch }) => {
+    const info = gitInfo();
+    if (info.kind === "repo" && info.status.files.length > 0)
+      throw {
+        code: "git",
+        message: "There are uncommitted changes. Commit them first, then switch branches.",
+        hint: null,
+      };
+    state.branch = branch;
+    return null;
+  },
+  git_create_branch: ({ name }) => {
+    state.branches.push(name);
+    state.branch = name;
+    return null;
+  },
   git_stage: ({ paths }) => {
     const changed = gitInfo().kind === "repo" ? gitInfo() : null;
     const all = changed?.kind === "repo" ? changed.status.files.map((f) => f.path) : [];
@@ -452,6 +649,16 @@ const handlers: Record<string, (args: any) => unknown> = {
     warnings: [],
   }),
   // The file dialogs: the tests can't click through a native dialog, so they get fixed paths.
+  preview_archive: () => archiveSummary,
+  import_archive: ({ target }) => {
+    const parent = target.parent ?? "";
+    const path = freePath(parent, "Imported request", false);
+    state.requests.set(path, request("Imported request", "PUT", "{{baseUrl}}/imported", 99));
+    return {
+      imported: { summary: archiveSummary, dir: target.collectionDir, path },
+      overview: null,
+    };
+  },
   "plugin:dialog|open": () => "/fake/picked",
   "plugin:dialog|save": () => "/fake/saved.zip",
 };
@@ -459,7 +666,7 @@ const handlers: Record<string, (args: any) => unknown> = {
 /** Starts answering IPC calls. `window.__fridaE2E.reset()` puts the state back. */
 export function installFakeBackend() {
   mockIPC(
-    (cmd, args) => {
+    async (cmd, args) => {
       const handler = handlers[cmd];
       if (!handler) {
         console.warn(`[e2e fake backend] unhandled command ${cmd}`, args);
@@ -467,7 +674,7 @@ export function installFakeBackend() {
       }
       // A copy, like data coming over IPC: handing out live objects would let the UI mutate the
       // fake's state, and stores wouldn't notice changes to an object they already hold.
-      const result = handler(args ?? {});
+      const result = await handler(args ?? {});
       return result === undefined ? null : structuredClone(result);
     },
     { shouldMockEvents: true },
@@ -476,6 +683,18 @@ export function installFakeBackend() {
     reset: () => {
       state = initialState();
     },
-    state: () => state,
+    /** A plain copy for the tests (`Map`s don't survive `page.evaluate`). */
+    state: () => ({
+      ...state,
+      requests: Object.fromEntries(state.requests),
+      folders: Object.fromEntries(state.folders),
+      committed: Object.fromEntries(state.committed),
+      secrets: Object.fromEntries(state.secrets),
+      staged: [...state.staged],
+      historyResponses: Object.fromEntries(state.historyResponses),
+      collectionStates: Object.fromEntries(state.collectionStates),
+      cancelled: [...state.cancelled],
+      savedBodies: Object.fromEntries(state.savedBodies),
+    }),
   };
 }

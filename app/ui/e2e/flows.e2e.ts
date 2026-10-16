@@ -2,30 +2,7 @@
  * The core UI flows (PLAN.md M12), against the fake backend. Several of them pin down bugs from
  * the second feedback round (the comments say which).
  */
-import type { Page } from "@playwright/test";
-import { expect, openWorkspace, test } from "./fixtures";
-
-/** Opens a request of the fake collection as a normal (not preview) tab. */
-async function openRequest(page: Page, name: string) {
-  if (name !== "Health" && (await page.getByText(name).count()) === 0)
-    await page.getByLabel("Expand folder").click();
-  await page.getByText(name, { exact: true }).dblclick();
-  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
-}
-
-/** Replaces the text of the URL bar (a one-line CodeMirror editor). */
-async function setUrl(page: Page, url: string) {
-  const editor = page.locator(".cm-content").first();
-  await editor.click();
-  await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.type(url);
-}
-
-async function useEnvironment(page: Page, name: string) {
-  await page.getByTitle("Environments", { exact: true }).click();
-  await page.getByRole("menuitem", { name }).first().click();
-  await expect(page.getByTitle("Environments", { exact: true })).toContainText(name);
-}
+import { expect, openRequest, openWorkspace, setUrl, test, useEnvironment } from "./fixtures";
 
 test("send a request with an environment and find it in the history", async ({ app }) => {
   await openWorkspace(app);

@@ -1,6 +1,6 @@
 import { KeyRound, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { type CognitoDomain, cognitoUrls, parseCognito } from "@/lib/cognito";
-import { useContext, useState } from "react";
+import { useContext, useId, useState } from "react";
 import { toast } from "sonner";
 import {
   type ApiKeyLocation,
@@ -515,10 +515,17 @@ function Fields({ children }: { children: React.ReactNode }) {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  // The field is named after its label (`role="group"` + `aria-labelledby`), so screen readers
+  // (and the UI tests) find "Token URL" etc. even though the editors aren't plain inputs.
+  const id = useId();
   return (
     <>
-      <span className="pt-1 text-xs text-muted-foreground @md:pt-0">{label}</span>
-      <div className="min-w-0">{children}</div>
+      <span id={id} className="pt-1 text-xs text-muted-foreground @md:pt-0">
+        {label}
+      </span>
+      <div className="min-w-0" role="group" aria-labelledby={id}>
+        {children}
+      </div>
     </>
   );
 }

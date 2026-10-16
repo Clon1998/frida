@@ -120,7 +120,7 @@ export function CollectionTree({ dir }: { dir: string }) {
       </div>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="min-h-0 flex-1 overflow-auto pb-1 text-sm">
+          <div className="min-h-0 flex-1 overflow-auto pb-1 text-sm" data-testid="request-tree">
             <DndContext
               sensors={sensors}
               onDragMove={onDragMove}
