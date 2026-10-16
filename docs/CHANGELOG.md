@@ -1,5 +1,22 @@
 # Changelog
 
+## M10: Release polish (2026-10-16)
+
+### What was built
+- **Release workflow** (`.github/workflows/release.yml`): a `v*` tag checks that it matches the app version, creates a
+  draft release with generated notes and attaches the .dmg, .msi, NSIS .exe, AppImage, .deb and .rpm of all four
+  targets. README explains releasing and the first start of the unsigned apps.
+- **Keyboard**: Cmd/Ctrl+K quick open (fuzzy search over the collection's requests), +T new request, +E environment
+  switcher, +/ shortcut list (also from the status bar); one table in `app/ui/src/lib/shortcuts.ts`.
+- **Empty states and onboarding**: the main area shows what to do and the main shortcuts; the start screen explains
+  workspaces, collections and secrets and points to the importers.
+
+### Things worth understanding in this milestone
+1. **Release automation without third-party actions**: the workflow only uses `gh` (preinstalled on GitHub's runners)
+   with the job's token and `permissions: contents: write`, so nothing outside GitHub gets write access.
+2. **Platform-specific modifiers** (`isMac()` in `lib/shortcuts.ts`): macOS uses Cmd for app shortcuts and keeps
+   Ctrl+E/K for text editing, so the handler checks `metaKey` there and `ctrlKey` elsewhere.
+
 ## M8: AWS (2026-10-16)
 
 ### What was built

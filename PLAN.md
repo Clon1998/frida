@@ -570,9 +570,15 @@ with a snapshot of its warnings, and runs an imported collection end to end (log
 inherited bearer auth, converted assertions passing).*
 
 ### M10: Release polish
-- [ ] Tauri bundler output: .dmg, .msi/.exe (NSIS), AppImage and .deb, plus an app icon.
-- [ ] A release workflow on git tag that attaches artifacts to a GitHub Release.
-- [ ] Ctrl/Cmd+K quick open, keyboard shortcuts audit, empty states, a basic onboarding screen ("open or create workspace").
+- [x] Tauri bundler output: .dmg, .msi/.exe (NSIS), AppImage and .deb, plus an app icon.
+- [x] A release workflow on git tag that attaches artifacts to a GitHub Release.
+- [x] Ctrl/Cmd+K quick open, keyboard shortcuts audit, empty states, a basic onboarding screen ("open or create workspace").
+
+*Status 2026-10-16: bundles are built by CI for all four targets (`targets: all`, icon from M0);
+`.github/workflows/release.yml` builds on `v*` tags and uploads to a draft release (not run yet: no tag pushed).
+Shortcuts: Cmd/Ctrl+Enter, S, W, T (new request), K (quick open), E (environment switcher), J (console), / (list);
+Cmd on macOS only, so Ctrl+E/K keep their text-editing meaning there. Code signing is not set up (README explains
+the first-start step).*
 
 ### Later (backlog, not scheduled)
 - Collection/folder runner with a pass/fail summary (`bru.setNextRequest`).
