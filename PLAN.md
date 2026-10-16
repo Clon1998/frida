@@ -635,12 +635,45 @@ Decided with Patrick on 2026-10-16 (see the decisions log).
 imported into another workspace loads unchanged (integration test, plus one checking that no secret values are in the
 archive and that path traversal entries are rejected); `pnpm e2e` passes locally and in CI.
 
+### M13: macOS data protection keychain + signed releases
+Why: the legacy macOS keychain grants access **per item**, so every secret asked for the login password, and unsigned
+debug builds lose "Always Allow" on every rebuild. Items in the data protection ("iOS-style") keychain belong to the
+app's access group and never prompt. That needs a signed app with a provisioning profile (Patrick has a paid Apple
+Developer account). Decided with Patrick on 2026-10-16.
+
+**Needed from Patrick before starting** (not in the repo; CI parts go into GitHub secrets):
+- [ ] Team ID (10 characters, developer.apple.com → Membership).
+- [ ] An explicit App ID `io.github.clon1998.frida` (Certificates, Identifiers & Profiles → Identifiers).
+- [ ] Certificates in the login keychain: **Apple Development** (local builds) and **Developer ID Application**
+  (releases). For CI: the Developer ID certificate exported as `.p12` with a password.
+- [ ] Provisioning profiles for the App ID: **macOS App Development** (with this Mac registered as a device, using its
+  Provisioning UDID from System Information) and **Developer ID**.
+- [ ] Notarization: an App Store Connect API key (Issuer ID, Key ID, `.p8` file) for CI.
+
+**Work:**
+- [ ] `frida-secrets`: a `ProtectedStore` on macOS using `keyring`'s Apple store with the `protected` feature
+  (`apple-native-keyring-store::protected`, access group `<TeamID>.io.github.clon1998.frida`), behind the
+  existing `CachedStore`. Chosen at startup if the protected store works; otherwise the legacy keychain as today.
+- [ ] Migration: on the first read of a secret missing from the protected store, read the legacy item once, write it to
+  the protected store and delete the legacy item (one last prompt per old item), or let the user re-enter instead.
+  Decide when starting.
+- [ ] Tauri bundle config: signing identity, entitlements (application identifier / keychain access group) and the
+  embedded provisioning profile (`Contents/embedded.provisionprofile`). Check the current Tauri 2 docs for the exact
+  config keys and the CI env variables (`APPLE_CERTIFICATE`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY`, …).
+- [ ] Release workflow: sign and notarize the macOS builds on `v*` tags.
+- [ ] `pnpm tauri dev` runs an unbundled binary without the profile, so it can't use the protected store. Options:
+  the legacy keychain with all secrets in **one** vault item (one prompt per run), or a signed debug bundle.
+  Decide when starting.
+
+**Acceptance:** a signed build stores and reads secrets without any keychain prompt; existing secrets survive
+(migrated or clearly asked for again); Windows and Linux behave as before.
+
 ### Later (backlog, not scheduled)
 - `frida-cli` headless runner (`frida run <collection> --env dev`).
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
 - SSM Parameter Store, SigV4 auth.
-- Code signing / notarization, auto-update.
+- Code signing / notarization for Windows, auto-update. (macOS signing: M13.)
 - Additional codegen targets (HTTPie, fetch, Java HttpClient, Python).
 - Postman import.
 
