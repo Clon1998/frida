@@ -6,16 +6,20 @@
 //! - [`EncryptedFileStore`]: an encrypted file in the app data dir, protected by a master
 //!   password. Used when no OS keychain is available (e.g. headless Linux).
 //! - [`MemoryStore`]: for tests.
+//! - [`CachedStore`]: an in-memory cache in front of another store; the app wraps the keychain
+//!   in it so each secret is read (and macOS asks for access) at most once per run.
 //!
 //! AWS Secrets Manager (M8) is a separate, async provider: see [`aws`].
 //!
 //! All stores do blocking I/O. Callers in async code must use `tokio::task::spawn_blocking`.
 
 pub mod aws;
+mod cached;
 mod encrypted_file;
 mod keychain;
 mod memory;
 
+pub use cached::CachedStore;
 pub use encrypted_file::EncryptedFileStore;
 pub use keychain::{KeychainStore, keychain_available};
 pub use memory::MemoryStore;

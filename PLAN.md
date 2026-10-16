@@ -844,6 +844,12 @@ Deviations from and clarifications of this plan, newest last.
   on-disk YAML plus a manifest (not a second single-file format); Playwright tests run against Vite with a mocked IPC
   (`tauri-driver` doesn't support macOS).
 
+- **2026-10-16 Keychain read cache.** Every inspection (while typing) read every active secret from the OS keychain;
+  on macOS each read can show an access prompt, and an ad-hoc signed debug build loses "Always Allow" on every
+  rebuild, which flooded the user with prompts. The app now wraps the keychain in `frida_secrets::CachedStore`: each
+  secret is read at most once per run, failed/denied reads are remembered too, and `set`/`delete` update the cache.
+  Values stay in process memory only (never written anywhere); edits made outside Frida show up after a restart.
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.

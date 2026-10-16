@@ -12,7 +12,7 @@ use frida_core::local_state::{LocalStore, Preferences};
 use frida_core::storage;
 use frida_core::watch::FsWatcher;
 use frida_secrets::aws::AwsFiles;
-use frida_secrets::{EncryptedFileStore, KeychainStore, SecretStore};
+use frida_secrets::{CachedStore, EncryptedFileStore, KeychainStore, SecretStore};
 use serde::Deserialize;
 use specta::Type;
 use tokio_util::sync::CancellationToken;
@@ -51,8 +51,8 @@ pub struct AppState {
 
 /// Where secret values are kept on this machine (PLAN.md §6).
 pub enum SecretBackend {
-    /// The OS keychain (the normal case).
-    Keychain(Arc<KeychainStore>),
+    /// The OS keychain (the normal case), behind a cache so each secret is read once per run.
+    Keychain(Arc<CachedStore>),
     /// No OS keychain available: an encrypted file that must be unlocked with a password.
     File(Arc<EncryptedFileStore>),
 }
@@ -95,7 +95,7 @@ impl OpenWorkspace {
 impl AppState {
     pub fn new(app_data_dir: PathBuf) -> Self {
         let secrets = if frida_secrets::keychain_available() {
-            SecretBackend::Keychain(Arc::new(KeychainStore))
+            SecretBackend::Keychain(Arc::new(CachedStore::new(Box::new(KeychainStore))))
         } else {
             tracing::warn!("no OS keychain available, using the encrypted secret file");
             SecretBackend::File(Arc::new(EncryptedFileStore::new(
