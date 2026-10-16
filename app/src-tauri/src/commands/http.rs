@@ -149,7 +149,7 @@ pub async fn send_request(
 }
 
 /// Sends the raw request and response (or the error) to the console panel.
-fn log_to_console(
+pub(crate) fn log_to_console(
     app: &tauri::AppHandle,
     request_id: &str,
     path: &str,

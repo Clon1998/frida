@@ -124,7 +124,7 @@ pub struct RunResult {
     pub item: RunItem,
     pub outcome: RunOutcome,
     pub status: Option<u16>,
-    pub time_ms: Option<u64>,
+    pub time_ms: Option<u32>,
     pub tests_passed: u32,
     pub tests_total: u32,
     /// Why it was not sent (`Error`), or the first failing test or script (`Failed`).
@@ -153,7 +153,8 @@ pub struct RunSummary {
     pub failed: u32,
     pub errors: u32,
     pub skipped: u32,
-    pub duration_ms: u64,
+    /// `u32` (not `u64`): TypeScript numbers can't hold every `u64`; 49 days is plenty.
+    pub duration_ms: u32,
     /// `None` when the run went through to the end.
     pub stopped: Option<RunStop>,
 }
@@ -249,8 +250,13 @@ pub async fn run(
             },
         };
     }
-    summary.duration_ms = started.elapsed().as_millis() as u64;
+    summary.duration_ms = millis(started.elapsed());
     summary
+}
+
+/// A duration in whole milliseconds, capped at `u32::MAX`.
+fn millis(duration: Duration) -> u32 {
+    u32::try_from(duration.as_millis()).unwrap_or(u32::MAX)
 }
 
 /// Loads the saved request and sends it in runner mode.
@@ -305,7 +311,7 @@ fn to_result(
         Ok(executed) => {
             let tests = &executed.scripts.tests;
             result.status = Some(executed.response.status);
-            result.time_ms = Some(executed.response.elapsed.as_millis() as u64);
+            result.time_ms = Some(millis(executed.response.elapsed));
             result.tests_total = tests.len() as u32;
             result.tests_passed = tests.iter().filter(|t| t.passed).count() as u32;
             let failed_test = tests.iter().find(|t| !t.passed);

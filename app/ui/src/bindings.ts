@@ -245,12 +245,20 @@ export const commands = {
 	 *  bodies that aren't cached (history entries).
 	 */
 	filterResponse: (responseId: string, bodyText: string | null, path: string) => typedError<string, ApiError>(__TAURI_INVOKE("filter_response", { responseId, bodyText, path })),
+	/**  The requests a run of `folder` (`""`: the whole collection) would send, in order. */
+	planRun: (dir: string, folder: string) => typedError<RunItem[], ApiError>(__TAURI_INVOKE("plan_run", { dir, folder })),
+	/**
+	 *  Runs the saved requests of `folder` with the active environments. Progress arrives as
+	 *  [`RunProgress`] events; stop the run with `cancel_request(run_id)`. Returns the totals.
+	 */
+	runCollection: (runId: string, dir: string, folder: string, options: RunOptions) => typedError<RunSummary, ApiError>(__TAURI_INVOKE("run_collection", { runId, dir, folder, options })),
 };
 
 /** Events */
 export const events = {
 	consoleLogged: makeEvent<ConsoleLogged>("console-logged"),
 	fsChanged: makeEvent<FsChanged>("fs-changed"),
+	runProgress: makeEvent<RunProgress>("run-progress"),
 	scriptLogged: makeEvent<ScriptLogged>("script-logged"),
 };
 
@@ -819,6 +827,80 @@ export type ResponseView = {
 	truncated: boolean,
 	/**  Test results and post-response script errors (filled in after the scripts ran). */
 	scripts: ScriptOutcome,
+};
+
+/**  One request of a run, in run order. */
+export type RunItem = {
+	/**  Collection-relative path of the request file. */
+	path: string,
+	name: string,
+	method: string,
+};
+
+/**  Settings of a run. */
+export type RunOptions = {
+	/**  Pause between two requests, in milliseconds. */
+	delayMs: number,
+};
+
+/**  How a request of the run went. */
+export type RunOutcome = 
+/**  Sent, and every test passed (or there were none). */
+"passed" | 
+/**  Sent, but a test or a post-response script failed. */
+"failed" | 
+/**  Not sent: the request couldn't be loaded, prepared or sent, or a pre-request script failed. */
+"error" | 
+/**  `fri.runner.skipRequest()` in a pre-request script. */
+"skipped";
+
+/**  Emitted after each request of a run, while the run goes on. */
+export type RunProgress = {
+	/**  The id the UI chose when it started the run. */
+	runId: string,
+	result: RunResult,
+	/**
+	 *  The response, when the request was sent (its body is in the response cache too, for
+	 *  saving and filtering, until newer responses push it out).
+	 */
+	response: ResponseView | null,
+};
+
+/**  The result of one request of the run. */
+export type RunResult = {
+	/**  Counts sends in this run, from 0 (a request sent twice by `setNextRequest` has two). */
+	step: number,
+	item: RunItem,
+	outcome: RunOutcome,
+	status: number | null,
+	timeMs: number | null,
+	testsPassed: number,
+	testsTotal: number,
+	/**  Why it was not sent (`Error`), or the first failing test or script (`Failed`). */
+	message: string | null,
+};
+
+/**  Why a run ended before the last request. */
+export type RunStop = 
+/**  The user stopped it. */
+{ kind: "cancelled" } | 
+/**  `fri.runner.stopExecution()` or `fri.setNextRequest(null)`. */
+{ kind: "script" } | 
+/**  `fri.setNextRequest(name)` named a request that isn't in this run. */
+{ kind: "unknownNextRequest"; name: string } | 
+/**  Too many sends ([`MAX_VISITS_PER_REQUEST`]): probably a `setNextRequest` loop. */
+{ kind: "loopGuard" };
+
+/**  Totals of a run. */
+export type RunSummary = {
+	passed: number,
+	failed: number,
+	errors: number,
+	skipped: number,
+	/**  `u32` (not `u64`): TypeScript numbers can't hold every `u64`; 49 days is plenty. */
+	durationMs: number,
+	/**  `None` when the run went through to the end. */
+	stopped: RunStop | null,
 };
 
 /**  A script failed: threw, timed out or ran out of memory. */

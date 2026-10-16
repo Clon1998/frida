@@ -49,7 +49,7 @@ pub struct ScriptLogged {
 /// It's a separate function so both [`run`] and the `export_bindings` test can use it.
 /// The `tauri::Wry` type parameter is the concrete webview runtime Tauri uses on desktop.
 fn specta_builder() -> Builder<tauri::Wry> {
-    use commands::{app, collection, env, git, history, http, workspace};
+    use commands::{app, collection, env, git, history, http, runner, workspace};
 
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -132,8 +132,15 @@ fn specta_builder() -> Builder<tauri::Wry> {
             http::cancel_request,
             http::save_response_body,
             http::filter_response,
+            runner::plan_run,
+            runner::run_collection,
         ])
-        .events(collect_events![FsChanged, ConsoleLogged, ScriptLogged])
+        .events(collect_events![
+            FsChanged,
+            ConsoleLogged,
+            ScriptLogged,
+            runner::RunProgress
+        ])
 }
 
 /// Writes `app/ui/src/bindings.ts` from the registered commands and their types.
