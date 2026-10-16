@@ -12,6 +12,7 @@ import { envColor } from "@/lib/envColors";
 import { scopeOf, useEnvs } from "@/stores/envs";
 import { cn } from "cn";
 import { ENVIRONMENTS_TAB, useTabs } from "@/stores/tabs";
+import { useUi } from "@/stores/ui";
 
 const NONE = "__none__";
 
@@ -22,6 +23,9 @@ const NONE = "__none__";
 export function EnvironmentPicker({ dir }: { dir: string }) {
   const { global, collection, activeGlobal, activeCollection, select, setEditorScope } = useEnvs();
   const openTab = useTabs((s) => s.openTab);
+  // Controlled, so Ctrl/Cmd+E can open it.
+  const pickerOpen = useUi((s) => s.envPickerOpen);
+  const setPickerOpen = useUi((s) => s.setEnvPickerOpen);
 
   const label =
     activeCollection && activeGlobal
@@ -67,7 +71,7 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={pickerOpen} onOpenChange={setPickerOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"

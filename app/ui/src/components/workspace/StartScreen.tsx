@@ -38,6 +38,24 @@ export function StartScreen() {
           <FolderOpen /> Open workspace…
         </Button>
       </div>
+      <ul className="max-w-md space-y-1.5 text-sm text-muted-foreground">
+        <li>
+          <span className="font-medium text-foreground">A workspace</span> is a folder that lists
+          your collections and holds shared (global) environments.
+        </li>
+        <li>
+          <span className="font-medium text-foreground">Collections</span> are folders of plain YAML
+          files, one per request: commit them to git and review changes like code.
+        </li>
+        <li>
+          <span className="font-medium text-foreground">Secrets</span> stay in your OS keychain (or
+          AWS Secrets Manager), never in the files.
+        </li>
+        <li>
+          Coming from Postman or Bruno? Import an OpenAPI file or a Bruno collection from the
+          collection menu once a workspace is open.
+        </li>
+      </ul>
       {recent.length > 0 && (
         <div className="w-full max-w-md">
           <h2 className="mb-1 text-xs font-medium text-muted-foreground">Recent</h2>

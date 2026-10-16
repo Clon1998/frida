@@ -80,3 +80,25 @@ export function folderTrail(tree: TreeNode[], path: string): { name: string; pat
   }
   return trail;
 }
+
+/** A request in quick open. */
+export interface RequestEntry {
+  path: string;
+  name: string;
+  method: string;
+  /** Folder names, e.g. `Orders / EU`. */
+  folder: string;
+}
+
+/** Every request of a tree, with its folder names. */
+export function flattenRequests(nodes: TreeNode[], folder: string[] = []): RequestEntry[] {
+  return nodes.flatMap((node): RequestEntry[] => {
+    if (node.kind === "folder") return flattenRequests(node.children, [...folder, node.name]);
+    if (node.kind === "request") {
+      return [
+        { path: node.path, name: node.name, method: node.method, folder: folder.join(" / ") },
+      ];
+    }
+    return [];
+  });
+}

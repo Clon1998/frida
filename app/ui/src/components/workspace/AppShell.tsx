@@ -1,5 +1,5 @@
 import { ask } from "@tauri-apps/plugin-dialog";
-import { Columns2, Rows2, SquareChevronUp } from "lucide-react";
+import { Columns2, Keyboard, Rows2, SquareChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
 import { CurlExportDialog } from "@/components/curl/CurlExportDialog";
@@ -8,6 +8,10 @@ import { CollectionEditor } from "@/components/doc/CollectionEditor";
 import { FolderEditor } from "@/components/doc/FolderEditor";
 import { EnvironmentsEditor } from "@/components/env/EnvironmentsEditor";
 import { ConsolePanel } from "@/components/console/ConsolePanel";
+import { QuickOpen } from "./QuickOpen";
+import { ShortcutsDialog } from "./ShortcutsDialog";
+import { formatKeys, isMac } from "@/lib/shortcuts";
+import * as actions from "@/stores/actions";
 import { AwsProfileDialog } from "@/components/env/AwsProfileDialog";
 import { GitStatusIndicator } from "@/components/git/GitStatusIndicator";
 import { HistoryView } from "@/components/history/HistoryView";
@@ -93,11 +97,7 @@ export function AppShell() {
                     <HistoryView key={tab.path} dir={dir} path={tab.path} />
                   </div>
                 )}
-                {!tab && (
-                  <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                    Open a request from the sidebar, or right-click it to create one.
-                  </div>
-                )}
+                {!tab && <EmptyState />}
               </main>
             </ResizablePanel>
             {consoleOpen && (
@@ -123,11 +123,23 @@ export function AppShell() {
 
       <CurlExportDialog />
       <CurlImportDialog />
+      <QuickOpen />
+      <ShortcutsDialog />
       <AwsProfileDialog />
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
         <span className="truncate">{collection ? collection.dir : "No collection"}</span>
         {collection && <GitStatusIndicator dir={collection.dir} />}
         <div className="flex-1" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-5"
+          title="Keyboard shortcuts (Ctrl/Cmd+/)"
+          aria-label="Keyboard shortcuts"
+          onClick={() => useUi.getState().setShortcutsOpen(true)}
+        >
+          <Keyboard />
+        </Button>
         <Button
           variant={consoleOpen ? "secondary" : "ghost"}
           size="sm"
@@ -234,17 +246,44 @@ function useFileWatcher() {
   }, []);
 }
 
-/** Ctrl/Cmd+Enter sends, Ctrl/Cmd+S saves, Ctrl/Cmd+W closes the active tab. */
+/**
+ * App-wide shortcuts (PLAN.md §14, listed in `lib/shortcuts.ts`): Ctrl/Cmd+Enter sends,
+ * +S saves, +W closes the tab, +T new request, +K quick open, +E environments, +J console,
+ * +/ shortcut list.
+ */
 function useShortcuts() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.key === "j") {
-        e.preventDefault();
-        useConsole.getState().toggle();
-        return;
-      }
+      // Cmd on macOS (where Ctrl+E/K/T are text-editing keys), Ctrl elsewhere.
+      const mod = isMac() ? e.metaKey : e.ctrlKey;
+      if (!mod || e.altKey) return;
+      const ui = useUi.getState();
       const dir = useWorkspace.getState().activeCollectionDir;
+      switch (e.key) {
+        case "j":
+          e.preventDefault();
+          useConsole.getState().toggle();
+          return;
+        case "/":
+          e.preventDefault();
+          ui.setShortcutsOpen(true);
+          return;
+        case "k":
+          if (!dir) return;
+          e.preventDefault();
+          ui.setQuickOpen(true);
+          return;
+        case "e":
+          if (!dir) return;
+          e.preventDefault();
+          ui.setEnvPickerOpen(true);
+          return;
+        case "t":
+          if (!dir) return;
+          e.preventDefault();
+          void actions.createRequest(dir, "", "New request");
+          return;
+      }
       if (!dir) return;
       const tabs = useTabs.getState();
       const active = tabs.byCollection[dir]?.active;
@@ -272,4 +311,34 @@ function useShortcuts() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+}
+
+/** The main area when no tab is open: what to do next and the most useful shortcuts. */
+function EmptyState() {
+  const rows: [string, string][] = [
+    ["Mod+K", "Search requests"],
+    ["Mod+T", "New request"],
+    ["Mod+E", "Switch environment"],
+    ["Mod+J", "Console"],
+    ["Mod+/", "All shortcuts"],
+  ];
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-sm text-muted-foreground">
+      <p>Open a request from the sidebar, or right-click a folder to create one.</p>
+      <table>
+        <tbody>
+          {rows.map(([keys, action]) => (
+            <tr key={keys}>
+              <td className="py-1 pr-4 text-right">
+                <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {formatKeys(keys)}
+                </kbd>
+              </td>
+              <td className="py-1">{action}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }

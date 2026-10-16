@@ -13,6 +13,13 @@ interface UiState {
   toggleInspector: () => void;
   setInspectorOpen: (open: boolean) => void;
   setUnresolved: (count: number) => void;
+  /** Open dialogs and menus that keyboard shortcuts can open (PLAN.md §14). */
+  quickOpen: boolean;
+  shortcutsOpen: boolean;
+  envPickerOpen: boolean;
+  setQuickOpen: (open: boolean) => void;
+  setShortcutsOpen: (open: boolean) => void;
+  setEnvPickerOpen: (open: boolean) => void;
   /** What the sidebar shows below the collection picker. */
   sidebarView: "tree" | "history" | "git";
   setSidebarView: (view: "tree" | "history" | "git") => void;
@@ -27,6 +34,12 @@ export const useUi = create<UiState>((set) => ({
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
   setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
   setUnresolved: (unresolved) => set({ unresolved }),
+  quickOpen: false,
+  shortcutsOpen: false,
+  envPickerOpen: false,
+  setQuickOpen: (quickOpen) => set({ quickOpen }),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  setEnvPickerOpen: (envPickerOpen) => set({ envPickerOpen }),
   sidebarView: "tree",
   setSidebarView: (sidebarView) => set({ sidebarView }),
 }));
