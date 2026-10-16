@@ -37,6 +37,13 @@ pub struct ConsoleLogged {
     pub entry: frida_core::http::ConsoleEntry,
 }
 
+/// Emitted for every `console.log` of a script, as it happens. Secret values are masked.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptLogged {
+    pub log: frida_core::http::ScriptLog,
+}
+
 /// Builds the tauri-specta builder that knows every command and event.
 ///
 /// It's a separate function so both [`run`] and the `export_bindings` test can use it.
@@ -101,7 +108,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             http::cancel_request,
             http::save_response_body,
         ])
-        .events(collect_events![FsChanged, ConsoleLogged])
+        .events(collect_events![FsChanged, ConsoleLogged, ScriptLogged])
 }
 
 /// Writes `app/ui/src/bindings.ts` from the registered commands and their types.

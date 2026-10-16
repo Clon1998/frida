@@ -6,6 +6,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use super::scripting::ScriptOutcome;
 use super::send::HttpResponse;
 use crate::model::KeyValue;
 
@@ -30,6 +31,8 @@ pub struct ResponseView {
     pub body_base64: Option<String>,
     /// `true` when the body was larger than [`MAX_DISPLAY_BYTES`] and only the start is shown.
     pub truncated: bool,
+    /// Test results and post-response script errors (filled in after the scripts ran).
+    pub scripts: ScriptOutcome,
 }
 
 impl ResponseView {
@@ -71,6 +74,7 @@ impl ResponseView {
             body_text,
             body_base64,
             truncated,
+            scripts: ScriptOutcome::default(),
         }
     }
 }

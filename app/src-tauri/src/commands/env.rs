@@ -266,16 +266,18 @@ pub async fn unlock_secret_file(state: State<'_, AppState>, password: String) ->
     }
 }
 
-/// Clears the runtime variables (`bru.setVar`) of a collection.
+/// Clears what scripts set in this session: the collection's runtime variables (`bru.setVar`)
+/// and the in-memory environment changes (`bru.setEnvVar`, `bru.setGlobalEnvVar`).
 #[tauri::command]
 #[specta::specta]
 pub fn clear_runtime_vars(state: State<'_, AppState>, dir: String) -> ApiResult<()> {
     let collection_dir = state.collection_dir(&dir)?;
     state
-        .runtime_vars
+        .sessions
         .lock()
-        .expect("runtime vars lock poisoned")
+        .expect("sessions lock poisoned")
         .remove(&collection_dir);
+    state.global_overrides.clear();
     Ok(())
 }
 

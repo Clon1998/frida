@@ -38,6 +38,7 @@ pub enum ErrorCode {
     WrongPassword,
     Secret,
     Auth,
+    Script,
 }
 
 impl ApiError {
@@ -71,6 +72,9 @@ impl From<CoreError> for ApiError {
                 .with_hint("It may have been moved or deleted outside Frida."),
             CoreError::InvalidInput(_) => ApiError::new(ErrorCode::InvalidInput, message),
             CoreError::Send(send) => send.into(),
+            CoreError::Script(_) => ApiError::new(ErrorCode::Script, message).with_hint(
+                "Fix the script at the line shown; its console.log output is in the console.",
+            ),
             CoreError::Secret(secret) => secret.into(),
             CoreError::Auth(auth) => match auth {
                 OAuth2Error::Cancelled => ApiError::new(ErrorCode::Cancelled, message),

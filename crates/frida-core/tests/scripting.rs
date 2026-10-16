@@ -98,8 +98,7 @@ async fn a_failing_pre_request_script_stops_the_send() {
     let session = SessionStore::with_runtime(&[("baseUrl", &format!("http://{addr}"))]);
     let mut request = storage::read_request(&collection(), "login.yaml").unwrap();
     request.scripts.pre = "const a = 1;\nthrow new Error('nope');".into();
-    let err = send(&session, "login.yaml", &request, &Mutex::new(Vec::new()))
-        .await;
+    let err = send(&session, "login.yaml", &request, &Mutex::new(Vec::new())).await;
     let Err(CoreError::Script(error)) = err else {
         panic!("expected a script error");
     };

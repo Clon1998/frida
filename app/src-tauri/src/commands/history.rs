@@ -75,14 +75,15 @@ pub async fn export_curl(
 ) -> ApiResult<String> {
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root).await?;
-    let runtime = state.runtime_vars(&root);
+    let store = state.session_store(&root);
+    let workspace_dir = state.workspace_dir().ok();
     let input = ExecuteInput {
         collection_dir: &root,
         request_rel: &path,
         request: &request,
         collection_env: collection_env.as_ref(),
         global_env: global_env.as_ref(),
-        runtime: &runtime,
+        session: state.session(&store, workspace_dir.as_deref()),
         cookies: None,
         oauth: &state.oauth,
     };

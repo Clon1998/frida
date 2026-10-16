@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use frida_core::auth::OAuth2Manager;
 use frida_core::history::HistoryStore;
-use frida_core::http::{CookieJar, ResponseCache};
+use frida_core::http::{CookieJar, EnvOverrides, ResponseCache, Session, SessionStore};
 use frida_core::local_state::LocalStore;
 use frida_core::storage;
 use frida_core::watch::FsWatcher;
@@ -31,8 +31,11 @@ pub struct AppState {
     pub responses: Mutex<ResponseCache>,
     pub watcher: Mutex<Option<FsWatcher>>,
     pub secrets: SecretBackend,
-    /// Variables set by scripts (`bru.setVar`), per collection folder. In memory only.
-    pub runtime_vars: Mutex<HashMap<PathBuf, HashMap<String, String>>>,
+    /// What scripts changed (`bru.setVar`, `bru.setEnvVar`), per collection folder. In memory
+    /// only. `Arc` so a send can keep using it without holding the map's lock.
+    pub sessions: Mutex<HashMap<PathBuf, Arc<SessionStore>>>,
+    /// `bru.setGlobalEnvVar` changes, shared by all collections like the global environment.
+    pub global_overrides: EnvOverrides,
     /// One cookie jar per collection folder, in memory only.
     pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,
     /// OAuth2 tokens, in memory, shared by all collections (tokens are keyed by provider).
@@ -110,7 +113,8 @@ impl AppState {
             responses: Mutex::new(ResponseCache::default()),
             watcher: Mutex::new(None),
             secrets,
-            runtime_vars: Mutex::new(HashMap::new()),
+            sessions: Mutex::new(HashMap::new()),
+            global_overrides: EnvOverrides::default(),
             cookie_jars: Mutex::new(HashMap::new()),
             // The authorization code flow opens the system browser for the user to sign in.
             oauth: OAuth2Manager::new(Arc::new(|url: &str| {
@@ -141,14 +145,25 @@ impl AppState {
         Arc::clone(jars.entry(collection_dir.to_path_buf()).or_default())
     }
 
-    /// A copy of a collection's runtime variables.
-    pub fn runtime_vars(&self, collection_dir: &Path) -> HashMap<String, String> {
-        self.runtime_vars
-            .lock()
-            .expect("runtime vars lock poisoned")
-            .get(collection_dir)
-            .cloned()
-            .unwrap_or_default()
+    /// The script session of a collection, created on first use.
+    pub fn session_store(&self, collection_dir: &Path) -> Arc<SessionStore> {
+        let mut sessions = self.sessions.lock().expect("sessions lock poisoned");
+        Arc::clone(sessions.entry(collection_dir.to_path_buf()).or_default())
+    }
+
+    /// What a send needs from the session. The references borrow `store`, `self` and
+    /// `workspace_dir`, so the returned value can't outlive them (that is what `'a` says).
+    pub fn session<'a>(
+        &'a self,
+        store: &'a SessionStore,
+        workspace_dir: Option<&'a Path>,
+    ) -> Session<'a> {
+        Session {
+            runtime: &store.runtime,
+            env_overrides: &store.env_overrides,
+            global_overrides: &self.global_overrides,
+            workspace_dir,
+        }
     }
 
     /// The open workspace's folder, or a `no_workspace` error.

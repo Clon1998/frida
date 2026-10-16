@@ -7,7 +7,7 @@ use frida_core::history::NewEntry;
 use frida_core::http::{self, ConsoleEntry, ExecuteInput, ResponseView};
 use tauri_specta::Event;
 
-use crate::ConsoleLogged;
+use crate::{ConsoleLogged, ScriptLogged};
 use frida_core::model::{Environment, Request};
 use frida_core::secrets;
 use frida_core::storage;
@@ -73,7 +73,8 @@ pub async fn send_request(
 ) -> ApiResult<ResponseView> {
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root).await?;
-    let runtime = state.runtime_vars(&root);
+    let store = state.session_store(&root);
+    let workspace_dir = state.workspace_dir().ok();
     let cancel = CancellationToken::new();
     state
         .in_flight
@@ -88,11 +89,17 @@ pub async fn send_request(
         request: &request,
         collection_env: collection_env.as_ref(),
         global_env: global_env.as_ref(),
-        runtime: &runtime,
+        session: state.session(&store, workspace_dir.as_deref()),
         cookies: Some(state.cookie_jar(&root)),
         oauth: &state.oauth,
     };
-    let result = http::execute(input, cancel).await;
+    // Script output goes to the console as it happens (already masked).
+    let on_log = |log: http::ScriptLog| {
+        if let Err(err) = (ScriptLogged { log }).emit(&app) {
+            tracing::warn!(%err, "could not emit script log");
+        }
+    };
+    let result = http::execute(input, cancel, &on_log).await;
     state
         .in_flight
         .lock()
@@ -101,9 +108,11 @@ pub async fn send_request(
 
     record_history(&state, &root, &path, &request, &result);
     log_to_console(&app, &request_id, &path, &request, &result);
-    let response = result?.response;
+    let executed = result?;
+    let response = executed.response;
     let id = uuid::Uuid::new_v4().to_string();
-    let view = ResponseView::new(id.clone(), &response);
+    let mut view = ResponseView::new(id.clone(), &response);
+    view.scripts = executed.scripts;
     state
         .responses
         .lock()
@@ -215,14 +224,15 @@ pub async fn inspect_request(
 ) -> ApiResult<ResolveReport> {
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root).await?;
-    let runtime = state.runtime_vars(&root);
+    let store = state.session_store(&root);
+    let workspace_dir = state.workspace_dir().ok();
     let report = http::inspect(&ExecuteInput {
         collection_dir: &root,
         request_rel: &path,
         request: &request,
         collection_env: collection_env.as_ref(),
         global_env: global_env.as_ref(),
-        runtime: &runtime,
+        session: state.session(&store, workspace_dir.as_deref()),
         cookies: None,
         oauth: &state.oauth,
     })?;
@@ -243,7 +253,8 @@ pub async fn fetch_oauth2_tokens(
 ) -> ApiResult<Vec<TokenInfo>> {
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root).await?;
-    let runtime = state.runtime_vars(&root);
+    let store = state.session_store(&root);
+    let workspace_dir = state.workspace_dir().ok();
     // Folders and the collection: a stand-in request inside them that inherits their auth.
     let (request, request_rel) = match request {
         Some(request) => (request, path),
@@ -269,7 +280,7 @@ pub async fn fetch_oauth2_tokens(
             request: &request,
             collection_env: collection_env.as_ref(),
             global_env: global_env.as_ref(),
-            runtime: &runtime,
+            session: state.session(&store, workspace_dir.as_deref()),
             cookies: None,
             oauth: &state.oauth,
         },
