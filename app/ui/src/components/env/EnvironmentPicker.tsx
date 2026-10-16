@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Check, ChevronDown, Layers, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +38,12 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
     envColor(list.find((e) => e.environment.name === name)?.environment.color);
   const color = colorOf(collection, activeCollection) ?? colorOf(global, activeGlobal);
 
+  // Closing a menu normally puts the focus back on its button. After "Configure…" the focus
+  // belongs to the editor that opens instead; otherwise it jumps back to the button a moment
+  // later and the first keystrokes typed into the editor are lost.
+  const openingEditor = useRef(false);
   const configure = (scope: "collection" | "global") => {
+    openingEditor.current = true;
     setEditorScope(scope);
     void openTab(dir, ENVIRONMENTS_TAB);
   };
@@ -84,7 +90,14 @@ export function EnvironmentPicker({ dir }: { dir: string }) {
           <ChevronDown className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent
+        align="end"
+        className="w-64"
+        onCloseAutoFocus={(e) => {
+          if (openingEditor.current) e.preventDefault();
+          openingEditor.current = false;
+        }}
+      >
         {section("collection")}
         <DropdownMenuSeparator />
         {section("global")}
