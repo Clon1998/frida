@@ -20,6 +20,8 @@ interface UiState {
   setQuickOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
   setEnvPickerOpen: (open: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
   /** What the sidebar shows below the collection picker. */
   sidebarView: "tree" | "history" | "git";
   setSidebarView: (view: "tree" | "history" | "git") => void;
@@ -40,6 +42,8 @@ export const useUi = create<UiState>((set) => ({
   setQuickOpen: (quickOpen) => set({ quickOpen }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   setEnvPickerOpen: (envPickerOpen) => set({ envPickerOpen }),
+  settingsOpen: false,
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   sidebarView: "tree",
   setSidebarView: (sidebarView) => set({ sidebarView }),
 }));

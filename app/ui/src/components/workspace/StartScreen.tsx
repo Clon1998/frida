@@ -1,7 +1,8 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen, Plus, Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useUi } from "@/stores/ui";
 import { useWorkspace } from "@/stores/workspace";
 import { NameDialog } from "./NameDialog";
 
@@ -25,7 +26,17 @@ export function StartScreen() {
   };
 
   return (
-    <main className="flex h-full flex-col items-center justify-center gap-6 p-6">
+    <main className="relative flex h-full flex-col items-center justify-center gap-6 p-6">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-3 right-3"
+        title="Settings"
+        aria-label="Settings"
+        onClick={() => useUi.getState().setSettingsOpen(true)}
+      >
+        <Settings />
+      </Button>
       <div className="text-center">
         <h1 className="text-3xl font-semibold tracking-tight">Frida</h1>
         <p className="text-muted-foreground">Fast Request Inspector for Developer APIs</p>

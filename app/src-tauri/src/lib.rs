@@ -55,7 +55,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             app::get_about_info,
             app::get_settings,
-            app::set_theme,
+            app::save_preferences,
+            app::check_git,
+            app::clear_aws_cache,
             app::get_collection_state,
             app::save_collection_state,
             workspace::create_workspace,

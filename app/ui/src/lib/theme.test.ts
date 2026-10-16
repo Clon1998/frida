@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { followSystemTheme } from "./theme";
+import { applyAppearance, applyTheme, followSystemTheme } from "./theme";
 
 function mockMatchMedia(matches: boolean) {
   const listeners: (() => void)[] = [];
@@ -37,5 +37,32 @@ describe("followSystemTheme", () => {
     const stop = followSystemTheme(document.createElement("html"));
     stop();
     expect(os.media.removeEventListener).toHaveBeenCalledOnce();
+  });
+});
+
+describe("theme and appearance settings", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fixes light or dark, and follows the OS for system", () => {
+    mockMatchMedia(true);
+    const root = document.createElement("html");
+    applyTheme("light", root);
+    expect(root.classList.contains("dark")).toBe(false);
+    applyTheme("dark", root);
+    expect(root.classList.contains("dark")).toBe(true);
+    applyTheme("light", root);
+    applyTheme("system", root);
+    expect(root.classList.contains("dark")).toBe(true);
+  });
+
+  it("sets the accent, UI size and editor font size on the root", () => {
+    const root = document.createElement("html");
+    applyAppearance({ accent: "blue", uiScale: 125, editorFontSize: 15 }, root);
+    expect(root.dataset.accent).toBe("blue");
+    expect(root.style.fontSize).toBe("125%");
+    expect(root.style.getPropertyValue("--editor-font-size")).toBe("15px");
+
+    applyAppearance({ accent: "neutral", uiScale: 100, editorFontSize: 13 }, root);
+    expect(root.style.fontSize).toBe("");
   });
 });

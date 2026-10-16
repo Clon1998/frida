@@ -13,30 +13,121 @@ use crate::error::{CoreError, Result};
 pub const MAX_RECENT_WORKSPACES: usize = 10;
 
 /// `settings.json`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
     /// Absolute workspace folders, most recent first.
     pub recent_workspaces: Vec<String>,
-    pub theme: ThemePreference,
     /// The active global environment per workspace folder.
     pub active_global_environments: std::collections::BTreeMap<String, String>,
-    /// How many history entries are kept (PLAN.md §13).
-    pub history_size: u32,
     /// The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`.
     pub aws_profiles: std::collections::BTreeMap<String, String>,
+    /// What the user chooses in the Settings dialog. The fields above are state the app keeps
+    /// by itself.
+    pub preferences: Preferences,
 }
 
-impl Default for AppSettings {
+/// The Settings dialog. Every field has a default, so older `settings.json` files load fine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Preferences {
+    pub theme: ThemePreference,
+    pub accent: Accent,
+    /// Size of the whole UI in percent (100 = normal).
+    pub ui_scale: u32,
+    /// Font size of the code editors (URL bar, body, scripts, responses) in pixels.
+    pub editor_font_size: u32,
+    /// How many history entries are kept (PLAN.md §13).
+    pub history_size: u32,
+    /// The git program. `None` runs `git` from the PATH.
+    pub git_path: Option<String>,
+    pub aws: AwsPreferences,
+}
+
+impl Default for Preferences {
     fn default() -> Self {
         Self {
-            recent_workspaces: Vec::new(),
             theme: ThemePreference::default(),
-            active_global_environments: Default::default(),
+            accent: Accent::default(),
+            ui_scale: 100,
+            editor_font_size: 13,
             history_size: crate::history::DEFAULT_RETENTION as u32,
-            aws_profiles: Default::default(),
+            git_path: None,
+            aws: AwsPreferences::default(),
         }
     }
+}
+
+impl Preferences {
+    /// Allowed ranges (the UI offers only these, but the file can be edited by hand).
+    pub const UI_SCALE: std::ops::RangeInclusive<u32> = 75..=150;
+    pub const EDITOR_FONT_SIZE: std::ops::RangeInclusive<u32> = 10..=24;
+    pub const HISTORY_SIZE: std::ops::RangeInclusive<u32> = 0..=100_000;
+    pub const AWS_CACHE_MINUTES: std::ops::RangeInclusive<u32> = 1..=24 * 60;
+
+    /// A copy with every number in its allowed range and blank paths turned into `None`.
+    pub fn sanitized(&self) -> Self {
+        fn clamp(value: u32, range: &std::ops::RangeInclusive<u32>) -> u32 {
+            value.clamp(*range.start(), *range.end())
+        }
+        /// `"  "` → `None`, `" /usr/bin/git "` → `Some("/usr/bin/git")`.
+        fn path(value: &Option<String>) -> Option<String> {
+            value
+                .as_deref()
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .map(str::to_string)
+        }
+        Self {
+            theme: self.theme,
+            accent: self.accent,
+            ui_scale: clamp(self.ui_scale, &Self::UI_SCALE),
+            editor_font_size: clamp(self.editor_font_size, &Self::EDITOR_FONT_SIZE),
+            history_size: clamp(self.history_size, &Self::HISTORY_SIZE),
+            git_path: path(&self.git_path),
+            aws: AwsPreferences {
+                config_file: path(&self.aws.config_file),
+                credentials_file: path(&self.aws.credentials_file),
+                cache_minutes: clamp(self.aws.cache_minutes, &Self::AWS_CACHE_MINUTES),
+            },
+        }
+    }
+}
+
+/// AWS settings (PLAN.md §9).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AwsPreferences {
+    /// `None`: `AWS_CONFIG_FILE`, else `~/.aws/config`.
+    pub config_file: Option<String>,
+    /// `None`: `AWS_SHARED_CREDENTIALS_FILE`, else `~/.aws/credentials`.
+    pub credentials_file: Option<String>,
+    /// How long fetched secret values are reused before asking AWS again.
+    pub cache_minutes: u32,
+}
+
+impl Default for AwsPreferences {
+    fn default() -> Self {
+        Self {
+            config_file: None,
+            credentials_file: None,
+            cache_minutes: 15,
+        }
+    }
+}
+
+/// The UI's accent color (buttons, focus rings, selection).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum Accent {
+    /// Black on light, white on dark.
+    #[default]
+    Neutral,
+    Blue,
+    Green,
+    Violet,
+    Orange,
+    Rose,
 }
 
 impl AppSettings {
@@ -165,6 +256,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn preferences_are_kept_in_range() {
+        let prefs = Preferences {
+            ui_scale: 500,
+            editor_font_size: 2,
+            git_path: Some("   ".into()),
+            aws: AwsPreferences {
+                config_file: Some(" /x/config ".into()),
+                credentials_file: None,
+                cache_minutes: 0,
+            },
+            ..Preferences::default()
+        }
+        .sanitized();
+        assert_eq!(prefs.ui_scale, 150);
+        assert_eq!(prefs.editor_font_size, 10);
+        assert_eq!(prefs.git_path, None);
+        assert_eq!(prefs.aws.config_file.as_deref(), Some("/x/config"));
+        assert_eq!(prefs.aws.cache_minutes, 1);
+        assert_eq!(Preferences::default().sanitized(), Preferences::default());
+    }
+
+    #[test]
+    fn older_settings_files_still_load() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("settings.json"),
+            r#"{"recentWorkspaces":["/w"],"theme":"dark","historySize":50}"#,
+        )
+        .unwrap();
+        let settings = LocalStore::new(dir.path()).load_settings();
+        assert_eq!(settings.recent_workspaces, ["/w"]);
+        assert_eq!(settings.preferences, Preferences::default());
+    }
+
+    #[test]
     fn missing_or_corrupt_files_give_defaults() {
         let dir = tempfile::tempdir().unwrap();
         let store = LocalStore::new(dir.path());
@@ -181,7 +307,8 @@ mod tests {
 
         let mut settings = AppSettings::default();
         settings.remember_workspace("/a");
-        settings.theme = ThemePreference::Dark;
+        settings.preferences.theme = ThemePreference::Dark;
+        settings.preferences.git_path = Some("/opt/git".into());
         store.save_settings(&settings).unwrap();
         assert_eq!(store.load_settings(), settings);
 

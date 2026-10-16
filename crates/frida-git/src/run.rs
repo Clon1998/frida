@@ -2,8 +2,9 @@
 //! limit so a hanging network operation can't block the app forever.
 
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
 use crate::{GitError, Result};
@@ -39,12 +40,43 @@ const FORBIDDEN_FLAGS: &[&str] = &[
     "--worktree",
 ];
 
+/// The git program set in the app settings, or `None` for `git` from the PATH.
+///
+/// A `static` is one value for the whole process, like a Java `static` field. Rust only allows
+/// mutable statics behind a lock, so threads can't race on it: `RwLock` lets many readers (every
+/// git call) in at once and a writer (changing the setting) alone.
+static EXECUTABLE: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+pub(crate) fn set_executable(path: Option<PathBuf>) {
+    *EXECUTABLE.write().expect("git executable lock poisoned") = path;
+}
+
+/// The program to run for `git`.
+pub(crate) fn executable() -> PathBuf {
+    EXECUTABLE
+        .read()
+        .expect("git executable lock poisoned")
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("git"))
+}
+
 pub(crate) fn git(dir: &Path, args: &[&str], timeout: Duration) -> Result<String> {
     git_allowing(dir, args, timeout, &[])
 }
 
 /// Like [`git`], but exit codes in `ok_codes` count as success too.
 pub(crate) fn git_allowing(
+    dir: &Path,
+    args: &[&str],
+    timeout: Duration,
+    ok_codes: &[i32],
+) -> Result<String> {
+    run_program(&executable(), dir, args, timeout, ok_codes)
+}
+
+/// Runs `program` (a git executable) with `args` after checking they are allowed.
+pub(crate) fn run_program(
+    program: &Path,
     dir: &Path,
     args: &[&str],
     timeout: Duration,
@@ -71,7 +103,7 @@ pub(crate) fn git_allowing(
         );
     }
 
-    let mut command = Command::new("git");
+    let mut command = Command::new(program);
     hide_console_window(&mut command);
     let mut child = command
         .args(args)
@@ -163,6 +195,12 @@ fn hide_console_window(_command: &mut Command) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_wrong_git_path_is_reported_as_not_found() {
+        let err = crate::version_of(Path::new("/no/such/git")).unwrap_err();
+        assert!(matches!(err, GitError::NotInstalled));
+    }
 
     #[test]
     #[should_panic(expected = "not allowed")]

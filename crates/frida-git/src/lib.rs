@@ -22,7 +22,7 @@ pub use parse::parse_status;
 /// Why a git operation failed. Messages are shown in the UI.
 #[derive(Debug, thiserror::Error)]
 pub enum GitError {
-    #[error("git is not installed or not on the PATH")]
+    #[error("git was not found (install it, or set its path in Settings → Git)")]
     NotInstalled,
 
     #[error("{0} is not inside a git repository")]
@@ -104,8 +104,25 @@ pub struct Repo {
 
 /// The installed git's version, e.g. `2.50.1`. Errors with [`GitError::NotInstalled`].
 pub fn version() -> Result<String> {
-    let out = run::git(Path::new("."), &["--version"], run::LOCAL_TIMEOUT)?;
+    version_of(&run::executable())
+}
+
+/// The version of the git program at `executable` (for "Test" in the settings).
+pub fn version_of(executable: &Path) -> Result<String> {
+    let out = run::run_program(
+        executable,
+        Path::new("."),
+        &["--version"],
+        run::LOCAL_TIMEOUT,
+        &[],
+    )?;
     Ok(out.trim().trim_start_matches("git version ").to_string())
+}
+
+/// Which git program every call runs: a path from the settings, or `None` for `git` from the
+/// PATH. Applies to the whole process.
+pub fn set_executable(path: Option<PathBuf>) {
+    run::set_executable(path);
 }
 
 /// Turns `dir` into a git repository (`git init`).

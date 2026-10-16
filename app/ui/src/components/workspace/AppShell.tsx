@@ -1,5 +1,5 @@
 import { ask } from "@tauri-apps/plugin-dialog";
-import { Columns2, Keyboard, Rows2, SquareChevronUp } from "lucide-react";
+import { Columns2, Keyboard, Rows2, Settings, SquareChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { commands, events } from "@/bindings";
 import { CurlExportDialog } from "@/components/curl/CurlExportDialog";
@@ -141,6 +141,16 @@ export function AppShell() {
           <Keyboard />
         </Button>
         <Button
+          variant="ghost"
+          size="icon"
+          className="size-5"
+          title="Settings (Ctrl/Cmd+,)"
+          aria-label="Settings"
+          onClick={() => useUi.getState().setSettingsOpen(true)}
+        >
+          <Settings />
+        </Button>
+        <Button
           variant={consoleOpen ? "secondary" : "ghost"}
           size="sm"
           className="h-5 gap-1 px-1.5 text-xs"
@@ -249,7 +259,7 @@ function useFileWatcher() {
 /**
  * App-wide shortcuts (PLAN.md §14, listed in `lib/shortcuts.ts`): Ctrl/Cmd+Enter sends,
  * +S saves, +W closes the tab, +T new request, +K quick open, +E environments, +J console,
- * +/ shortcut list.
+ * +/ shortcut list, +, settings.
  */
 function useShortcuts() {
   useEffect(() => {
@@ -267,6 +277,10 @@ function useShortcuts() {
         case "/":
           e.preventDefault();
           ui.setShortcutsOpen(true);
+          return;
+        case ",":
+          e.preventDefault();
+          ui.setSettingsOpen(true);
           return;
         case "k":
           if (!dir) return;

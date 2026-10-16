@@ -8,6 +8,7 @@ export const SHORTCUTS: { keys: string; action: string }[] = [
   { keys: "Mod+E", action: "Switch environment" },
   { keys: "Mod+J", action: "Show or hide the console" },
   { keys: "Mod+/", action: "Show these shortcuts" },
+  { keys: "Mod+,", action: "Settings" },
   { keys: "Enter", action: "In the URL bar: send" },
   { keys: "{{", action: "In editors: suggest variables" },
   { keys: "Mod+Enter", action: "In the commit message: commit" },

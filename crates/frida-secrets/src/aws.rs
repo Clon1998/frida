@@ -1,8 +1,9 @@
 //! AWS Secrets Manager as a secret source (PLAN.md §9.1).
 //!
-//! - [`list_profiles`] reads the profile names from `~/.aws/config` and `~/.aws/credentials`.
-//! - [`AwsSecrets`] fetches secret values with a profile, caches them in memory for 15 minutes
-//!   and picks a key out of JSON secrets. The actual AWS call sits behind [`SecretFetcher`], so
+//! - [`list_profiles`] reads the profile names from `~/.aws/config` and `~/.aws/credentials`
+//!   (or the files chosen in the settings, see [`AwsFiles`]).
+//! - [`AwsSecrets`] fetches secret values with a profile, caches them in memory (15 minutes by
+//!   default, changeable in the settings) and picks a key out of JSON secrets. The actual AWS call sits behind [`SecretFetcher`], so
 //!   tests use a fake instead of the SDK.
 //! - Errors say what to do; an expired SSO session tells the user to run `aws sso login`
 //!   (Frida never runs it itself).
@@ -11,13 +12,49 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
 /// How long fetched values are reused before asking AWS again.
 pub const CACHE_TTL: Duration = Duration::from_secs(15 * 60);
+
+/// Where the AWS config and credentials files are. `None` means the usual place:
+/// `AWS_CONFIG_FILE` / `AWS_SHARED_CREDENTIALS_FILE` if set, else `~/.aws/config` and
+/// `~/.aws/credentials`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AwsFiles {
+    pub config: Option<PathBuf>,
+    pub credentials: Option<PathBuf>,
+}
+
+impl AwsFiles {
+    /// The config file that is actually used.
+    pub fn config_path(&self) -> PathBuf {
+        self.config.clone().unwrap_or_else(|| {
+            std::env::var_os("AWS_CONFIG_FILE")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir().join(".aws/config"))
+        })
+    }
+
+    /// The credentials file that is actually used.
+    pub fn credentials_path(&self) -> PathBuf {
+        self.credentials.clone().unwrap_or_else(|| {
+            std::env::var_os("AWS_SHARED_CREDENTIALS_FILE")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir().join(".aws/credentials"))
+        })
+    }
+}
+
+fn home_dir() -> PathBuf {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_default()
+}
 
 /// A profile from the AWS config files.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -85,6 +122,7 @@ pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 pub trait SecretFetcher: Send + Sync {
     fn fetch(
         &self,
+        files: &AwsFiles,
         profile: &str,
         region: Option<&str>,
         secret_id: &str,
@@ -97,7 +135,9 @@ type CacheKey = (String, Option<String>, String);
 /// Secret values from AWS, cached in memory (with when they were fetched). Share one per app.
 pub struct AwsSecrets {
     fetcher: Arc<dyn SecretFetcher>,
-    ttl: Duration,
+    /// The settings can change while the app runs, hence the locks (read often, written rarely).
+    ttl: RwLock<Duration>,
+    files: RwLock<AwsFiles>,
     cache: Mutex<HashMap<CacheKey, (Instant, String)>>,
 }
 
@@ -109,9 +149,26 @@ impl AwsSecrets {
     pub fn with_ttl(fetcher: Arc<dyn SecretFetcher>, ttl: Duration) -> Self {
         Self {
             fetcher,
-            ttl,
+            ttl: RwLock::new(ttl),
+            files: RwLock::new(AwsFiles::default()),
             cache: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Applies the settings. Other files can mean other credentials, so changing them empties
+    /// the cache.
+    pub fn configure(&self, ttl: Duration, files: AwsFiles) {
+        *self.ttl.write().expect("aws ttl lock poisoned") = ttl;
+        let mut current = self.files.write().expect("aws files lock poisoned");
+        if *current != files {
+            *current = files;
+            self.clear(None);
+        }
+    }
+
+    /// The config files in use (for listing profiles).
+    pub fn files(&self) -> AwsFiles {
+        self.files.read().expect("aws files lock poisoned").clone()
     }
 
     /// With the real AWS SDK.
@@ -123,7 +180,8 @@ impl AwsSecrets {
     pub fn cached(&self, secret: &AwsSecretRef) -> Option<Result<String, AwsError>> {
         let cache = self.cache.lock().expect("aws cache lock poisoned");
         let (fetched, raw) = cache.get(&cache_key(secret))?;
-        (fetched.elapsed() < self.ttl).then(|| pick(raw, secret))
+        let ttl = *self.ttl.read().expect("aws ttl lock poisoned");
+        (fetched.elapsed() < ttl).then(|| pick(raw, secret))
     }
 
     /// The secret's value: from the cache when fresh, otherwise from AWS.
@@ -131,9 +189,15 @@ impl AwsSecrets {
         if let Some(value) = self.cached(secret) {
             return value;
         }
+        let files = self.files();
         let raw = self
             .fetcher
-            .fetch(&secret.profile, secret.region.as_deref(), &secret.secret_id)
+            .fetch(
+                &files,
+                &secret.profile,
+                secret.region.as_deref(),
+                &secret.secret_id,
+            )
             .await?;
         // The lock is taken only after the await, never held across it.
         self.cache
@@ -187,10 +251,12 @@ pub struct SdkFetcher;
 impl SecretFetcher for SdkFetcher {
     fn fetch(
         &self,
+        files: &AwsFiles,
         profile: &str,
         region: Option<&str>,
         secret_id: &str,
     ) -> BoxFuture<Result<String, AwsError>> {
+        let files = files.clone();
         let profile = profile.to_string();
         let region = region.map(str::to_string);
         let secret_id = secret_id.to_string();
@@ -200,6 +266,9 @@ impl SecretFetcher for SdkFetcher {
                     .profile_name(&profile);
                 if let Some(region) = region {
                     loader = loader.region(aws_config::Region::new(region));
+                }
+                if files != AwsFiles::default() {
+                    loader = loader.profile_files(profile_files(&files));
                 }
                 let config = loader.load().await;
                 let client = aws_sdk_secretsmanager::Client::new(&config);
@@ -219,6 +288,21 @@ impl SecretFetcher for SdkFetcher {
             }
         })
     }
+}
+
+/// The SDK's view of [`AwsFiles`]: a chosen file replaces the usual one, the other stays.
+fn profile_files(files: &AwsFiles) -> aws_runtime::env_config::file::EnvConfigFiles {
+    use aws_runtime::env_config::file::{EnvConfigFileKind as ProfileFileKind, EnvConfigFiles};
+    let mut builder = EnvConfigFiles::builder();
+    builder = match &files.config {
+        Some(path) => builder.with_file(ProfileFileKind::Config, path),
+        None => builder.include_default_config_file(true),
+    };
+    builder = match &files.credentials {
+        Some(path) => builder.with_file(ProfileFileKind::Credentials, path),
+        None => builder.include_default_credentials_file(true),
+    };
+    builder.build()
 }
 
 /// The error and all its causes in one line (the SDK nests the interesting part).
@@ -269,22 +353,11 @@ pub(crate) fn classify(message: &str, profile: &str, secret_id: &str) -> AwsErro
     }
 }
 
-/// The profiles in `~/.aws/config` and `~/.aws/credentials` (or the files named by
-/// `AWS_CONFIG_FILE` / `AWS_SHARED_CREDENTIALS_FILE`), sorted by name.
-pub fn list_profiles() -> Vec<AwsProfile> {
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_default();
-    let config = std::env::var_os("AWS_CONFIG_FILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".aws/config"));
-    let credentials = std::env::var_os("AWS_SHARED_CREDENTIALS_FILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".aws/credentials"));
+/// The profiles in the AWS config and credentials files (see [`AwsFiles`]), sorted by name.
+pub fn list_profiles(files: &AwsFiles) -> Vec<AwsProfile> {
     parse_profiles(
-        &std::fs::read_to_string(config).unwrap_or_default(),
-        &std::fs::read_to_string(credentials).unwrap_or_default(),
+        &std::fs::read_to_string(files.config_path()).unwrap_or_default(),
+        &std::fs::read_to_string(files.credentials_path()).unwrap_or_default(),
     )
 }
 
@@ -361,7 +434,13 @@ mod tests {
     }
 
     impl SecretFetcher for FakeFetcher {
-        fn fetch(&self, _: &str, _: Option<&str>, id: &str) -> BoxFuture<Result<String, AwsError>> {
+        fn fetch(
+            &self,
+            _: &AwsFiles,
+            _: &str,
+            _: Option<&str>,
+            id: &str,
+        ) -> BoxFuture<Result<String, AwsError>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             let answer = self.answers.get(id).cloned().unwrap_or_else(|| {
                 Err(AwsError::NotFound {
@@ -409,6 +488,17 @@ mod tests {
         let expired = AwsSecrets::with_ttl(fetcher.clone(), Duration::ZERO);
         expired.get(&secret("plain", None)).await.unwrap();
         assert!(expired.cached(&secret("plain", None)).is_none());
+
+        // Settings: a longer cache time applies to values already cached; other files empty it.
+        expired.configure(Duration::from_secs(60), AwsFiles::default());
+        assert!(expired.cached(&secret("plain", None)).is_some());
+        let other = AwsFiles {
+            config: Some("/elsewhere/config".into()),
+            credentials: None,
+        };
+        expired.configure(Duration::from_secs(60), other.clone());
+        assert!(expired.cached(&secret("plain", None)).is_none());
+        assert_eq!(expired.files(), other);
     }
 
     #[tokio::test]

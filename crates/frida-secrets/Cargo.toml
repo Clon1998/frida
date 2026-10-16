@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 aws-config = { workspace = true }
+aws-runtime = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
 specta = { workspace = true }
 tokio = { workspace = true }

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use frida_core::CoreError;
 use frida_core::model::{EnvVariable, Environment, SecretSource};
 use frida_core::secrets::{AwsFetch, fill_aws_secrets};
-use frida_secrets::aws::{AwsError, AwsSecrets, BoxFuture, SecretFetcher};
+use frida_secrets::aws::{AwsError, AwsFiles, AwsSecrets, BoxFuture, SecretFetcher};
 
 struct Fake {
     calls: AtomicUsize,
@@ -17,6 +17,7 @@ struct Fake {
 impl SecretFetcher for Fake {
     fn fetch(
         &self,
+        _: &AwsFiles,
         profile: &str,
         _: Option<&str>,
         id: &str,

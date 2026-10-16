@@ -3,13 +3,15 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use frida_core::auth::OAuth2Manager;
 use frida_core::history::HistoryStore;
 use frida_core::http::{CookieJar, EnvOverrides, ResponseCache, Session, SessionStore};
-use frida_core::local_state::LocalStore;
+use frida_core::local_state::{LocalStore, Preferences};
 use frida_core::storage;
 use frida_core::watch::FsWatcher;
+use frida_secrets::aws::AwsFiles;
 use frida_secrets::{EncryptedFileStore, KeychainStore, SecretStore};
 use serde::Deserialize;
 use specta::Type;
@@ -40,7 +42,7 @@ pub struct AppState {
     pub cookie_jars: Mutex<HashMap<PathBuf, Arc<CookieJar>>>,
     /// OAuth2 tokens, in memory, shared by all collections (tokens are keyed by provider).
     pub oauth: OAuth2Manager,
-    /// AWS Secrets Manager values, cached in memory for 15 minutes (PLAN.md §9.1).
+    /// AWS Secrets Manager values, cached in memory (15 minutes by default, PLAN.md §9.1).
     pub aws: Arc<frida_secrets::aws::AwsSecrets>,
     /// Request history. `Arc` so it can be moved into `spawn_blocking` closures. `None` if the
     /// database couldn't be opened (history is then simply off; sending still works).
@@ -107,7 +109,7 @@ impl AppState {
                 None
             }
         };
-        Self {
+        let state = Self {
             aws: Arc::new(frida_secrets::aws::AwsSecrets::with_sdk()),
             history,
             local: LocalStore::new(app_data_dir),
@@ -123,7 +125,22 @@ impl AppState {
             oauth: OAuth2Manager::new(Arc::new(|url: &str| {
                 tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
             })),
-        }
+        };
+        state.apply_preferences(&state.local.load_settings().preferences);
+        state
+    }
+
+    /// Makes the parts of the settings that live outside the UI take effect: which git program
+    /// runs, and the AWS files and cache time. Called at startup and after every change.
+    pub fn apply_preferences(&self, preferences: &Preferences) {
+        frida_git::set_executable(preferences.git_path.as_ref().map(PathBuf::from));
+        self.aws.configure(
+            Duration::from_secs(u64::from(preferences.aws.cache_minutes) * 60),
+            AwsFiles {
+                config: preferences.aws.config_file.as_ref().map(PathBuf::from),
+                credentials: preferences.aws.credentials_file.as_ref().map(PathBuf::from),
+            },
+        );
     }
 
     /// The folder holding the environments of `scope`, and the keychain scope id of its secrets.

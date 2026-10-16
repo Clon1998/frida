@@ -357,11 +357,12 @@ fn global_aws_key(workspace_dir: &Path, env: &str) -> String {
     format!("{}|{env}", workspace_dir.to_string_lossy())
 }
 
-/// The AWS profiles in `~/.aws/config` and `~/.aws/credentials`.
+/// The AWS profiles in `~/.aws/config` and `~/.aws/credentials` (or the files from the settings).
 #[tauri::command]
 #[specta::specta]
-pub async fn list_aws_profiles() -> ApiResult<Vec<AwsProfile>> {
-    blocking(|| Ok(frida_secrets::aws::list_profiles())).await
+pub async fn list_aws_profiles(state: State<'_, AppState>) -> ApiResult<Vec<AwsProfile>> {
+    let files = state.aws.files();
+    blocking(move || Ok(frida_secrets::aws::list_profiles(&files))).await
 }
 
 #[tauri::command]

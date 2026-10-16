@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 
 /* Dark mode is driven by a `.dark` class on <html> (see src/lib/theme.ts), so it can follow
-   the OS and later be overridden manually. */
+   the OS or be set in the settings. */
 @custom-variant dark (&:is(.dark *));
 
 /* shadcn/ui "neutral" theme tokens. */
@@ -47,6 +47,49 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+}
+
+/* Accent colors (Settings → Appearance), set as `data-accent` on <html> by src/lib/theme.ts.
+   "neutral" is the default black/white above. Tailwind's 600 shade on light, 500 on dark. */
+[data-accent="blue"] {
+  --primary: oklch(0.546 0.245 262.881);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.623 0.214 259.815);
+}
+.dark[data-accent="blue"] {
+  --primary: oklch(0.623 0.214 259.815);
+}
+[data-accent="green"] {
+  --primary: oklch(0.627 0.194 149.214);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.723 0.219 149.579);
+}
+.dark[data-accent="green"] {
+  --primary: oklch(0.627 0.194 149.214);
+}
+[data-accent="violet"] {
+  --primary: oklch(0.541 0.281 293.009);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.606 0.25 292.717);
+}
+.dark[data-accent="violet"] {
+  --primary: oklch(0.606 0.25 292.717);
+}
+[data-accent="orange"] {
+  --primary: oklch(0.646 0.222 41.116);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.705 0.213 47.604);
+}
+.dark[data-accent="orange"] {
+  --primary: oklch(0.646 0.222 41.116);
+}
+[data-accent="rose"] {
+  --primary: oklch(0.586 0.253 17.585);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.645 0.246 16.439);
+}
+.dark[data-accent="rose"] {
+  --primary: oklch(0.645 0.246 16.439);
 }
 
 @theme inline {

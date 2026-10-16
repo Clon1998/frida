@@ -3,6 +3,7 @@ import {
   type AppSettings,
   commands,
   type ImportSummary,
+  type Preferences,
   type TreeNode,
   type WorkspaceOverview,
 } from "@/bindings";
@@ -19,6 +20,11 @@ interface WorkspaceState {
   trees: Record<string, TreeNode[]>;
 
   loadSettings: () => Promise<void>;
+  /**
+   * Saves the Settings dialog. Shown right away; Rust corrects values out of range and applies
+   * what isn't UI (git program, AWS).
+   */
+  savePreferences: (preferences: Preferences) => Promise<void>;
   openWorkspace: (dir: string) => Promise<void>;
   createWorkspace: (dir: string, name: string) => Promise<void>;
   closeWorkspace: () => Promise<void>;
@@ -59,6 +65,19 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
 
     loadSettings: async () => {
       set({ settings: await commands.getSettings() });
+    },
+
+    savePreferences: async (preferences) => {
+      const withPreferences = (p: Preferences) => {
+        const settings = get().settings;
+        if (settings) set({ settings: { ...settings, preferences: p } });
+      };
+      withPreferences(preferences);
+      try {
+        withPreferences(await unwrap(commands.savePreferences(preferences)));
+      } catch (e) {
+        showError(e);
+      }
     },
 
     openWorkspace: async (dir) => {

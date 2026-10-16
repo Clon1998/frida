@@ -1,10 +1,10 @@
 //! App-level commands: about info and local settings.
 
 use frida_core::AboutInfo;
-use frida_core::local_state::{AppSettings, CollectionState, ThemePreference};
+use frida_core::local_state::{AppSettings, CollectionState, Preferences};
 use tauri::State;
 
-use crate::error::ApiResult;
+use crate::error::{ApiResult, blocking};
 use crate::state::AppState;
 
 /// Returns the product name and core library version.
@@ -20,12 +20,41 @@ pub fn get_settings(state: State<'_, AppState>) -> AppSettings {
     state.local.load_settings()
 }
 
+/// Saves the Settings dialog and applies it right away (git program, AWS). Values out of range
+/// are corrected; returns what was saved.
 #[tauri::command]
 #[specta::specta]
-pub fn set_theme(state: State<'_, AppState>, theme: ThemePreference) -> ApiResult<()> {
+pub fn save_preferences(
+    state: State<'_, AppState>,
+    preferences: Preferences,
+) -> ApiResult<Preferences> {
+    let preferences = preferences.sanitized();
     let mut settings = state.local.load_settings();
-    settings.theme = theme;
-    Ok(state.local.save_settings(&settings)?)
+    settings.preferences = preferences.clone();
+    state.local.save_settings(&settings)?;
+    state.apply_preferences(&preferences);
+    Ok(preferences)
+}
+
+/// The version of the git program at `path` (`None`: `git` from the PATH), for "Test" in the
+/// settings. Doesn't change the setting.
+#[tauri::command]
+#[specta::specta]
+pub async fn check_git(path: Option<String>) -> ApiResult<String> {
+    let program = std::path::PathBuf::from(
+        path.as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .unwrap_or("git"),
+    );
+    blocking(move || Ok(frida_git::version_of(&program)?)).await
+}
+
+/// Forgets all fetched AWS secret values, so the next send asks AWS again.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_aws_cache(state: State<'_, AppState>) {
+    state.aws.clear(None);
 }
 
 /// Open tabs and expanded folders of a collection, from local state.

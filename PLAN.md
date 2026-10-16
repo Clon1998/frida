@@ -263,7 +263,9 @@ auth:
 
 ### 4.6 Local (non-git) state
 Stored in the OS app data dir, never in the repo:
-- `settings.json`: theme, recent workspaces, UI prefs, global TLS defaults, history size.
+- `settings.json`: recent workspaces, active global environment and AWS profile per global env, and the
+  `preferences` edited in the Settings dialog (theme, accent color, UI size, editor font size, history size,
+  git program, AWS config/credentials files and secret cache time).
 - `state/{collectionId}.json`: open tabs, active tab, active environment, AWS profile per env, expanded tree nodes.
 - `history.sqlite`: request history.
 - Cookie jars per collection, in memory with optional persistence.
@@ -366,7 +368,7 @@ UI requirements:
 - List the profiles from `~/.aws/config` and `~/.aws/credentials`, including SSO profiles.
 - Map a profile per environment (global and collection) in local state. The UI prompts for it when needed and it can be changed in the env settings.
 - Fetching: use the SDK with the selected profile, then `GetSecretValue`. If `jsonKey` is set, parse the secret string as JSON and pick that key.
-- Cache in memory only, with a 15 min TTL. Provide a "refresh secrets" button per env.
+- Cache in memory only, with a 15 min TTL (changeable in Settings → AWS). Provide a "refresh secrets" button per env.
 - Errors are mapped to actionable messages. For an expired or missing SSO session, show: *"Run `aws sso login --profile X`"* with a copy button. The app never runs the login itself.
 
 ### 9.2 Cognito preset for OAuth2
@@ -757,6 +759,15 @@ Deviations from and clarifications of this plan, newest last.
   written once the list has been ordered, so existing files don't change. Unordered environments (`seq` 0 or missing)
   come after ordered ones, by name. Once a scope is ordered, new and duplicated environments go last. Saving an
   environment keeps the `seq` that is on disk; only `reorder_environments` changes it.
+
+- **2026-10-16 Settings dialog (requested by Patrick).** App settings open as a dialog (gear in the footer and on
+  the start screen, Ctrl/Cmd+,), not a tab: they are per machine and must work without a collection. Every change is
+  saved and applied at once. Sections: Appearance (theme system/light/dark, accent color, UI size via the root font
+  size, editor font size), Git (program path, checked with `git --version`), AWS (config and credentials file,
+  secret cache time, "forget fetched secrets"), History (entries to keep). Stored as `preferences` in
+  `settings.json`; the old top-level `theme` and `historySize` (never editable) are dropped. Rust clamps values to
+  allowed ranges. The git path is a process-wide setting in `frida-git`; AWS files go to the SDK via
+  `EnvConfigFiles` (`aws-runtime`, already a dependency of aws-config, now listed directly).
 
 ## 17. Testing strategy
 

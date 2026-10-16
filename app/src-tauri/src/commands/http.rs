@@ -225,7 +225,7 @@ fn record_history(
             Vec::new(),
         ),
     };
-    let retention = state.local.load_settings().history_size as usize;
+    let retention = state.local.load_settings().preferences.history_size as usize;
     // Fire and forget: SQLite is blocking I/O, so it runs on the blocking thread pool.
     tokio::task::spawn_blocking(move || {
         if let Err(err) = history.add(&entry, &sensitive, retention) {

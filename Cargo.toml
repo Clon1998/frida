@@ -64,6 +64,8 @@ hmac = "0.13.0"
 # AWS Secrets Manager (frida-secrets, PLAN.md §9).
 aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.120.0"
+# Already a dependency of aws-config; used directly for custom config file locations.
+aws-runtime = "1.10.0"
 
 # Response decompression (see frida-core http/decode.rs). Already in the tree through reqwest.
 flate2 = "1.1.10"

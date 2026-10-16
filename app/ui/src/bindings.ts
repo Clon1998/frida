@@ -8,7 +8,18 @@ export const commands = {
 	/**  Returns the product name and core library version. */
 	getAboutInfo: () => __TAURI_INVOKE<AboutInfo>("get_about_info"),
 	getSettings: () => __TAURI_INVOKE<AppSettings>("get_settings"),
-	setTheme: (theme: ThemePreference) => typedError<null, ApiError>(__TAURI_INVOKE("set_theme", { theme })),
+	/**
+	 *  Saves the Settings dialog and applies it right away (git program, AWS). Values out of range
+	 *  are corrected; returns what was saved.
+	 */
+	savePreferences: (preferences: Preferences) => typedError<Preferences, ApiError>(__TAURI_INVOKE("save_preferences", { preferences })),
+	/**
+	 *  The version of the git program at `path` (`None`: `git` from the PATH), for "Test" in the
+	 *  settings. Doesn't change the setting.
+	 */
+	checkGit: (path: string | null) => typedError<string, ApiError>(__TAURI_INVOKE("check_git", { path })),
+	/**  Forgets all fetched AWS secret values, so the next send asks AWS again. */
+	clearAwsCache: () => __TAURI_INVOKE<void>("clear_aws_cache"),
 	/**  Open tabs and expanded folders of a collection, from local state. */
 	getCollectionState: (collectionId: string) => typedError<CollectionState, ApiError>(__TAURI_INVOKE("get_collection_state", { collectionId })),
 	saveCollectionState: (collectionId: string, collectionState: CollectionState) => typedError<null, ApiError>(__TAURI_INVOKE("save_collection_state", { collectionId, collectionState })),
@@ -101,7 +112,7 @@ export const commands = {
 	 *  of the scope, in the new order.
 	 */
 	reorderEnvironments: (scope: EnvScope, names: string[]) => typedError<null, ApiError>(__TAURI_INVOKE("reorder_environments", { scope, names })),
-	/**  The AWS profiles in `~/.aws/config` and `~/.aws/credentials`. */
+	/**  The AWS profiles in `~/.aws/config` and `~/.aws/credentials` (or the files from the settings). */
 	listAwsProfiles: () => typedError<AwsProfile[], ApiError>(__TAURI_INVOKE("list_aws_profiles")),
 	getAwsProfile: (scope: EnvScope, environment: string) => typedError<string | null, ApiError>(__TAURI_INVOKE("get_aws_profile", { scope, environment })),
 	/**
@@ -244,6 +255,11 @@ export type AboutInfo = {
 	coreVersion: string,
 };
 
+/**  The UI's accent color (buttons, focus rings, selection). */
+export type Accent = 
+/**  Black on light, white on dark. */
+"neutral" | "blue" | "green" | "violet" | "orange" | "rose";
+
 /**  The selected global and collection environment. */
 export type ActiveEnvironments = {
 	global: string | null,
@@ -269,13 +285,15 @@ export type ApiKeyLocation = "header" | "query";
 export type AppSettings = {
 	/**  Absolute workspace folders, most recent first. */
 	recentWorkspaces?: string[],
-	theme?: ThemePreference,
 	/**  The active global environment per workspace folder. */
 	activeGlobalEnvironments?: { [key in string]: string },
-	/**  How many history entries are kept (PLAN.md §13). */
-	historySize?: number,
 	/**  The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`. */
 	awsProfiles?: { [key in string]: string },
+	/**
+	 *  What the user chooses in the Settings dialog. The fields above are state the app keeps
+	 *  by itself.
+	 */
+	preferences?: Preferences,
 };
 
 /**
@@ -320,6 +338,16 @@ export type AwsErrorInfo = {
 	global: boolean | null,
 	/**  e.g. `aws sso login --profile dev`. */
 	fixCommand: string | null,
+};
+
+/**  AWS settings (PLAN.md §9). */
+export type AwsPreferences = {
+	/**  `None`: `AWS_CONFIG_FILE`, else `~/.aws/config`. */
+	configFile?: string | null,
+	/**  `None`: `AWS_SHARED_CREDENTIALS_FILE`, else `~/.aws/credentials`. */
+	credentialsFile?: string | null,
+	/**  How long fetched secret values are reused before asking AWS again. */
+	cacheMinutes?: number,
 };
 
 /**  A profile from the AWS config files. */
@@ -702,6 +730,21 @@ export type Params = {
 export type PathParam = {
 	name: string,
 	value?: string,
+};
+
+/**  The Settings dialog. Every field has a default, so older `settings.json` files load fine. */
+export type Preferences = {
+	theme?: ThemePreference,
+	accent?: Accent,
+	/**  Size of the whole UI in percent (100 = normal). */
+	uiScale?: number,
+	/**  Font size of the code editors (URL bar, body, scripts, responses) in pixels. */
+	editorFontSize?: number,
+	/**  How many history entries are kept (PLAN.md §13). */
+	historySize?: number,
+	/**  The git program. `None` runs `git` from the PATH. */
+	gitPath?: string | null,
+	aws?: AwsPreferences,
 };
 
 export type Request = {
