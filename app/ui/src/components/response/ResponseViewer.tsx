@@ -138,6 +138,8 @@ export function ResponsePanel({
   const kind = bodyKind(response.contentType, response.bodyText);
   const text = response.bodyText ?? "";
   const jsonFilter = useJsonFilter(response, kind === "json", uncached);
+  // The JSONPath field only shows after clicking "Filter", and stays while a filter is set.
+  const [filterOpen, setFilterOpen] = useState(false);
   const shown = jsonFilter.result ?? (pretty && kind === "json" ? prettyJson(text) : text);
   const hasPreview = kind === "image" || kind === "html";
   const [stored, setSubTab] = useSubTab(`response:${viewKey}`, hasPreview ? "preview" : "body");
@@ -230,17 +232,50 @@ export function ResponsePanel({
               >
                 Raw
               </Button>
-              <div className="relative min-w-40 flex-1">
-                <Filter className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
-                <Input
-                  className="h-8 pl-7 font-mono text-xs md:text-xs"
-                  placeholder="Filter: $.items[*].id"
-                  aria-label="JSONPath filter"
-                  spellCheck={false}
-                  value={jsonFilter.path}
-                  onChange={(e) => jsonFilter.setPath(e.target.value)}
-                />
-              </div>
+              {filterOpen || jsonFilter.path ? (
+                <div className="relative min-w-40 flex-1">
+                  <Filter className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    className="h-8 pr-8 pl-7 font-mono text-xs md:text-xs"
+                    placeholder="JSONPath, e.g. $.items[*].id"
+                    aria-label="JSONPath filter"
+                    spellCheck={false}
+                    value={jsonFilter.path}
+                    onChange={(e) => jsonFilter.setPath(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        jsonFilter.setPath("");
+                        setFilterOpen(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1 right-1 size-6"
+                    title="Remove the filter (Escape)"
+                    aria-label="Remove filter"
+                    onClick={() => {
+                      jsonFilter.setPath("");
+                      setFilterOpen(false);
+                    }}
+                  >
+                    <X />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto text-muted-foreground"
+                  title="Filter with JSONPath"
+                  aria-label="Filter with JSONPath"
+                  onClick={() => setFilterOpen(true)}
+                >
+                  <Filter /> Filter
+                </Button>
+              )}
               {jsonFilter.error && (
                 <p className="w-full text-xs text-destructive">{jsonFilter.error}</p>
               )}

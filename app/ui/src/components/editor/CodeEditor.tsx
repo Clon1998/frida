@@ -9,9 +9,13 @@ import {
   placeholder as placeholderExtension,
   tooltips,
 } from "@codemirror/view";
+import { openSearchPanel } from "@codemirror/search";
 import { basicSetup, minimalSetup } from "codemirror";
+import { Search } from "lucide-react";
+import { cn } from "cn";
 import { useContext, useEffect, useRef } from "react";
 import { diffHighlight } from "./diff";
+import { searchExtension } from "./search";
 import {
   setVariables,
   type VariableContext,
@@ -42,6 +46,11 @@ interface CodeEditorProps {
   placeholder?: string;
   /** Called with pasted text; return `true` to handle it instead of inserting it. */
   onPasteText?: (text: string) => boolean;
+  /**
+   * Multi-line editors have a find bar (Cmd/Ctrl+F); this also shows a search button in the
+   * top right corner. Default: on for multi-line editors.
+   */
+  searchButton?: boolean;
 }
 
 const languageExtension = (language: CodeLanguage): Extension => {
@@ -164,6 +173,7 @@ export function CodeEditor({
   onEnter,
   placeholder,
   onPasteText,
+  searchButton = !singleLine,
 }: CodeEditorProps) {
   const contextVariables = useContext(VariablesContext) ?? null;
   const variables = variablesProp === undefined ? contextVariables : variablesProp;
@@ -207,7 +217,7 @@ export function CodeEditor({
             ]),
           ),
         ]
-      : [basicSetup, EditorView.lineWrapping];
+      : [basicSetup, searchExtension(), EditorView.lineWrapping];
     const editor = new EditorView({
       parent: host.current,
       state: EditorState.create({
@@ -223,10 +233,7 @@ export function CodeEditor({
           variablesExtension({ pathParams }),
           placeholder ? placeholderExtension(placeholder) : [],
           languageSlot.current.of(languageExtension(language)),
-          readOnlySlot.current.of([
-            EditorState.readOnly.of(readOnly),
-            EditorView.editable.of(!readOnly),
-          ]),
+          readOnlySlot.current.of(readOnlyExtension(readOnly, singleLine)),
           EditorView.domEventHandlers({
             paste: (event) => {
               const text = event.clipboardData?.getData("text/plain");
@@ -271,16 +278,47 @@ export function CodeEditor({
 
   useEffect(() => {
     view.current?.dispatch({
-      effects: readOnlySlot.current.reconfigure([
-        EditorState.readOnly.of(readOnly),
-        EditorView.editable.of(!readOnly),
-      ]),
+      effects: readOnlySlot.current.reconfigure(readOnlyExtension(readOnly, singleLine)),
     });
-  }, [readOnly]);
+  }, [readOnly, singleLine]);
 
   useEffect(() => {
     view.current?.dispatch({ effects: setVariables.of(variables ?? null) });
   }, [variables]);
 
-  return <div ref={host} className={className} />;
+  // CodeMirror appends its editor to `host` after React's children (the button), so the two
+  // don't get in each other's way.
+  return (
+    <div
+      ref={host}
+      className={cn(
+        searchButton && "group/editor relative [&:has(.cm-panels-top)>button]:hidden",
+        className,
+      )}
+    >
+      {searchButton && (
+        <button
+          type="button"
+          title="Find (Ctrl/Cmd+F)"
+          aria-label="Find"
+          className="absolute top-1.5 right-1.5 z-10 flex size-6 items-center justify-center rounded border bg-background/90 text-muted-foreground opacity-60 group-hover/editor:opacity-100 hover:text-foreground focus-visible:opacity-100"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            if (view.current) openSearchPanel(view.current);
+          }}
+        >
+          <Search className="size-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Read-only multi-line editors stay focusable (`editable`), so text can be selected and
+ * Cmd/Ctrl+F reaches the find bar; only edits are blocked (`readOnly`). Read-only single-line
+ * editors aren't focusable at all.
+ */
+function readOnlyExtension(readOnly: boolean, singleLine: boolean): Extension {
+  return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly || !singleLine)];
 }

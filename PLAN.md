@@ -608,7 +608,7 @@ was checked in a browser with a mocked backend; a manual run in the app is still
 
 ### M12: Feedback round 2 (search, diffs in tabs, Frida archives, UI flow tests)
 Decided with Patrick on 2026-10-16 (see the decisions log).
-- [ ] **Search in bodies** (feedback #3): Cmd/Ctrl+F and a search button in the response body, request body and
+- [x] **Search in bodies** (feedback #3): Cmd/Ctrl+F and a search button in the response body, request body and
   script editors (CodeMirror's search panel, already part of `basicSetup`; styled to the theme), with match count and
   next/previous. The JSONPath filter becomes less prominent: a filter icon next to Pretty/Raw that expands the field;
   it stays open while a filter is set.

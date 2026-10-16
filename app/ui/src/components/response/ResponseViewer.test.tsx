@@ -38,6 +38,9 @@ describe("JSONPath filter", () => {
     });
     render(<ResponsePanel response={response} viewKey="test" />);
     expect(editorText()).toContain('"items"');
+    // The field is folded away until "Filter" is clicked.
+    expect(screen.queryByLabelText("JSONPath filter")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Filter with JSONPath"));
 
     fireEvent.change(screen.getByLabelText("JSONPath filter"), {
       target: { value: "$.items[*].id" },
