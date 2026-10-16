@@ -522,13 +522,17 @@ in the UI; further UI polish is deferred.*
 `tests/history.rs` (end-to-end send with secrets; nothing in history or curl).*
 
 ### M5: Scripting & tests
-- [ ] rquickjs sandbox with limits, the API from §10 and `docs/scripting.md`.
-- [ ] Pre/post script chain across collection, folder and request levels. Tests panel and console panel.
+- [x] rquickjs sandbox with limits, the API from §10 and `docs/scripting.md`.
+- [x] Pre/post script chain across collection, folder and request levels. Tests panel and console panel.
 
 **Acceptance:**
 - A fixture collection chains a login request into `bru.setVar` and then an authenticated request.
 - An infinite loop script is killed by the timeout.
 - `bru.sendRequest` works.
+*Status 2026-10-16: done (automated): `crates/frida-core/tests/scripting.rs` (fixture `testdata/scripting`: login →
+`bru.setVar` → authenticated request whose folder script awaits `bru.sendRequest`),
+`crates/frida-script/tests/sandbox.rs` (endless loop and long `await` stopped, memory limit, line numbers). The
+sample workspace has a "Scripting" folder for trying it by hand.*
 
 ### M6: OpenAPI import
 - [ ] §11.1 with the import summary dialog.
@@ -664,6 +668,16 @@ Deviations from and clarifications of this plan, newest last.
   zstd` unless set; the console records the headers as sent (plus `host`, `cookie`, `content-length`); and the main
   send decompresses bodies itself (flate2/brotli/zstd, already in the tree via reqwest) because reqwest's own
   decompression strips `Content-Encoding`/`Content-Length` from the response headers.
+
+- **2026-10-16 Scripting design (M5).** The `req`/`res`/`bru`/`test`/`expect` API is plain JavaScript
+  (`crates/frida-script/src/prelude.js`) over a JSON state; Rust only provides a few native hooks (`sendRequest`,
+  `sleep`, `interpolate`, hashes, base64). Each script gets a fresh QuickJS runtime on a blocking thread (QuickJS is
+  `!Send`). Pre-request scripts see the unresolved request (Bruno behaviour); changed headers replace the inherited set.
+  `bru.setEnvVar` is a session override unless `{ persist: true }` (Bruno persists immediately; we avoid surprise git
+  changes), never for secrets. `crypto` is a small built-in helper set instead of `crypto-js`; dayjs is vendored.
+  `bru.sendRequest` follows axios (non-2xx rejects). Runtime variables are JSON values (objects allowed, as in Bruno).
+  The Tests tab, the response's test count and script `console.log` lines in the console panel complete it. Added
+  crates: rquickjs (with `futures`), sha1, md-5, hmac; npm: @codemirror/lang-javascript for script highlighting.
 
 ## 17. Testing strategy
 

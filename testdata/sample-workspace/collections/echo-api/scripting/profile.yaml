@@ -1,0 +1,20 @@
+version: 1
+name: 2. Profile (uses token)
+seq: 2
+method: GET
+url: "{{baseUrl}}/profile"
+headers:
+- name: Authorization
+  value: "Bearer {{sessionToken}}"
+  enabled: true
+scripts:
+  pre: |
+    // A request from a script, awaited.
+    const ping = await bru.sendRequest({ url: bru.interpolate("{{baseUrl}}/ping?from=script") });
+    console.log("ping answered with", ping.status);
+  post: ""
+tests: |
+  test("sends the token from login", () => {
+    expect(res.body.headers.authorization).to.equal("Bearer " + bru.getVar("sessionToken"));
+  });
+  test("a failing test looks like this", () => expect(res.status).to.equal(201));

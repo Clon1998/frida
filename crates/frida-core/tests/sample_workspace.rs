@@ -56,11 +56,12 @@ async fn every_sample_request_succeeds_against_the_test_server() {
         .unwrap()
         .unwrap();
 
+    // One session for all, like the app: the login's `bru.setVar` reaches the next request.
+    let session = http::SessionStore::default();
     for path in paths.iter().filter(|p| !p.contains("slow")) {
         let mut request = storage::read_request(&collection, path).unwrap();
         request.url = port(&request.url);
 
-        let session = http::SessionStore::default();
         let input = http::ExecuteInput {
             collection_dir: &collection,
             request_rel: path,
@@ -71,11 +72,24 @@ async fn every_sample_request_succeeds_against_the_test_server() {
             cookies: None,
             oauth: &frida_core::auth::OAuth2Manager::new(std::sync::Arc::new(|_| Ok(()))),
         };
-        let response = http::execute(input, CancellationToken::new(), &|_| {})
+        let executed = http::execute(input, CancellationToken::new(), &|_| {})
             .await
-            .unwrap_or_else(|e| panic!("{path} failed: {e}"))
-            .response;
-        assert_eq!(response.status, 200, "{path}");
+            .unwrap_or_else(|e| panic!("{path} failed: {e}"));
+        assert_eq!(executed.response.status, 200, "{path}");
+        assert!(
+            executed.scripts.errors.is_empty(),
+            "{path}: {:?}",
+            executed.scripts.errors
+        );
+        for test in &executed.scripts.tests {
+            // The sample shows one failing test on purpose.
+            let expected = !test.name.starts_with("a failing test");
+            assert_eq!(
+                test.passed, expected,
+                "{path}: {} {:?}",
+                test.name, test.error
+            );
+        }
     }
 }
 

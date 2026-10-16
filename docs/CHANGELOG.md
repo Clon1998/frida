@@ -1,5 +1,36 @@
 # Changelog
 
+## M5: Scripting & tests (2026-10-16)
+
+### What was built
+- **Sandbox** (`crates/frida-script`): a fresh QuickJS runtime per script (rquickjs) with a 10 s deadline (interrupt
+  handler for busy loops, a tokio timeout for awaits) and a 128 MB memory limit. Errors carry the script's location and
+  line. The Bruno-compatible API lives in `src/prelude.js`; `docs/scripting.md` lists everything supported.
+- **Pipeline** (`crates/frida-core/src/http/scripting.rs`): pre-request scripts (collection → folders → request) run
+  on the unresolved request and their changes are applied before resolving; post-response scripts and tests run after
+  the send. Runtime variables and in-memory environment changes live in a per-collection `SessionStore`;
+  `{ persist: true }` writes non-secret values to the environment file. `bru.sendRequest` uses the real HTTP stack.
+- **UI**: JavaScript highlighting in script and test editors, a Tests tab (and a pass count) on the response, script
+  `console.log` lines in the console, script errors with location and line. A "Scripting" folder in the sample
+  workspace shows a login → token → authenticated request chain.
+- Also in this round: the console's Pretty/Raw views with the headers as actually sent (`host`, `user-agent`,
+  `cookie`, ...), and responses keep `content-encoding` because Frida decompresses bodies itself.
+
+### Rust things worth understanding in this milestone
+1. **`!Send` types and `spawn_blocking` + `Handle::block_on`** (`crates/frida-script/src/engine.rs` `run_script`).
+   A QuickJS runtime may only be used on the thread that created it, but tokio tasks hop between threads at every
+   `.await`. So each script gets its own blocking thread, and `block_on` lets that thread still await async work
+   (HTTP, sleep) on the app's runtime.
+2. **`Rc<Cell<bool>>` for single-threaded shared flags** (`engine.rs` interrupt handler). The handler closure and the
+   code after the script share "is the time limit armed?". `Rc` is the cheap, single-thread version of `Arc`, and
+   `Cell` allows changing a `bool` through a shared reference. The compiler would reject `Rc` if it ever crossed threads.
+3. **Trait objects for callbacks into the app** (`ScriptHost` in `frida-script/src/lib.rs`, `on_log` in
+   `http/execute.rs`). The sandbox crate knows nothing about HTTP; it calls `host.send_request(..)`, which returns a
+   `Pin<Box<dyn Future + Send>>` because `async fn` can't be called through `dyn` yet.
+4. **Borrowed session handles** (`http::Session<'a>` and `AppState::session`). A send borrows the runtime-variable
+   mutex and the override maps instead of copying them; the lifetime `'a` makes the compiler check that the store
+   outlives the send. Locks are only held inside single statements, never across `.await`.
+
 ## M4: curl export/import + history (2026-10-15)
 
 ### What was built

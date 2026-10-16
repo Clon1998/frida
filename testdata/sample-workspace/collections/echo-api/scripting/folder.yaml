@@ -1,0 +1,10 @@
+version: 1
+name: Scripting
+seq: 4
+scripts:
+  pre: |
+    // Folder script: runs before every request in this folder.
+    req.setHeader("X-Started", String(Date.now()));
+  post: ""
+tests: |
+  test("fast enough", () => expect(res.responseTime).to.be.below(2000));
