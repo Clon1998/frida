@@ -58,6 +58,12 @@ interface EnvsState {
   /** Which scope the environment editor tab shows. */
   editorScope: "global" | "collection";
   setEditorScope: (scope: "global" | "collection") => void;
+  /**
+   * The environment selected in the editor, per scope. Kept here (not in the component) so it
+   * survives switching to another tab and back.
+   */
+  editorSelected: { global: string | null; collection: string | null };
+  setEditorSelected: (scope: "global" | "collection", name: string | null) => void;
 
   load: (dir: string) => Promise<void>;
   select: (scope: EnvScope, name: string | null) => Promise<void>;
@@ -77,6 +83,9 @@ export const useEnvs = create<EnvsState>((set, get) => ({
   version: 0,
   editorScope: "collection",
   setEditorScope: (editorScope) => set({ editorScope }),
+  editorSelected: { global: null, collection: null },
+  setEditorSelected: (scope, name) =>
+    set((s) => ({ editorSelected: { ...s.editorSelected, [scope]: name } })),
 
   load: async (dir) => {
     try {

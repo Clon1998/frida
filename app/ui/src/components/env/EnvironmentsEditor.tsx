@@ -34,7 +34,9 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
   const kind = useEnvs((s) => s.editorScope);
   const setKind = useEnvs((s) => s.setEditorScope);
   const entries = useEnvs((s) => (kind === "global" ? s.global : s.collection));
-  const [selected, setSelected] = useState<string | null>(null);
+  const selected = useEnvs((s) => s.editorSelected[kind]);
+  const setSelectedIn = useEnvs((s) => s.setEditorSelected);
+  const setSelected = (name: string | null) => setSelectedIn(kind, name);
   const [creating, setCreating] = useState(false);
   const scope = scopeOf(kind, dir);
 
