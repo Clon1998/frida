@@ -187,6 +187,61 @@ pub fn copy_env_secrets(
     Ok(())
 }
 
+/// Copy or move, for [`transfer_environment`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum TransferMode {
+    Copy,
+    /// Copy, then delete the original (file and secrets).
+    Move,
+}
+
+/// Where an environment lives: its folder (workspace or collection) and keychain scope.
+pub struct EnvLocation<'a> {
+    pub dir: &'a Path,
+    pub scope_id: &'a str,
+}
+
+/// Copies or moves the environment `name` to another scope, e.g. from a collection to the
+/// workspace's global environments or to another collection. It gets a free name there
+/// (`dev 2` if `dev` exists). Secret values go along through the keychain (never through a
+/// file). Returns the new environment.
+///
+/// Blocking (keychain), see [`fill_secret_values`].
+pub fn transfer_environment(
+    name: &str,
+    from: &EnvLocation,
+    to: &EnvLocation,
+    mode: TransferMode,
+    store: &dyn SecretStore,
+) -> Result<Environment> {
+    if from.dir == to.dir {
+        return Err(CoreError::InvalidInput(
+            "the environment is already there".into(),
+        ));
+    }
+    let original =
+        storage::find_environment(from.dir, name)?.ok_or_else(|| CoreError::NotFound {
+            path: from.dir.join("environments").join(name),
+        })?;
+    let added = storage::add_environment(to.dir, &original)?;
+    for var in original
+        .variables
+        .iter()
+        .filter(|v| v.secret && v.source.is_none())
+    {
+        let source = SecretKey::new(from.scope_id, &original.name, &var.name);
+        if let Some(value) = store.get(&source)? {
+            store.set(&SecretKey::new(to.scope_id, &added.name, &var.name), &value)?;
+        }
+    }
+    if mode == TransferMode::Move {
+        storage::delete_environment(from.dir, &original.name)?;
+        delete_env_secrets(&original, from.scope_id, store)?;
+    }
+    Ok(added)
+}
+
 /// Deletes all secrets of `env` (used when the environment is deleted).
 pub fn delete_env_secrets(
     env: &Environment,
@@ -237,6 +292,84 @@ mod tests {
         assert!(fill_secret_values(&mut env, "col", &store).is_empty());
         assert_eq!(env.variables[0].value.as_deref(), Some("s3cr3t"));
         assert_eq!(env.variables[1].value.as_deref(), Some("x"));
+    }
+
+    /// Two scopes on disk: a collection and the workspace (global environments).
+    fn two_scopes() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let col = tmp.path().join("col");
+        let ws = tmp.path().join("ws");
+        std::fs::create_dir_all(col.join("environments")).unwrap();
+        std::fs::create_dir_all(ws.join("environments")).unwrap();
+        (tmp, col, ws)
+    }
+
+    #[test]
+    fn copying_and_moving_environments_takes_their_secrets_along() {
+        let (_tmp, col, ws) = two_scopes();
+        let store = MemoryStore::default();
+        storage::add_environment(&col, &secret_env()).unwrap();
+        store
+            .set(&SecretKey::new("col", "dev", "token"), "s3cr3t")
+            .unwrap();
+        // A "dev" already exists globally, so the copy becomes "dev 2".
+        storage::add_environment(&ws, &Environment::new("dev")).unwrap();
+        let from = EnvLocation {
+            dir: &col,
+            scope_id: "col",
+        };
+        let to = EnvLocation {
+            dir: &ws,
+            scope_id: "ws",
+        };
+
+        let copy = transfer_environment("dev", &from, &to, TransferMode::Copy, &store).unwrap();
+        assert_eq!(copy.name, "dev 2");
+        assert_eq!(copy.variables[1].value.as_deref(), Some("x"));
+        assert_eq!(
+            store
+                .get(&SecretKey::new("ws", "dev 2", "token"))
+                .unwrap()
+                .as_deref(),
+            Some("s3cr3t")
+        );
+        // The secret value is in the keychain only, not in the new file.
+        let on_disk = std::fs::read_to_string(ws.join("environments/dev-2.yaml")).unwrap();
+        assert!(!on_disk.contains("s3cr3t"));
+        assert!(storage::find_environment(&col, "dev").unwrap().is_some());
+
+        let moved = transfer_environment("dev", &from, &to, TransferMode::Move, &store).unwrap();
+        assert_eq!(moved.name, "dev 3");
+        assert!(storage::find_environment(&col, "dev").unwrap().is_none());
+        assert_eq!(
+            store.get(&SecretKey::new("col", "dev", "token")).unwrap(),
+            None
+        );
+        assert!(transfer_environment("x", &to, &to, TransferMode::Copy, &store).is_err());
+    }
+
+    #[test]
+    fn clipboard_yaml_never_contains_secret_values() {
+        let (_tmp, col, ws) = two_scopes();
+        let mut env = secret_env();
+        env.variables[0].value = Some("typed-in".into());
+        storage::add_environment(&col, &env).unwrap();
+
+        let yaml = storage::environment_to_yaml(&col, "dev").unwrap();
+        assert!(yaml.contains("token") && !yaml.contains("typed-in"));
+        // Even if someone pastes a value for a secret, it is dropped.
+        let pasted = storage::environment_from_yaml(
+            &yaml.replace("secret: true", "secret: true\n  value: sneaky"),
+        )
+        .unwrap();
+        assert!(
+            pasted
+                .variables
+                .iter()
+                .all(|v| !v.secret || v.value.is_none())
+        );
+        assert_eq!(storage::add_environment(&ws, &pasted).unwrap().name, "dev");
+        assert!(storage::environment_from_yaml("hello: world").is_err());
     }
 
     #[test]

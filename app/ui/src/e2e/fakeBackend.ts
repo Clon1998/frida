@@ -30,6 +30,8 @@ import type {
 
 const WORKSPACE = "/fake/workspace";
 const COLLECTION = `${WORKSPACE}/collections/echo-api`;
+/** A second collection, only used as a target for environments (its tree is never opened). */
+const OTHER_COLLECTION = `${WORKSPACE}/collections/billing`;
 
 /** A folder with every field set, as the real backend sends it. */
 const folder = (name: string, seq: number): Folder => ({
@@ -126,6 +128,7 @@ function initialState() {
     staged: new Set<string>(),
     environments,
     globalEnvironments: [] as Environment_Serialize[],
+    otherEnvironments: [] as Environment_Serialize[],
     active: { global: null as string | null, collection: null as string | null },
     secrets: new Map<string, string>(),
     history: [] as HistorySummary[],
@@ -151,6 +154,12 @@ const overview = (): WorkspaceOverview => ({
   name: "Fake workspace",
   collections: [
     { dir: COLLECTION, id: state.collection.id, name: state.collection.name, error: null },
+    {
+      dir: OTHER_COLLECTION,
+      id: "b111ing0-0000-4000-8000-000000000002",
+      name: "Billing",
+      error: null,
+    },
   ],
 });
 
@@ -197,7 +206,34 @@ function tree(parent = ""): TreeNode[] {
 }
 
 const envList = (scope: EnvScope) =>
-  scope.kind === "global" ? state.globalEnvironments : state.environments;
+  scope.kind === "global"
+    ? state.globalEnvironments
+    : scope.dir === OTHER_COLLECTION
+      ? state.otherEnvironments
+      : state.environments;
+
+/** Keychain scope of an environment list, like the real collection id / workspace hash. */
+const scopeKey = (scope: EnvScope) =>
+  scope.kind === "global" ? "global" : scope.dir === OTHER_COLLECTION ? "billing" : "echo";
+
+/** `name`, else `name 2`, `name 3`, ... (like the real `free_environment_name`). */
+function freeEnvName(list: Environment_Serialize[], name: string) {
+  let candidate = name;
+  for (let n = 2; list.some((e) => e.name === candidate); n++) candidate = `${name} ${n}`;
+  return candidate;
+}
+
+/** Adds a copy of `env` under a free name, without secret values. */
+function addEnv(list: Environment_Serialize[], env: Environment_Serialize) {
+  const added = {
+    ...structuredClone(env),
+    name: freeEnvName(list, env.name),
+    seq: 99,
+    variables: env.variables.map((v) => (v.secret ? { ...v, value: null } : v)),
+  };
+  list.push(added);
+  return added;
+}
 
 const envInfo = (scope: EnvScope): EnvironmentInfo_Serialize[] =>
   envList(scope).map((environment) => ({
@@ -512,6 +548,43 @@ const handlers: Record<string, (args: any) => unknown> = {
     return null;
   },
   reorder_environments: () => null,
+  // The real backend sends YAML; the UI only passes the text through, so JSON does here.
+  environment_yaml: ({ scope, name }) =>
+    JSON.stringify(
+      envList(scope).find((e) => e.name === name),
+      null,
+      2,
+    ),
+  paste_environment: ({ scope, yaml }) => {
+    let env: Environment_Serialize;
+    try {
+      env = JSON.parse(yaml);
+    } catch {
+      throw {
+        code: "invalid_input",
+        message: "the clipboard doesn't contain a Frida environment",
+        hint: null,
+      };
+    }
+    return addEnv(envList(scope), env).name;
+  },
+  transfer_environment: ({ from, name, to, mode }) => {
+    const source = envList(from);
+    const original = source.find((e) => e.name === name);
+    if (!original) throw { code: "not_found", message: `${name} not found`, hint: null };
+    const added = addEnv(envList(to), original);
+    for (const v of original.variables.filter((x) => x.secret)) {
+      const value = state.secrets.get(`${original.name}/${v.name}`);
+      if (value !== undefined) state.secrets.set(`${scopeKey(to)}:${added.name}/${v.name}`, value);
+    }
+    if (mode === "move") {
+      source.splice(source.indexOf(original), 1);
+      if (from.kind === "global" && state.active.global === name) state.active.global = null;
+      if (from.kind === "collection" && state.active.collection === name)
+        state.active.collection = null;
+    }
+    return added.name;
+  },
   get_active_environments: () => state.active,
   set_active_environment: ({ scope, name }) => {
     if (scope.kind === "global") state.active.global = name;

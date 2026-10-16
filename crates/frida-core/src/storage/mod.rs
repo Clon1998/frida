@@ -11,7 +11,8 @@ pub use collection::{
     save_collection, save_folder, save_request, scan_tree,
 };
 pub use environments::{
-    create_environment, delete_environment, duplicate_environment, find_environment,
+    add_environment, create_environment, delete_environment, duplicate_environment,
+    environment_from_yaml, environment_to_yaml, find_environment, free_environment_name,
     list_environments, reorder_environments, save_environment,
 };
 pub use paths::{COLLECTION_FILE, FOLDER_FILE, WORKSPACE_FILE, slugify};

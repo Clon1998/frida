@@ -118,6 +118,87 @@ pub async fn reorder_environments(
     Ok(storage::reorder_environments(&dir, &names)?)
 }
 
+/// The environment `name` as YAML, for "Copy to clipboard". Never contains secret values.
+#[tauri::command]
+#[specta::specta]
+pub fn environment_yaml(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    name: String,
+) -> ApiResult<String> {
+    let (dir, _) = state.env_location(&scope)?;
+    Ok(storage::environment_to_yaml(&dir, &name)?)
+}
+
+/// "Paste environment": adds the environment in `yaml` (from the clipboard) to `scope` under a
+/// free name. Returns that name. Secret variables arrive without values.
+#[tauri::command]
+#[specta::specta]
+pub fn paste_environment(
+    state: State<'_, AppState>,
+    scope: EnvScope,
+    yaml: String,
+) -> ApiResult<String> {
+    let (dir, _) = state.env_location(&scope)?;
+    let env = storage::environment_from_yaml(&yaml)?;
+    Ok(storage::add_environment(&dir, &env)?.name)
+}
+
+/// Copies or moves the environment `name` from `from` to `to` (another collection, or between a
+/// collection and the global environments), secrets included. Returns its name there. Moving
+/// the active environment away clears the selection in `from`.
+#[tauri::command]
+#[specta::specta]
+pub async fn transfer_environment(
+    state: State<'_, AppState>,
+    from: EnvScope,
+    name: String,
+    to: EnvScope,
+    mode: secrets::TransferMode,
+) -> ApiResult<String> {
+    let (from_dir, from_id) = state.env_location(&from)?;
+    let (to_dir, to_id) = state.env_location(&to)?;
+    let store = state.secrets.store();
+    let moved_name = name.clone();
+    let added = blocking(move || {
+        Ok(secrets::transfer_environment(
+            &name,
+            &secrets::EnvLocation {
+                dir: &from_dir,
+                scope_id: &from_id,
+            },
+            &secrets::EnvLocation {
+                dir: &to_dir,
+                scope_id: &to_id,
+            },
+            mode,
+            store.as_ref(),
+        )?)
+    })
+    .await?;
+    if mode == secrets::TransferMode::Move {
+        let active = match &from {
+            EnvScope::Global => {
+                let ws = state.workspace_dir()?.to_string_lossy().to_string();
+                state
+                    .local
+                    .load_settings()
+                    .active_global_environments
+                    .get(&ws)
+                    .cloned()
+            }
+            EnvScope::Collection { dir } => {
+                let id = storage::load_collection(&state.collection_dir(dir)?)?.id;
+                state.local.load_collection_state(&id)?.active_environment
+            }
+        };
+        if active.as_deref() == Some(moved_name.as_str()) {
+            set_active(&state, from, None)?;
+        }
+    }
+    Ok(added.name)
+}
+
 /// Deletes an environment file and its secrets.
 #[tauri::command]
 #[specta::specta]
@@ -217,6 +298,10 @@ pub fn set_active_environment(
     scope: EnvScope,
     name: Option<String>,
 ) -> ApiResult<()> {
+    set_active(&state, scope, name)
+}
+
+fn set_active(state: &AppState, scope: EnvScope, name: Option<String>) -> ApiResult<()> {
     match scope {
         EnvScope::Global => {
             let ws = state.workspace_dir()?.to_string_lossy().to_string();

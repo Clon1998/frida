@@ -14,12 +14,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, CircleOff, Copy } from "lucide-react";
-import { commands, type EnvScope } from "@/bindings";
+import { ArrowRightLeft, Check, CircleOff, ClipboardCopy, Copy, CopyPlus } from "lucide-react";
+import { commands, type EnvScope, type TransferMode } from "@/bindings";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { showError, unwrap } from "@/lib/api";
@@ -27,13 +31,28 @@ import { envColor } from "@/lib/envColors";
 import { type EnvEntry, envDraftKey, useEnvs } from "@/stores/envs";
 import { cn } from "cn";
 
+/** Another place an environment can be copied or moved to (global, or another collection). */
+export interface EnvTarget {
+  label: string;
+  scope: EnvScope;
+}
+
+/** What the context menu of an environment can do; the editor implements them. */
+export interface EnvActions {
+  duplicate: (name: string) => void;
+  copyToClipboard: (name: string) => void;
+  transfer: (name: string, target: EnvTarget, mode: TransferMode) => void;
+}
+
 interface EnvironmentListProps {
   dir: string;
   scope: EnvScope;
   entries: EnvEntry[];
   selected: string | null;
   onSelect: (name: string) => void;
-  onDuplicate: (name: string) => void;
+  /** Where environments of this scope can go. */
+  targets: EnvTarget[];
+  actions: EnvActions;
 }
 
 /**
@@ -46,7 +65,8 @@ export function EnvironmentList({
   entries,
   selected,
   onSelect,
-  onDuplicate,
+  targets,
+  actions,
 }: EnvironmentListProps) {
   const sensors = useSensors(
     // A few pixels of movement before dragging starts, so a click still selects.
@@ -89,7 +109,8 @@ export function EnvironmentList({
             scope={scope}
             selected={selected === e.environment.name}
             onSelect={() => onSelect(e.environment.name)}
-            onDuplicate={() => onDuplicate(e.environment.name)}
+            targets={targets}
+            actions={actions}
           />
         ))}
       </SortableContext>
@@ -102,13 +123,15 @@ function SortableEnvironment({
   scope,
   selected,
   onSelect,
-  onDuplicate,
+  targets,
+  actions,
 }: {
   entry: EnvEntry;
   scope: EnvScope;
   selected: boolean;
   onSelect: () => void;
-  onDuplicate: () => void;
+  targets: EnvTarget[];
+  actions: EnvActions;
 }) {
   const env = entry.environment;
   const unsaved = useEnvs((s) => s.editorDrafts[envDraftKey(scope, env.name)] !== undefined);
@@ -170,9 +193,32 @@ function SortableEnvironment({
             <Check /> Set as active
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={onDuplicate}>
+        <ContextMenuItem onSelect={() => actions.duplicate(env.name)}>
           <Copy /> Duplicate
         </ContextMenuItem>
+        <ContextMenuItem onSelect={() => actions.copyToClipboard(env.name)}>
+          <ClipboardCopy /> Copy to clipboard
+        </ContextMenuItem>
+        {targets.length > 0 && <ContextMenuSeparator />}
+        {targets.length > 0 &&
+          (["copy", "move"] as const).map((mode) => (
+            <ContextMenuSub key={mode}>
+              <ContextMenuSubTrigger>
+                {mode === "copy" ? <CopyPlus /> : <ArrowRightLeft />}
+                {mode === "copy" ? "Copy to" : "Move to"}
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                {targets.map((target) => (
+                  <ContextMenuItem
+                    key={target.label}
+                    onSelect={() => actions.transfer(env.name, target, mode)}
+                  >
+                    {target.label}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          ))}
       </ContextMenuContent>
     </ContextMenu>
   );

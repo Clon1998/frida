@@ -897,6 +897,13 @@ Deviations from and clarifications of this plan, newest last.
   secret is read at most once per run, failed/denied reads are remembered too, and `set`/`delete` update the cache.
   Values stay in process memory only (never written anywhere); edits made outside Frida show up after a restart.
 
+- **2026-10-16 Copy and move environments (requested by Patrick).** An environment's context menu has "Copy to
+  clipboard" (its YAML, secret values never included, so secrets arrive "unset"), "Copy to ▸" and "Move to ▸"
+  (global ↔ collection, collection → another collection; secret values go along through the keychain, never a
+  file). "Paste…" in the editor adds a copied environment. A taken name gets a number (`dev 2`). Moving the active
+  environment clears the selection where it was. Commands: `environment_yaml`, `paste_environment`,
+  `transfer_environment`; core: `storage::add_environment`, `secrets::transfer_environment`. No on-disk change.
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.

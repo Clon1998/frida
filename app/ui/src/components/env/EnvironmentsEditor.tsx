@@ -1,5 +1,5 @@
 import { arrayMove } from "@dnd-kit/sortable";
-import { Ban, Copy, Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
+import { Ban, ClipboardPaste, Copy, Eye, EyeOff, Lock, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { commands, type EnvScope } from "@/bindings";
@@ -7,7 +7,16 @@ import { CellInput, GridCell, GridRow, GridTable } from "@/components/request/Gr
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import {
@@ -18,10 +27,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AwsProfilePicker } from "./AwsProfilePicker";
-import { EnvironmentList } from "./EnvironmentList";
+import { type EnvActions, type EnvTarget, EnvironmentList } from "./EnvironmentList";
 import { useRowIds } from "@/components/request/useRowIds";
 import { NameDialog } from "@/components/workspace/NameDialog";
-import { showError, unwrap } from "@/lib/api";
+import { showError, toApiError, unwrap } from "@/lib/api";
 import { forDisk, secretOps } from "@/lib/envs";
 import {
   type EnvDraft,
@@ -33,7 +42,7 @@ import {
   useEnvs,
 } from "@/stores/envs";
 import { useSubTab } from "@/stores/subTabs";
-import { useActiveCollection } from "@/stores/workspace";
+import { useActiveCollection, useWorkspace } from "@/stores/workspace";
 import { ENV_COLORS } from "@/lib/envColors";
 import { cn } from "cn";
 
@@ -55,6 +64,7 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
   const setSelectedIn = useEnvs((s) => s.setEditorSelected);
   const setSelected = (name: string | null) => setSelectedIn(kind, name);
   const [creating, setCreating] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const scope = scopeOf(kind, dir);
 
   // Keep a valid selection when the list or the scope changes.
@@ -80,6 +90,79 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
     } catch (e) {
       showError(e);
     }
+  };
+
+  const workspace = useWorkspace((s) => s.workspace);
+  /** Global for collection environments; the collections (this one first) for global ones. */
+  const targets: EnvTarget[] =
+    kind === "collection"
+      ? [
+          { label: "Global (workspace)", scope: { kind: "global" } },
+          ...(workspace?.collections ?? [])
+            .filter((c) => c.error === null && c.dir !== dir)
+            .map((c) => ({ label: c.name, scope: scopeOf("collection", c.dir) })),
+        ]
+      : (workspace?.collections ?? [])
+          .filter((c) => c.error === null)
+          .sort((a, b) => (a.dir === dir ? -1 : b.dir === dir ? 1 : 0))
+          .map((c) => ({
+            label: c.dir === dir ? `${c.name} (this collection)` : c.name,
+            scope: scopeOf("collection", c.dir),
+          }));
+
+  const actions: EnvActions = {
+    duplicate: (name) => void duplicate(name),
+    copyToClipboard: (name) =>
+      void (async () => {
+        try {
+          await navigator.clipboard.writeText(await unwrap(commands.environmentYaml(scope, name)));
+          toast.success(`Copied "${name}"`, {
+            description:
+              "Paste it into another collection's environments. Secret values are not included.",
+          });
+        } catch (e) {
+          showError(e);
+        }
+      })(),
+    transfer: (name, target, mode) =>
+      void (async () => {
+        try {
+          const added = await unwrap(commands.transferEnvironment(scope, name, target.scope, mode));
+          await useEnvs.getState().load(dir);
+          if (mode === "move" && current?.environment.name === name) setSelected(null);
+          // Global ↔ this collection: both are in this editor, so offer to go there.
+          const here: ScopeKind | null =
+            target.scope.kind === "global"
+              ? "global"
+              : target.scope.dir === dir
+                ? "collection"
+                : null;
+          toast.success(
+            `${mode === "copy" ? "Copied" : "Moved"} "${name}" to ${target.label}` +
+              (added !== name ? ` as "${added}"` : ""),
+            here
+              ? {
+                  action: {
+                    label: "Show",
+                    onClick: () => {
+                      setKind(here);
+                      setSelectedIn(here, added);
+                    },
+                  },
+                }
+              : undefined,
+          );
+        } catch (e) {
+          showError(e);
+        }
+      })(),
+  };
+
+  const paste = async (yaml: string) => {
+    const name = await unwrap(commands.pasteEnvironment(scope, yaml));
+    await useEnvs.getState().load(dir);
+    setSelected(name);
+    toast.success(`Added "${name}"`);
   };
 
   const locked = backend !== null && !backend.keychain && !backend.unlocked;
@@ -112,13 +195,22 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
               entries={entries}
               selected={current?.environment.name ?? null}
               onSelect={setSelected}
-              onDuplicate={(name) => void duplicate(name)}
+              targets={targets}
+              actions={actions}
             />
             {entries.length === 0 && (
               <p className="px-2 py-1 text-xs text-muted-foreground">No environments yet.</p>
             )}
             <Button size="sm" variant="outline" className="mt-1" onClick={() => setCreating(true)}>
               <Plus /> New environment
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Add an environment copied with “Copy to clipboard”"
+              onClick={() => setPasting(true)}
+            >
+              <ClipboardPaste /> Paste…
             </Button>
           </aside>
           <div className="min-w-0 flex-1 overflow-auto p-3">
@@ -138,6 +230,7 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
         </div>
       )}
 
+      <PasteEnvironmentDialog open={pasting} onOpenChange={setPasting} onPaste={paste} />
       <NameDialog
         open={creating}
         title="New environment"
@@ -146,6 +239,71 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
         onConfirm={(name) => void create(name)}
       />
     </div>
+  );
+}
+
+/**
+ * "Paste…": a box to paste an environment into (Ctrl/Cmd+V). A dialog instead of reading the
+ * clipboard directly, which the webview may only allow after a system prompt.
+ */
+function PasteEnvironmentDialog({
+  open,
+  onOpenChange,
+  onPaste,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPaste: (yaml: string) => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const close = (next: boolean) => {
+    if (!next) {
+      setText("");
+      setError(null);
+    }
+    onOpenChange(next);
+  };
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Paste environment</DialogTitle>
+          <DialogDescription>
+            Paste an environment copied with &ldquo;Copy to clipboard&rdquo; (Ctrl/Cmd+V). If the
+            name is taken, it gets a number.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          autoFocus
+          aria-label="Environment"
+          className="h-48 font-mono text-xs"
+          spellCheck={false}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError(null);
+          }}
+        />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => close(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!text.trim()}
+            onClick={() =>
+              void onPaste(text).then(
+                () => close(false),
+                (e) => setError(toApiError(e).message),
+              )
+            }
+          >
+            Add environment
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

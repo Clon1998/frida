@@ -152,6 +152,19 @@ export const commands = {
 	getActiveEnvironments: (dir: string) => typedError<ActiveEnvironments, ApiError>(__TAURI_INVOKE("get_active_environments", { dir })),
 	/**  Selects an environment (`None` = no environment). */
 	setActiveEnvironment: (scope: EnvScope, name: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_active_environment", { scope, name })),
+	/**  The environment `name` as YAML, for "Copy to clipboard". Never contains secret values. */
+	environmentYaml: (scope: EnvScope, name: string) => typedError<string, ApiError>(__TAURI_INVOKE("environment_yaml", { scope, name })),
+	/**
+	 *  "Paste environment": adds the environment in `yaml` (from the clipboard) to `scope` under a
+	 *  free name. Returns that name. Secret variables arrive without values.
+	 */
+	pasteEnvironment: (scope: EnvScope, yaml: string) => typedError<string, ApiError>(__TAURI_INVOKE("paste_environment", { scope, yaml })),
+	/**
+	 *  Copies or moves the environment `name` from `from` to `to` (another collection, or between a
+	 *  collection and the global environments), secrets included. Returns its name there. Moving
+	 *  the active environment away clears the selection in `from`.
+	 */
+	transferEnvironment: (from: EnvScope, name: string, to: EnvScope, mode: TransferMode) => typedError<string, ApiError>(__TAURI_INVOKE("transfer_environment", { from, name, to, mode })),
 	secretBackendStatus: () => __TAURI_INVOKE<SecretBackendStatus>("secret_backend_status"),
 	/**  Unlocks (or, the first time, creates) the encrypted secret file. */
 	unlockSecretFile: (password: string) => typedError<null, ApiError>(__TAURI_INVOKE("unlock_secret_file", { password })),
@@ -1142,6 +1155,11 @@ export type TokenPlacement = {
 	name?: string,
 	prefix?: string,
 };
+
+/**  Copy or move, for [`transfer_environment`]. */
+export type TransferMode = "copy" | 
+/**  Copy, then delete the original (file and secrets). */
+"move";
 
 /**
  *  One entry in the sidebar tree.

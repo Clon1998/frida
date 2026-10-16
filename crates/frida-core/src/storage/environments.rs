@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use super::paths::{ENVIRONMENTS_DIR, EntryKind, YAML_EXT, unique_name};
 use crate::error::{CoreError, Result};
 use crate::model::Environment;
-use crate::yaml::{read_yaml, write_yaml};
+use crate::yaml::{from_yaml_str, read_yaml, to_yaml_string, write_yaml};
 
 /// All readable environments in `dir`, sorted by name. Broken files are skipped with a warning,
 /// so one bad file doesn't hide the others.
@@ -319,4 +319,54 @@ mod duplicate_tests {
         assert_eq!(loaded.variables, env.variables);
         assert_eq!(loaded.color.as_deref(), Some("red"));
     }
+}
+
+/// A name that no environment in `dir` has yet: `name`, else `name 2`, `name 3`, ...
+pub fn free_environment_name(dir: &Path, name: &str) -> Result<String> {
+    let mut candidate = name.trim().to_string();
+    let mut n = 2;
+    while find_environment(dir, &candidate)?.is_some() {
+        candidate = format!("{} {n}", name.trim());
+        n += 1;
+    }
+    Ok(candidate)
+}
+
+/// Adds `env` (e.g. from another scope or the clipboard) to `dir` under a free name based on
+/// its own, at the end of the list. Secret values are never written. Returns what was saved.
+pub fn add_environment(dir: &Path, env: &Environment) -> Result<Environment> {
+    let name = free_environment_name(dir, &env.name)?;
+    let created = create_environment(dir, &name)?;
+    let added = Environment {
+        name: created.name,
+        seq: created.seq,
+        ..env.without_secret_values()
+    };
+    save_environment(dir, &added.name, &added)?;
+    Ok(added)
+}
+
+/// The environment `name` as YAML for the clipboard: the file's content, never secret values
+/// (secret variables keep their names, so they show up as "unset" after pasting).
+pub fn environment_to_yaml(dir: &Path, name: &str) -> Result<String> {
+    let env = find_environment(dir, name)?.ok_or_else(|| CoreError::NotFound {
+        path: dir.join(ENVIRONMENTS_DIR).join(name),
+    })?;
+    to_yaml_string(&env.without_secret_values())
+}
+
+/// Reads an environment from pasted YAML (see [`environment_to_yaml`]). Secret values in it, if
+/// someone typed them in, are dropped.
+pub fn environment_from_yaml(text: &str) -> Result<Environment> {
+    let env: Environment = from_yaml_str(text, Path::new("the clipboard")).map_err(|e| {
+        CoreError::InvalidInput(format!(
+            "the clipboard doesn't contain a Frida environment ({e})"
+        ))
+    })?;
+    if env.name.trim().is_empty() {
+        return Err(CoreError::InvalidInput(
+            "the pasted environment has no name".into(),
+        ));
+    }
+    Ok(env.without_secret_values())
 }
