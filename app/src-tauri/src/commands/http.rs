@@ -235,15 +235,20 @@ fn record_history(
 }
 
 /// Resolves the variables of `request` without sending it, for the inspector panel and the
-/// editor tooltips. Secret values are masked.
+/// editor tooltips (highlighting, `{{` autocompletion). Secret values are masked.
+///
+/// Like [`fetch_oauth2_tokens`], `path` may also be a folder or `""` (the collection) with
+/// `request: None`: then it reports the variables available inside that folder, for the
+/// folder and collection settings tabs.
 #[tauri::command]
 #[specta::specta]
 pub async fn inspect_request(
     state: State<'_, AppState>,
     dir: String,
     path: String,
-    request: Request,
+    request: Option<Request>,
 ) -> ApiResult<ResolveReport> {
+    let (request, path) = request_or_stand_in(request, path);
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::CacheOnly).await?;
     let store = state.session_store(&root);
@@ -259,6 +264,23 @@ pub async fn inspect_request(
         oauth: &state.oauth,
     })?;
     Ok(report.masked())
+}
+
+/// For folders and the collection (`request: None`, `path` = the folder or `""`): a stand-in
+/// request inside them, which inherits their auth, headers and vars. Returns the request and
+/// its collection-relative path.
+fn request_or_stand_in(request: Option<Request>, path: String) -> (Request, String) {
+    match request {
+        Some(request) => (request, path),
+        None => {
+            let rel = if path.is_empty() {
+                "_.yaml".to_string()
+            } else {
+                format!("{path}/_.yaml")
+            };
+            (Request::new("stand-in"), rel)
+        }
+    }
 }
 
 /// Fetches new OAuth2 tokens for the item at `path` ("Get new token"). `path` may be a request,
@@ -277,18 +299,7 @@ pub async fn fetch_oauth2_tokens(
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
     let workspace_dir = state.workspace_dir().ok();
-    // Folders and the collection: a stand-in request inside them that inherits their auth.
-    let (request, request_rel) = match request {
-        Some(request) => (request, path),
-        None => {
-            let rel = if path.is_empty() {
-                "_.yaml".to_string()
-            } else {
-                format!("{path}/_.yaml")
-            };
-            (Request::new("token"), rel)
-        }
-    };
+    let (request, request_rel) = request_or_stand_in(request, path);
     let cancel = CancellationToken::new();
     state
         .in_flight

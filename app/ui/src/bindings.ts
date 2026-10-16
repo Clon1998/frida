@@ -154,9 +154,30 @@ export const commands = {
 	sendRequest: (requestId: string, dir: string, path: string, request: Request) => typedError<ResponseView, ApiError>(__TAURI_INVOKE("send_request", { requestId, dir, path, request })),
 	/**
 	 *  Resolves the variables of `request` without sending it, for the inspector panel and the
-	 *  editor tooltips. Secret values are masked.
+	 *  editor tooltips (highlighting, `{{` autocompletion). Secret values are masked.
+	 * 
+	 *  Like [`fetch_oauth2_tokens`], `path` may also be a folder or `""` (the collection) with
+	 *  `request: None`: then it reports the variables available inside that folder, for the
+	 *  folder and collection settings tabs.
 	 */
-	inspectRequest: (dir: string, path: string, request: Request) => typedError<ResolveReport, ApiError>(__TAURI_INVOKE("inspect_request", { dir, path, request })),
+	inspectRequest: (dir: string, path: string, request: {
+	version: number,
+	name: string,
+	/**  Sort order inside its folder. Lower comes first. */
+	seq?: number,
+	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
+	method: string,
+	url?: string,
+	params?: Params,
+	headers?: KeyValue[],
+	body?: Body,
+	auth?: Auth,
+	vars?: KeyValue[],
+	scripts?: Scripts,
+	tests?: string,
+	settings?: Settings,
+	docs?: string,
+} | null) => typedError<ResolveReport, ApiError>(__TAURI_INVOKE("inspect_request", { dir, path, request })),
 	/**
 	 *  Fetches new OAuth2 tokens for the item at `path` ("Get new token"). `path` may be a request,
 	 *  a folder or `""` (the collection); `request` is the editor's state for request tabs. For the

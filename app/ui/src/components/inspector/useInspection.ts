@@ -11,8 +11,11 @@ const DEBOUNCE_MS = 250;
  * Resolves the variables of the request being edited (debounced), whenever it or the active
  * environments change. Returns the report and the variable context for the editors
  * (`null` until the first report arrives).
+ *
+ * For folder and collection tabs pass `request: null` and the folder path (`""` for the
+ * collection): the report then lists the variables available inside it.
  */
-export function useInspection(dir: string, path: string, request: RequestModel) {
+export function useInspection(dir: string, path: string, request: RequestModel | null) {
   const envVersion = useEnvs((s) => s.version);
   const [report, setReport] = useState<ResolveReport | null>(null);
 
@@ -30,7 +33,7 @@ export function useInspection(dir: string, path: string, request: RequestModel) 
     };
   }, [dir, path, request, envVersion]);
 
-  const pathParamsKey = JSON.stringify(request.params.path);
+  const pathParamsKey = JSON.stringify(request?.params.path ?? []);
   const variables: VariableContext | null = useMemo(
     () =>
       report && {

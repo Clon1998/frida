@@ -42,6 +42,8 @@ interface CodeEditorProps {
   placeholder?: string;
   /** Called with pasted text; return `true` to handle it instead of inserting it. */
   onPasteText?: (text: string) => boolean;
+  /** Focus the editor (cursor at the end) when it appears. */
+  autoFocus?: boolean;
 }
 
 const languageExtension = (language: CodeLanguage): Extension => {
@@ -140,6 +142,7 @@ export function CodeEditor({
   onEnter,
   placeholder,
   onPasteText,
+  autoFocus = false,
 }: CodeEditorProps) {
   const contextVariables = useContext(VariablesContext);
   const variables = variablesProp === undefined ? contextVariables : variablesProp;
@@ -221,6 +224,10 @@ export function CodeEditor({
       }),
     });
     view.current = editor;
+    if (autoFocus) {
+      editor.focus();
+      editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+    }
     return () => editor.destroy();
     // Only on mount: later changes are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
