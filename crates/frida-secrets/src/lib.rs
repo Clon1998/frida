@@ -54,7 +54,7 @@ impl SecretKey {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum SecretError {
     #[error("the OS keychain is not available: {0}")]
     KeychainUnavailable(String),

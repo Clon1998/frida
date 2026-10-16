@@ -10,9 +10,9 @@ use crate::{SecretError, SecretKey, SecretStore};
 enum Cached {
     /// The value, or `None` when none is set.
     Value(Option<String>),
-    /// The read failed (e.g. the user clicked "Deny" in the macOS prompt). Only the error text is
-    /// kept; it never contains the secret.
-    Failed(String),
+    /// The read failed (e.g. the user clicked "Deny" in the macOS prompt). Errors never contain
+    /// the secret.
+    Failed(SecretError),
 }
 
 /// Reads each secret from the inner store at most once per app run, and remembers failed reads.
@@ -28,13 +28,20 @@ enum Cached {
 /// restart.) Secret values stay in this process's memory only, like the values a send already
 /// holds; they are never written anywhere.
 ///
+/// Reads of the inner store happen one at a time (`reading`). A keychain read blocks while its
+/// macOS prompt is open, and meanwhile every keystroke starts another inspection; without this,
+/// each of those found the cache still empty and opened a prompt of its own. Now they wait, and
+/// then find the first read's answer in the cache.
+///
 /// The inner store is a `Box<dyn SecretStore>` (a trait object) rather than a generic `S`, to
 /// keep the type simple: callers only ever see `CachedStore`.
 pub struct CachedStore {
     inner: Box<dyn SecretStore>,
-    /// `std::sync::Mutex` is fine here: it is only held for a map lookup or insert, never while
-    /// waiting for the inner store (so one slow keychain read doesn't block other keys' hits).
+    /// Only held for a map lookup or insert, so cache hits never wait for a slow read.
     cache: Mutex<HashMap<SecretKey, Cached>>,
+    /// Held during a read of the inner store. Blocking other threads on it is fine: all callers
+    /// already run in `spawn_blocking` (it's a `std` mutex, never held across an `.await`).
+    reading: Mutex<()>,
 }
 
 impl CachedStore {
@@ -42,6 +49,14 @@ impl CachedStore {
         Self {
             inner,
             cache: Mutex::new(HashMap::new()),
+            reading: Mutex::new(()),
+        }
+    }
+
+    fn lookup(&self, key: &SecretKey) -> Option<Result<Option<String>, SecretError>> {
+        match self.cache.lock().expect("secret cache lock").get(key)? {
+            Cached::Value(value) => Some(Ok(value.clone())),
+            Cached::Failed(err) => Some(Err(err.clone())),
         }
     }
 
@@ -55,16 +70,14 @@ impl CachedStore {
 
 impl SecretStore for CachedStore {
     fn get(&self, key: &SecretKey) -> Result<Option<String>, SecretError> {
-        let hit = self
-            .cache
-            .lock()
-            .expect("secret cache lock")
-            .get(key)
-            .cloned();
-        match hit {
-            Some(Cached::Value(value)) => return Ok(value),
-            Some(Cached::Failed(message)) => return Err(SecretError::Keychain(message)),
-            None => {}
+        if let Some(hit) = self.lookup(key) {
+            return hit;
+        }
+        // `_reading` is a guard: the lock is released when it goes out of scope (RAII).
+        let _reading = self.reading.lock().expect("secret read lock");
+        // Another thread may have read this key while we waited for the lock.
+        if let Some(hit) = self.lookup(key) {
+            return hit;
         }
         match self.inner.get(key) {
             Ok(value) => {
@@ -72,7 +85,7 @@ impl SecretStore for CachedStore {
                 Ok(value)
             }
             Err(err) => {
-                self.remember(key, Cached::Failed(err.to_string()));
+                self.remember(key, Cached::Failed(err.clone()));
                 Err(err)
             }
         }
@@ -141,6 +154,41 @@ mod tests {
         assert_eq!(reads.load(Ordering::SeqCst), 1);
     }
 
+    /// Like a keychain read waiting for the user to answer the macOS prompt.
+    struct Slow(Arc<AtomicUsize>);
+
+    impl SecretStore for Slow {
+        fn get(&self, _key: &SecretKey) -> Result<Option<String>, SecretError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            Ok(Some("v".into()))
+        }
+        fn set(&self, _key: &SecretKey, _value: &str) -> Result<(), SecretError> {
+            Ok(())
+        }
+        fn delete(&self, _key: &SecretKey) -> Result<(), SecretError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn concurrent_reads_of_an_uncached_secret_ask_the_store_once() {
+        let reads = Arc::new(AtomicUsize::new(0));
+        let cached = Arc::new(CachedStore::new(Box::new(Slow(Arc::clone(&reads)))));
+        let key = SecretKey::new("c", "dev", "token");
+        let threads: Vec<_> = (0..8)
+            .map(|_| {
+                let cached = Arc::clone(&cached);
+                let key = key.clone();
+                std::thread::spawn(move || cached.get(&key).unwrap())
+            })
+            .collect();
+        for t in threads {
+            assert_eq!(t.join().unwrap().as_deref(), Some("v"));
+        }
+        assert_eq!(reads.load(Ordering::SeqCst), 1);
+    }
+
     #[test]
     fn remembers_a_denied_read() {
         let reads = Arc::new(AtomicUsize::new(0));
@@ -151,7 +199,8 @@ mod tests {
         }));
         let key = SecretKey::new("c", "dev", "token");
         for _ in 0..5 {
-            assert!(cached.get(&key).is_err());
+            let err = cached.get(&key).unwrap_err();
+            assert_eq!(err.to_string(), "keychain error: user denied access");
         }
         assert_eq!(reads.load(Ordering::SeqCst), 1);
     }
