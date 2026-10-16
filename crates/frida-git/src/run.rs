@@ -71,7 +71,9 @@ pub(crate) fn git_allowing(
         );
     }
 
-    let mut child = Command::new("git")
+    let mut command = Command::new("git");
+    hide_console_window(&mut command);
+    let mut child = command
         .args(args)
         .current_dir(dir)
         // Never wait for a username/password prompt nobody can see.
@@ -138,6 +140,25 @@ pub(crate) fn git_allowing(
         })
     }
 }
+
+/// Frida is a GUI app without a console. On Windows, every console program it starts (like
+/// `git`) would otherwise get its own console window that flashes open and shut.
+/// `CREATE_NO_WINDOW` tells Windows not to create one.
+///
+/// `#[cfg(windows)]` is conditional compilation (a bit like a build profile that drops code):
+/// on macOS/Linux the first function doesn't exist, the empty second one is compiled instead.
+/// `CommandExt` is an *extension trait*: importing it adds the Windows-only `creation_flags`
+/// method to `Command`.
+#[cfg(windows)]
+fn hide_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    /// From the Win32 API (`winbase.h`).
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console_window(_command: &mut Command) {}
 
 #[cfg(test)]
 mod tests {
