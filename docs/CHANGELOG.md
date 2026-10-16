@@ -1,5 +1,30 @@
 # Changelog
 
+## M6: OpenAPI import (2026-10-16)
+
+### What was built
+- **Mapper** (`crates/frida-core/src/import/openapi.rs`): OpenAPI 3.0/3.1 in YAML or JSON → a collection plan: tags
+  become folders, operations become requests (name from summary, operationId or `METHOD path`), `{id}` → `:id`,
+  query/header parameters (disabled unless required), example bodies from the spec or generated from the schema
+  (`$ref`, `allOf`/`oneOf`/`anyOf`, enums, formats, recursion and depth limits), `servers[0]` with its variables as
+  `baseUrl` in a `default` environment, security schemes as collection or request auth with credential variables.
+- **Import summary**: counts, base URL, secrets to fill in and warnings (external refs, unsupported auth, relative
+  server URL, ...), shown before and after importing.
+- **UI**: "Import OpenAPI…" in the collection menu and the empty sidebar; a dialog that previews, lets you pick the
+  target folder and shows the result.
+
+### Rust things worth understanding in this milestone
+1. **Walking untyped JSON** (`openapi.rs`). `serde_json::Value` is like Jackson's `JsonNode`: `get`, `pointer`
+   (`/components/schemas/Pet`, used to follow `$ref`s) and `as_str`/`as_array` return `Option`s, so missing fields are
+   handled with `?`, `unwrap_or` and `let ... else` instead of null checks.
+2. **Cloning to escape borrow puzzles** (`Mapper::resolve`). Returning `&Value` into the document while also
+   pushing warnings onto `&mut self` tied the borrows together; returning an owned copy (`Value`) makes the code simple.
+   For documents of this size the copy costs nothing noticeable: boring beats clever.
+3. **Plan, then write** (`map_openapi` vs `write_plan`). The mapping is a pure function returning data, so the tests
+   snapshot it as YAML (`insta`) without touching the disk; only `write_plan` does I/O.
+4. **Recursion guards** (`Mapper::example`). A `refs` stack (`Vec<String>`) passed as `&mut` detects a schema that
+   refers to itself, and a depth limit stops runaway nesting; the stack is pushed before and popped after each `$ref`.
+
 ## M5: Scripting & tests (2026-10-16)
 
 ### What was built

@@ -535,9 +535,12 @@ in the UI; further UI polish is deferred.*
 sample workspace has a "Scripting" folder for trying it by hand.*
 
 ### M6: OpenAPI import
-- [ ] §11.1 with the import summary dialog.
+- [x] §11.1 with the import summary dialog.
 
 **Acceptance:** snapshot tests pass for at least 3 real-world specs (e.g. the Petstore 3.0 and 3.1 examples plus one internal-style spec with security schemes).
+*Status 2026-10-16: done (automated): `crates/frida-core/tests/openapi.rs` snapshots four specs in `testdata/openapi`
+(OAI Petstore expanded 3.0, OAI Tic Tac Toe 3.1, Swagger Petstore 3.0 JSON, an internal-style 3.1 spec with server
+variables, bearer/basic/OAuth2 and per-operation security), checks the tricky mappings and sends an imported request.*
 
 ### M7: Git panel
 - [ ] §12.
@@ -678,6 +681,16 @@ Deviations from and clarifications of this plan, newest last.
   `bru.sendRequest` follows axios (non-2xx rejects). Runtime variables are JSON values (objects allowed, as in Bruno).
   The Tests tab, the response's test count and script `console.log` lines in the console panel complete it. Added
   crates: rquickjs (with `futures`), sha1, md-5, hmac; npm: @codemirror/lang-javascript for script highlighting.
+
+- **2026-10-16 OpenAPI import (M6).** No OpenAPI crate: the spec is read into `serde_json::Value` (YAML via
+  serde-saphyr) and walked by hand, one code path for 3.0 and 3.1 (`openapiv3` is 3.0-only; `oas3` is strict about
+  real-world mistakes). `serde_json`'s `preserve_order` feature is on so folders and requests keep the spec's order.
+  Details beyond §11.1: tag order follows the top-level `tags` list; operation `security` that differs from the API's
+  becomes request auth (`[]` → no auth); several alternatives → the first, with a warning; credentials become
+  `{{variables}}` in the `default` environment (secrets without value, listed in the summary); implicit OAuth2 and
+  cookie API keys/parameters produce warnings; `readOnly` properties are left out of example bodies; XML bodies are
+  rendered from the example; non-JSON `+json` types get an explicit `Content-Type` header. The import dialog previews
+  the summary before writing, and the target folder defaults to `<workspace>/collections/<title>`.
 
 ## 17. Testing strategy
 
