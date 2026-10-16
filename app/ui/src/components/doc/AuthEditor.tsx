@@ -383,22 +383,27 @@ function OAuth2Fields({
           </Select>
         </Field>
         <Field label="Send token in">
-          <div className="flex gap-2">
+          {/* Wraps in narrow panes instead of squeezing the inputs to nothing. */}
+          <div className="flex flex-wrap gap-2">
             <LocationSelect
               value={placement.in ?? "header"}
               onChange={(location) => set({ tokenPlacement: { ...placement, in: location } })}
             />
-            <TextInput
-              value={placement.name}
-              placeholder="Authorization"
-              onChange={(name) => set({ tokenPlacement: { ...placement, name } })}
-            />
-            {(placement.in ?? "header") === "header" && (
+            <div className="min-w-28 flex-1">
               <TextInput
-                value={placement.prefix}
-                placeholder="Bearer"
-                onChange={(prefix) => set({ tokenPlacement: { ...placement, prefix } })}
+                value={placement.name}
+                placeholder="Authorization"
+                onChange={(name) => set({ tokenPlacement: { ...placement, name } })}
               />
+            </div>
+            {(placement.in ?? "header") === "header" && (
+              <div className="min-w-28 flex-1">
+                <TextInput
+                  value={placement.prefix}
+                  placeholder="Bearer"
+                  onChange={(prefix) => set({ tokenPlacement: { ...placement, prefix } })}
+                />
+              </div>
             )}
           </div>
         </Field>
@@ -436,7 +441,7 @@ function TokenPanel({ context }: { context: AuthContext }) {
 
   return (
     <div className="flex flex-col gap-2 border-t pt-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {requestId ? (
           <Button
             size="sm"
@@ -497,14 +502,23 @@ function TokenPanel({ context }: { context: AuthContext }) {
 }
 
 function Fields({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-[10rem_1fr] items-center gap-x-3 gap-y-2">{children}</div>;
+  // Labels above the fields while the form is narrow, beside them from 28rem (a container
+  // query: it follows the pane's width, not the window's). `minmax(0, 1fr)`: a plain `1fr`
+  // column never gets narrower than its content (a long URL) and would overflow the card.
+  return (
+    <div className="@container">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-x-3 gap-y-1 @md:grid-cols-[10rem_minmax(0,1fr)] @md:items-center @md:gap-y-2">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <div>{children}</div>
+      <span className="pt-1 text-xs text-muted-foreground @md:pt-0">{label}</span>
+      <div className="min-w-0">{children}</div>
     </>
   );
 }

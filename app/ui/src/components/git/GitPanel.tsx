@@ -245,11 +245,11 @@ function RepoView({ dir, status, busy }: { dir: string; status: Status; busy: st
 }
 
 const LETTER_COLORS: Record<string, string> = {
-  M: "text-amber-600 dark:text-amber-400",
-  A: "text-emerald-600 dark:text-emerald-400",
-  U: "text-emerald-600 dark:text-emerald-400",
-  D: "text-rose-600 dark:text-rose-400",
-  R: "text-sky-600 dark:text-sky-400",
+  M: "text-warning",
+  A: "text-success",
+  U: "text-success",
+  D: "text-destructive",
+  R: "text-info",
 };
 
 function FileSection({
@@ -320,7 +320,7 @@ function FileSection({
             <span
               className={cn(
                 "w-3 shrink-0 text-center font-mono text-xs font-semibold",
-                f.conflicted ? "text-rose-600" : (LETTER_COLORS[l] ?? "text-muted-foreground"),
+                f.conflicted ? "text-destructive" : (LETTER_COLORS[l] ?? "text-muted-foreground"),
               )}
             >
               {f.conflicted ? "!" : l}

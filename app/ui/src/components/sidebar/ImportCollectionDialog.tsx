@@ -191,8 +191,8 @@ function SummaryView({ summary, done }: { summary: ImportSummary; done: boolean 
         </p>
       )}
       {summary.warnings.length > 0 && (
-        <div className="max-h-48 overflow-auto rounded-md border bg-amber-500/5 p-2">
-          <p className="mb-1 flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+        <div className="max-h-48 overflow-auto rounded-md border bg-warning/5 p-2">
+          <p className="mb-1 flex items-center gap-1 font-medium text-warning">
             <AlertTriangle className="size-4" /> {summary.warnings.length} warnings
           </p>
           <ul className="list-disc space-y-1 pl-5 text-xs">

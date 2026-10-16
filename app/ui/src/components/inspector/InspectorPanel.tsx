@@ -79,11 +79,13 @@ function VariableCard({ dir, variable: v }: { dir: string; variable: ResolvedVar
 
   return (
     <div className="mb-2 rounded-md border bg-background p-2">
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono font-semibold">{v.name}</span>
+      {/* Wraps in a narrow drawer: the source badge moves under the name. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="min-w-0 font-mono font-semibold break-all">{v.name}</span>
         {v.isSecret && <Badge variant="outline">secret</Badge>}
-        <div className="flex-1" />
-        <Badge variant={v.resolved ? "secondary" : "destructive"}>{sourceLabel(v.source)}</Badge>
+        <Badge className="ml-auto" variant={v.resolved ? "secondary" : "destructive"}>
+          {sourceLabel(v.source)}
+        </Badge>
       </div>
       <div className="mt-1 flex items-start gap-1">
         <span

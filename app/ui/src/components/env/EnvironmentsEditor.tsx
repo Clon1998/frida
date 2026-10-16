@@ -86,10 +86,12 @@ export function EnvironmentsEditor({ dir }: { dir: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-3 py-2">
         <Tabs value={kind} onValueChange={(v) => setKind(v as ScopeKind)}>
           <TabsList>
-            <TabsTrigger value="collection">Collection: {collection?.name}</TabsTrigger>
+            <TabsTrigger value="collection">
+              <span className="max-w-48 truncate">Collection: {collection?.name}</span>
+            </TabsTrigger>
             <TabsTrigger value="global">Global (workspace)</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -195,26 +197,30 @@ function AwsSourceFields({
   source: AwsSource;
   onChange: (source: AwsSource) => void;
 }) {
+  // Side by side when the cell is wide enough (20rem), else stacked (a container query on the
+  // cell, not the window).
   return (
-    <div className="flex divide-x">
-      <CellInput
-        className="flex-[2]"
-        placeholder="secret id or ARN"
-        value={source.secretId}
-        onChange={(e) => onChange({ ...source, secretId: e.target.value })}
-      />
-      <CellInput
-        className="flex-1"
-        placeholder="JSON key (optional)"
-        value={source.jsonKey ?? ""}
-        onChange={(e) => onChange({ ...source, jsonKey: e.target.value || null })}
-      />
-      <CellInput
-        className="flex-1"
-        placeholder="region (profile's)"
-        value={source.region ?? ""}
-        onChange={(e) => onChange({ ...source, region: e.target.value || null })}
-      />
+    <div className="@container">
+      <div className="flex flex-col divide-y @xs:flex-row @xs:divide-x @xs:divide-y-0">
+        <CellInput
+          className="@xs:flex-[2]"
+          placeholder="secret id or ARN"
+          value={source.secretId}
+          onChange={(e) => onChange({ ...source, secretId: e.target.value })}
+        />
+        <CellInput
+          className="@xs:flex-1"
+          placeholder="JSON key (optional)"
+          value={source.jsonKey ?? ""}
+          onChange={(e) => onChange({ ...source, jsonKey: e.target.value || null })}
+        />
+        <CellInput
+          className="@xs:flex-1"
+          placeholder="region (profile's)"
+          value={source.region ?? ""}
+          onChange={(e) => onChange({ ...source, region: e.target.value || null })}
+        />
+      </div>
     </div>
   );
 }
@@ -372,18 +378,19 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
 
   return (
     <div className="flex max-w-4xl flex-col gap-3">
-      <div className="flex items-end gap-2">
-        <label className="flex flex-col gap-1 text-sm">
+      {/* Wraps in a narrow pane: name and colors first, the buttons move to the next line. */}
+      <div className="flex flex-wrap items-end gap-x-2 gap-y-3">
+        <label className="flex w-64 max-w-full flex-col gap-1 text-sm">
           Name
           <Input
-            className="h-8 w-64"
+            className="h-8"
             value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
           />
         </label>
         <div className="flex flex-col gap-1 text-sm">
           Color
-          <div className="flex h-8 items-center gap-1">
+          <div className="flex min-h-8 flex-wrap items-center gap-1">
             <button
               type="button"
               title="No color"
@@ -412,39 +419,40 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
             ))}
           </div>
         </div>
-        <div className="flex-1" />
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!dirty}
-          onClick={() => {
-            setStored(draftKey, null);
-          }}
-        >
-          Revert
-        </Button>
-        <Button size="sm" disabled={!dirty} title="Save (Ctrl/Cmd+S)" onClick={() => void save()}>
-          Save
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          title={dirty ? "Duplicate (copies the saved version)" : "Duplicate"}
-          aria-label="Duplicate environment"
-          onClick={onDuplicate}
-        >
-          <Copy />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          aria-label="Delete environment"
-          onClick={() => setDeleting(true)}
-        >
-          <Trash2 />
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!dirty}
+            onClick={() => {
+              setStored(draftKey, null);
+            }}
+          >
+            Revert
+          </Button>
+          <Button size="sm" disabled={!dirty} title="Save (Ctrl/Cmd+S)" onClick={() => void save()}>
+            Save
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            title={dirty ? "Duplicate (copies the saved version)" : "Duplicate"}
+            aria-label="Duplicate environment"
+            onClick={onDuplicate}
+          >
+            <Copy />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            aria-label="Delete environment"
+            onClick={() => setDeleting(true)}
+          >
+            <Trash2 />
+          </Button>
+        </div>
       </div>
 
       <Tabs value={view} onValueChange={setView}>

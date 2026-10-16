@@ -59,8 +59,16 @@ export function GridTable({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const shownColumns = reorder ? [{ label: "", width: "1.25rem" }, ...columns] : columns;
-  const body = <tbody>{children}</tbody>;
-  return (
+  const body = reorder ? (
+    <SortableContext items={reorder.ids} strategy={verticalListSortingStrategy}>
+      <SortableIds.Provider value={reorder.ids}>
+        <tbody>{children}</tbody>
+      </SortableIds.Provider>
+    </SortableContext>
+  ) : (
+    <tbody>{children}</tbody>
+  );
+  const table = (
     <div className="overflow-hidden rounded-md border">
       <table className="w-full table-fixed border-collapse text-xs">
         <colgroup>
@@ -73,34 +81,34 @@ export function GridTable({
             {shownColumns.map((c, i) => (
               <th
                 key={i}
-                className="border-r border-b px-2 py-1.5 text-left font-medium text-muted-foreground last:border-r-0"
+                className="truncate border-r border-b px-2 py-1.5 text-left font-medium text-muted-foreground last:border-r-0"
               >
                 {c.label}
               </th>
             ))}
           </tr>
         </thead>
-        {reorder ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={({ active, over }) => {
-              if (over && active.id !== over.id)
-                reorder.onMove(
-                  reorder.ids.indexOf(String(active.id)),
-                  reorder.ids.indexOf(String(over.id)),
-                );
-            }}
-          >
-            <SortableContext items={reorder.ids} strategy={verticalListSortingStrategy}>
-              <SortableIds.Provider value={reorder.ids}>{body}</SortableIds.Provider>
-            </SortableContext>
-          </DndContext>
-        ) : (
-          body
-        )}
+        {body}
       </table>
     </div>
+  );
+  if (!reorder) return table;
+  // Around the table, not inside it: DndContext renders hidden <div>s for screen readers, and a
+  // <div> directly inside a <table> is invalid HTML.
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={({ active, over }) => {
+        if (over && active.id !== over.id)
+          reorder.onMove(
+            reorder.ids.indexOf(String(active.id)),
+            reorder.ids.indexOf(String(over.id)),
+          );
+      }}
+    >
+      {table}
+    </DndContext>
   );
 }
 

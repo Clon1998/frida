@@ -38,12 +38,13 @@ export function ConsolePanel() {
     <section className="flex h-full flex-col border-t bg-background">
       <div className="flex h-8 shrink-0 items-center gap-2 border-b px-3 text-xs">
         <span className="font-medium">Console</span>
-        <span className="text-muted-foreground">
+        <span className="truncate whitespace-nowrap text-muted-foreground">
           {items.filter((i) => i.kind === "http").length} requests
         </span>
         <div className="flex-1" />
         <ViewToggle view={view} onChange={setView} />
-        <div className="relative w-56">
+        {/* Shrinks (down to 6rem) before anything else in the bar. */}
+        <div className="relative w-56 min-w-24 shrink">
           <Search className="absolute top-1.5 left-2 size-3.5 text-muted-foreground" />
           <Input
             className="h-6 pl-7 text-xs"
@@ -114,9 +115,9 @@ function matches(item: ConsoleItem, needle: string): boolean {
 
 const LOG_COLORS: Record<ScriptLog["level"], string> = {
   log: "",
-  info: "text-sky-700 dark:text-sky-400",
+  info: "text-info",
   debug: "text-muted-foreground",
-  warn: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  warn: "bg-warning/10 text-warning",
   error: "bg-destructive/10 text-destructive",
 };
 
@@ -166,15 +167,7 @@ function ConsoleRow({
         </span>
         {r ? (
           <>
-            <span
-              className={
-                r.status < 400
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-amber-600 dark:text-amber-400"
-              }
-            >
-              {r.status}
-            </span>
+            <span className={r.status < 400 ? "text-success" : "text-warning"}>{r.status}</span>
             <span className="w-16 text-right text-muted-foreground">
               {formatDuration(r.timeMs)}
             </span>

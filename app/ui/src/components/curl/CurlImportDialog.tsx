@@ -103,10 +103,7 @@ export function CurlImportDialog() {
               <span className="font-semibold">{parsed.request.method}</span> {parsed.request.url}
             </p>
             {parsed.warnings.map((w) => (
-              <p
-                key={w}
-                className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400"
-              >
+              <p key={w} className="flex items-center gap-1.5 text-xs text-warning">
                 <AlertTriangle className="size-3.5 shrink-0" /> {w}
               </p>
             ))}

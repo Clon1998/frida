@@ -56,12 +56,12 @@ export function diffHighlight(): Extension {
     ),
     EditorView.baseTheme({
       ".cm-diff-added": {
-        backgroundColor: "color-mix(in oklch, oklch(69.6% 0.17 162.48) 16%, transparent)",
+        backgroundColor: "color-mix(in oklch, var(--success) 16%, transparent)",
       },
       ".cm-diff-removed": {
-        backgroundColor: "color-mix(in oklch, oklch(63.7% 0.237 25.331) 16%, transparent)",
+        backgroundColor: "color-mix(in oklch, var(--destructive) 16%, transparent)",
       },
-      ".cm-diff-hunk": { color: "oklch(62.3% 0.214 259.815)" },
+      ".cm-diff-hunk": { color: "var(--info)" },
       ".cm-diff-meta": { opacity: "0.6" },
     }),
   ];

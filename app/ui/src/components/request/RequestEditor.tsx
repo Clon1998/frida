@@ -89,14 +89,16 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
       <div className="flex h-full flex-col">
         <ConflictBanner dir={dir} tab={tab} />
 
-        <div className="flex items-center gap-2 border-b p-2">
+        {/* In a narrow request pane (container query) Send shows only its icon, and below a
+            minimum URL width the row wraps so the URL gets its own line. */}
+        <div className="@container flex flex-wrap items-center gap-2 border-b p-2">
           <MethodSelect
             value={request.method}
             onChange={(method) => update((r) => ({ ...r, method }))}
           />
           {/* The editor floats over the content below, so it can grow downwards while editing
             without moving anything (see the single-line theme in CodeEditor). */}
-          <div className="relative h-9 min-w-0 flex-1">
+          <div className="relative h-9 min-w-28 flex-1">
             <CodeEditor
               singleLine
               className="absolute inset-x-0 top-0 z-20 min-h-9 rounded-md border bg-background px-1 py-1.5 has-[.cm-focused]:shadow-md has-[.cm-focused]:ring-2 has-[.cm-focused]:ring-ring/40"
@@ -111,7 +113,8 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="size-9 shrink-0"
+            // Hidden in very narrow panes; also in the tab's and the tree's right-click menu.
+            className="hidden size-9 shrink-0 @sm:inline-flex"
             title="Copy as curl"
             aria-label="Copy as curl"
             onClick={() => openCurlExport(dir, tab.path)}
@@ -119,15 +122,23 @@ export function RequestEditor({ dir, tab }: RequestEditorProps) {
             <SquareTerminal />
           </Button>
           {sending ? (
-            <Button variant="outline" onClick={() => void cancel(dir, tab.path)}>
+            <Button
+              variant="outline"
+              aria-label="Cancel"
+              onClick={() => void cancel(dir, tab.path)}
+            >
               <Loader2 className="animate-spin" />
-              Cancel
+              <span className="hidden @md:inline">Cancel</span>
               <X />
             </Button>
           ) : (
-            <Button onClick={() => void send(dir, tab.path)} title="Send (Ctrl/Cmd+Enter)">
+            <Button
+              aria-label="Send"
+              title="Send (Ctrl/Cmd+Enter)"
+              onClick={() => void send(dir, tab.path)}
+            >
               <Send />
-              Send
+              <span className="hidden @md:inline">Send</span>
             </Button>
           )}
         </div>

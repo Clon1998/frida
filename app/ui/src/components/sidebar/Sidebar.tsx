@@ -116,10 +116,17 @@ export function Sidebar() {
           onValueChange={(v) => setView(v as "tree" | "history" | "git")}
           className="px-2 pt-2"
         >
-          <TabsList className="w-full">
-            <TabsTrigger value="tree">Requests</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="git">Git</TabsTrigger>
+          {/* One row even in a narrow sidebar: labels shrink (and cut off) instead of wrapping. */}
+          <TabsList className="w-full flex-nowrap [&>button]:text-xs">
+            <TabsTrigger value="tree" className="min-w-0 px-1">
+              <span className="truncate">Requests</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="min-w-0 px-1">
+              <span className="truncate">History</span>
+            </TabsTrigger>
+            <TabsTrigger value="git" className="min-w-0 px-1">
+              <span className="truncate">Git</span>
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       )}

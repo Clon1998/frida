@@ -6,7 +6,7 @@ export function ConflictBanner({ dir, tab }: { dir: string; tab: DocumentTab }) 
   const resolveConflict = useTabs((s) => s.resolveConflict);
   if (!tab.conflict) return null;
   return (
-    <div className="flex items-center gap-2 border-b bg-amber-500/10 px-3 py-2 text-sm">
+    <div className="flex items-center gap-2 border-b bg-warning/10 px-3 py-2 text-sm">
       <span className="flex-1">This file changed on disk while you were editing it.</span>
       <Button size="sm" variant="outline" onClick={() => resolveConflict(dir, tab.path, "disk")}>
         Reload from disk

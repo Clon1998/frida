@@ -91,7 +91,7 @@ export function HistoryView({ dir, path }: { dir: string; path: string }) {
                 <p className="p-2 text-xs text-muted-foreground">No body.</p>
               )}
               {entry.requestBodyTruncated && (
-                <p className="p-2 text-xs text-amber-600">Only the first 1 MB was stored.</p>
+                <p className="p-2 text-xs text-warning">Only the first 1 MB was stored.</p>
               )}
             </TabsContent>
           </Tabs>

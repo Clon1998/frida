@@ -85,7 +85,7 @@ export function SettingsDialog() {
             Stored on this computer only, never in the workspace. Changes apply right away.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex h-[28rem] min-h-0">
+        <div className="flex h-[min(28rem,calc(100dvh-9rem))] min-h-0">
           <nav className="flex w-40 shrink-0 flex-col gap-0.5 border-r p-2">
             {SECTIONS.map((s) => (
               <button
@@ -364,9 +364,7 @@ function GitCheck({ path }: { path: string | null }) {
           Checking…
         </span>
       )}
-      {state.kind === "ok" && (
-        <span className="text-emerald-600 dark:text-emerald-400">git {state.version}</span>
-      )}
+      {state.kind === "ok" && <span className="text-success">git {state.version}</span>}
       {state.kind === "error" && <span className="text-destructive">{state.message}</span>}
     </p>
   );

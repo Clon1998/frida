@@ -14,10 +14,10 @@ import type { RequestTab } from "@/stores/tabs";
 import { cn } from "cn";
 
 function statusColor(status: number) {
-  if (status < 300) return "bg-emerald-600 text-white";
-  if (status < 400) return "bg-sky-600 text-white";
-  if (status < 500) return "bg-amber-600 text-white";
-  return "bg-rose-600 text-white";
+  if (status < 300) return "bg-success/15 text-success";
+  if (status < 400) return "bg-info/15 text-info";
+  if (status < 500) return "bg-warning/15 text-warning";
+  return "bg-destructive/15 text-destructive";
 }
 
 export function ResponseViewer({ tab, dir }: { tab: RequestTab; dir: string }) {
@@ -86,35 +86,35 @@ export function ResponsePanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
+      {/* Wraps as whole items in a narrow pane (never inside "87 ms" or a button). */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-xs whitespace-nowrap">
         <Badge className={statusColor(response.status)}>
           {response.status} {response.statusText}
         </Badge>
         <span className="text-muted-foreground">{formatDuration(response.timeMs)}</span>
         <span className="text-muted-foreground">{formatBytes(response.sizeBytes)}</span>
         {(tests.length > 0 || errors.length > 0) && (
-          <span
-            className={cn(
-              "font-medium",
-              testsFailed
-                ? "text-rose-600 dark:text-rose-400"
-                : "text-emerald-600 dark:text-emerald-400",
-            )}
-          >
+          <span className={cn("font-medium", testsFailed ? "text-destructive" : "text-success")}>
             Tests {passed}/{tests.length}
           </span>
         )}
-        <div className="flex-1" />
-        <Button variant="ghost" size="sm" onClick={() => void copy()} disabled={!response.bodyText}>
-          <Copy /> Copy
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => void saveToFile()}>
-          <Download /> Save
-        </Button>
+        <div className="ml-auto flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void copy()}
+            disabled={!response.bodyText}
+          >
+            <Copy /> Copy
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => void saveToFile()}>
+            <Download /> Save
+          </Button>
+        </div>
       </div>
 
       {response.truncated && (
-        <p className="border-b bg-amber-500/10 px-3 py-1.5 text-xs">
+        <p className="border-b bg-warning/10 px-3 py-1.5 text-xs">
           The body is larger than 5 MB, so only the beginning is shown. Use Save to get all of it.
         </p>
       )}
@@ -124,10 +124,7 @@ export function ResponsePanel({
           <TabsTrigger value="body">Body</TabsTrigger>
           {hasPreview && <TabsTrigger value="preview">Preview</TabsTrigger>}
           <TabsTrigger value="headers">Headers ({response.headers.length})</TabsTrigger>
-          <TabsTrigger
-            value="tests"
-            className={cn(testsFailed && "text-rose-600 dark:text-rose-400")}
-          >
+          <TabsTrigger value="tests" className={cn(testsFailed && "text-destructive")}>
             Tests{tests.length > 0 && ` (${passed}/${tests.length})`}
           </TabsTrigger>
         </TabsList>
@@ -179,6 +176,7 @@ export function ResponsePanel({
             {kind === "html" && (
               // `sandbox=""` applies every restriction: no scripts, forms, popups or same-origin
               // access, so a malicious page can't reach the app (CLAUDE.md security rules).
+              // White on purpose, also in dark mode: pages expect a white page background.
               <iframe
                 title="HTML preview"
                 sandbox=""
@@ -202,7 +200,7 @@ export function ResponsePanel({
           </table>
           {response.finalUrl && (
             <p className="mt-3 text-xs text-muted-foreground">
-              Final URL: <span className="font-mono">{response.finalUrl}</span>
+              Final URL: <span className="font-mono break-all">{response.finalUrl}</span>
             </p>
           )}
         </TabsContent>
@@ -259,9 +257,9 @@ export function TestResults({ scripts }: { scripts: ScriptOutcome }) {
         {scripts.tests.map((t, i) => (
           <li key={i} className="flex items-start gap-2">
             {t.passed ? (
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
             ) : (
-              <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+              <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
             )}
             <div className="min-w-0">
               <p>{t.name}</p>

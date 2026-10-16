@@ -150,7 +150,7 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
                 Verify TLS certificates
               </label>
               {!settings.tls.verify && (
-                <p className="-mt-2 text-xs text-amber-600 dark:text-amber-400">
+                <p className="-mt-2 text-xs text-warning">
                   Any certificate is accepted, including invalid or self-signed ones. Only use this
                   for local development.
                 </p>

@@ -55,6 +55,11 @@ A milestone is only done when all of these pass.
 ## Code style
 - Rust: rustfmt defaults, clippy clean, `#![deny(unsafe_code)]` in all crates unless a dependency forces otherwise.
 - TS: strict mode, ESLint + Prettier, function components, Zustand stores per domain (workspace, tabs, envs, git).
+- Colors come from theme variables (`index.css`): `primary`, `muted-foreground`, `destructive` and the status colors
+  `success` / `warning` / `info` (e.g. `text-success`, `bg-warning/10`). No palette colors (`text-emerald-600 dark:…`)
+  except for deliberate category colors (environment colors, accent swatches).
+- Layout must hold at the minimum window size (800×500): rows that can get crowded wrap (`flex-wrap`), grid columns use
+  `minmax(0, 1fr)`, and pane-dependent layouts use container queries (`@container`, `@md:`), not window breakpoints.
 - Tests are expected for every non-trivial function in `crates/*`. Use `insta` snapshots for importers and codegen.
 - Fixtures live in `testdata/`.
 

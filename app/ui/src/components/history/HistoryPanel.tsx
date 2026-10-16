@@ -98,8 +98,8 @@ export function HistoryPanel({ dir }: { dir: string }) {
                   e.status === null
                     ? "text-destructive"
                     : e.status < 400
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-amber-600 dark:text-amber-400",
+                      ? "text-success"
+                      : "text-warning",
                 )}
               >
                 {e.status ?? "error"}
