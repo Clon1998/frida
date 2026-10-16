@@ -13,7 +13,7 @@ import {
   type TokenInfo,
 } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import { CodeEditor } from "@/components/editor/CodeEditor";
+import { VariableInput } from "@/components/editor/VariableInput";
 import { VariablesContext } from "@/components/editor/variables";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -510,12 +510,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /**
- * A form field for values that may contain `{{variables}}`. With variable info around (every
- * editor tab provides it) it is a one-line code editor with highlighting, tooltips and `{{`
- * autocompletion, like the URL bar; otherwise a plain input.
- *
- * Secret fields with a literal value show dots while not being edited; values that start with
- * `{{` are just a variable reference and are always shown.
+ * A form field for values that may contain `{{variables}}`: inside editor tabs a
+ * {@link VariableInput} (highlighting, `{{` autocompletion), elsewhere a plain input. Secret
+ * fields with a literal value show dots while not being edited.
  */
 function TextInput({
   value = "",
@@ -529,45 +526,32 @@ function TextInput({
   secret?: boolean;
 }) {
   const variables = useContext(VariablesContext);
-  const [editing, setEditing] = useState(false);
-  const masked = secret && !editing && !value.trim().startsWith("{{");
+  const [focused, setFocused] = useState(false);
   const hint = placeholder ?? (secret ? "{{secretVariable}} recommended" : undefined);
 
-  // Plain input outside editor tabs (see VariablesContext), and for hidden secrets.
-  if (variables === undefined || masked) {
+  if (variables !== undefined) {
     return (
-      <Input
-        className="h-8 font-mono text-xs"
-        type={masked ? "password" : "text"}
+      <VariableInput
+        className="min-h-8 font-mono text-xs md:text-xs"
         value={value}
         placeholder={hint}
-        // Focusing a masked field swaps in the editor below (focused, so typing just goes on).
-        onFocus={() => setEditing(true)}
-        onBlur={() => setEditing(false)}
-        onChange={(e) => onChange(e.target.value)}
+        secret={secret}
+        onChange={onChange}
       />
     );
   }
+  // Outside editor tabs (see VariablesContext). One element; only its type changes.
+  const masked = secret && !focused && !value.trim().startsWith("{{");
   return (
-    // Styled like the shadcn <Input> above (border, focus ring, 32px high, 12px padding), so
-    // editor fields and plain ones (hidden secrets) look the same side by side.
-    <div
-      className="min-w-0 rounded-md border border-input px-1 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30"
-      onBlur={(e) => {
-        // Popups (autocompletion) live outside; only leaving the field itself counts.
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEditing(false);
-      }}
-    >
-      <CodeEditor
-        singleLine
-        compact
-        autoFocus={editing}
-        className="w-full font-mono [&_.cm-editor]:bg-transparent [&_.cm-scroller]:leading-[30px]!"
-        value={value}
-        placeholder={hint}
-        onChange={onChange}
-      />
-    </div>
+    <Input
+      className="h-8 font-mono text-xs md:text-xs"
+      type={masked ? "password" : "text"}
+      value={value}
+      placeholder={hint}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 }
 

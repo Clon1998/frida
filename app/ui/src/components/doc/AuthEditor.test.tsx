@@ -65,14 +65,22 @@ describe("auth fields", () => {
     expect(document.querySelectorAll("input")).toHaveLength(0);
   });
 
-  it("hide literal secrets until the field is focused", () => {
+  it("hide literal secrets until the field is focused, without swapping elements", () => {
     renderEditor(basic("alice", "hunter2"));
-    const password = document.querySelector<HTMLInputElement>('input[type="password"]');
-    expect(password?.value).toBe("hunter2");
-    expect(document.querySelectorAll(".cm-editor")).toHaveLength(1);
+    const editors = document.querySelectorAll(".cm-editor");
+    expect(editors).toHaveLength(2);
+    expect(document.querySelectorAll("input")).toHaveLength(0);
+    const password = document.querySelector<HTMLElement>("[data-masked]");
+    expect(password?.textContent).toContain("hunter2");
 
-    fireEvent.focus(password as HTMLInputElement);
-    expect(document.querySelector('input[type="password"]')).toBeNull();
-    expect(document.querySelectorAll(".cm-editor")).toHaveLength(2);
+    // Typing needs focus to stay: the same editor is unmasked, nothing is replaced.
+    fireEvent.focus(editors[1]?.querySelector(".cm-content") as HTMLElement);
+    expect(document.querySelector("[data-masked]")).toBeNull();
+    expect(document.querySelectorAll(".cm-editor")[1]).toBe(editors[1]);
+  });
+
+  it("show variable references in secret fields", () => {
+    renderEditor(basic("alice", "{{password}}"));
+    expect(document.querySelector("[data-masked]")).toBeNull();
   });
 });
