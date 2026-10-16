@@ -116,6 +116,7 @@ mod tests {
             elapsed: Duration::from_millis(12),
             final_url: "http://x/".to_string(),
             http_version: "HTTP/1.1".into(),
+            request_headers: Vec::new(),
         }
     }
 

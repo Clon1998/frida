@@ -6,6 +6,7 @@
 //! - `/image.png`      a 1x1 PNG
 //! - `/status/{code}`  responds with that status code
 //! - `/cookies/set?k=v` sets each query pair as a cookie (`Set-Cookie`)
+//! - `/gzip`           echoes like `/echo`, gzip-compressed (`Content-Encoding: gzip`)
 //! - anything else     echoes the request back as JSON: method, path, query, headers, body
 //!
 //! - `/oauth/*`        a mock OAuth2 provider, see the `oauth` module
@@ -47,6 +48,7 @@ pub fn router() -> Router {
         )
         .route("/status/{code}", any(status))
         .route("/cookies/set", get(set_cookies))
+        .route("/gzip", any(gzip))
         .merge(oauth::router())
         .fallback(echo)
 }
@@ -85,6 +87,27 @@ async fn echo(method: Method, uri: Uri, headers: HeaderMap, body: Bytes) -> Resp
     (
         [(header::CONTENT_TYPE, "application/json")],
         payload.to_string(),
+    )
+        .into_response()
+}
+
+async fn gzip(method: Method, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
+    use std::io::Write;
+    let echoed = echo(method, uri, headers, body).await;
+    let plain = axum::body::to_bytes(echoed.into_body(), usize::MAX)
+        .await
+        .unwrap_or_default();
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    let compressed = encoder
+        .write_all(&plain)
+        .and_then(|()| encoder.finish())
+        .unwrap_or_default();
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CONTENT_ENCODING, "gzip"),
+        ],
+        compressed,
     )
         .into_response()
 }

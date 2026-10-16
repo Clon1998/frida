@@ -16,6 +16,7 @@ tokio = { workspace = true }
 rcgen = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }
+flate2 = { workspace = true }
 
 [lints]
 workspace = true

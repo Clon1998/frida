@@ -5,11 +5,21 @@ use std::time::{Duration, Instant};
 
 use tokio_util::sync::CancellationToken;
 
+use reqwest::cookie::CookieStore;
+use reqwest::header::{self, HeaderMap, HeaderValue};
+
 use super::cookies::CookieJar;
 use super::prepare::{PreparedBody, PreparedPart, PreparedRequest};
 
 /// Redirects are followed up to this many hops (PLAN.md §7).
 const MAX_REDIRECTS: usize = 10;
+
+/// Sent unless the request sets its own `User-Agent` (Postman sends `PostmanRuntime/x.y`).
+/// Some APIs, e.g. GitHub's, reject requests without one.
+const USER_AGENT: &str = concat!("frida-http/", env!("CARGO_PKG_VERSION"));
+
+/// The encodings [`super::decode`] can undo.
+const ACCEPT_ENCODING: &str = "gzip, deflate, br, zstd";
 
 /// What came back from the server. The body is kept as raw bytes; [`super::ResponseView`]
 /// turns it into something the UI can display.
@@ -25,6 +35,9 @@ pub struct HttpResponse {
     pub final_url: String,
     /// e.g. `HTTP/1.1` or `HTTP/2.0`, for the console's status line.
     pub http_version: String,
+    /// The request headers as they went out, including those added on the way (`host`,
+    /// `user-agent`, `cookie`, `content-length`, ...), for the console. Empty when unknown.
+    pub request_headers: Vec<(String, String)>,
 }
 
 /// Why sending failed. Each variant maps to a clear message in the UI.
@@ -74,7 +87,15 @@ async fn send_inner(
     prepared: &PreparedRequest,
     cookies: Option<Arc<CookieJar>>,
 ) -> Result<HttpResponse, SendError> {
-    let client = build_client(prepared, cookies).await?;
+    // Decompression is done by `decode` below, so the response keeps its `content-encoding`.
+    let client = build_client(prepared, cookies.clone())
+        .await?
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
+        .no_zstd()
+        .build()
+        .map_err(|e| SendError::Tls(error_chain(&e)))?;
 
     let url = reqwest::Url::parse(&prepared.url).map_err(|e| SendError::InvalidUrl {
         url: prepared.url.clone(),
@@ -93,10 +114,16 @@ async fn send_inner(
         PreparedBody::Form(fields) => builder.form(fields),
         PreparedBody::Multipart(parts) => builder.multipart(build_multipart(parts).await?),
     };
+    // Built first (instead of `builder.send()`) so the final headers can be read for the console.
+    let mut request = builder
+        .build()
+        .map_err(|e| SendError::Other(error_chain(&e)))?;
+    add_default_headers(request.headers_mut());
+    let request_headers = wire_headers(&request, cookies.as_deref());
 
     let started = Instant::now();
-    let response = builder
-        .send()
+    let response = client
+        .execute(request)
         .await
         .map_err(|e| map_error(e, prepared.timeout))?;
 
@@ -104,8 +131,85 @@ async fn send_inner(
     let final_url = response.url().to_string();
     // `Version`'s Debug output is already the protocol name, e.g. "HTTP/1.1".
     let http_version = format!("{:?}", response.version());
-    let headers = response
+    let headers = header_pairs(response.headers());
+    let content_encoding = response
         .headers()
+        .get(header::CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let raw_body = response
+        .bytes()
+        .await
+        .map_err(|e| map_error(e, prepared.timeout))?
+        .to_vec();
+    let elapsed = started.elapsed();
+    // Decompressing is CPU work, so it runs on a blocking thread when there is any.
+    let body = match content_encoding {
+        None => raw_body,
+        Some(encoding) => {
+            tokio::task::spawn_blocking(move || super::decode::decode(Some(&encoding), raw_body))
+                .await
+                .map_err(|e| SendError::Other(e.to_string()))?
+        }
+    };
+
+    Ok(HttpResponse {
+        status: status.as_u16(),
+        status_text: status.canonical_reason().unwrap_or("").to_string(),
+        headers,
+        body,
+        elapsed,
+        final_url,
+        http_version,
+        request_headers,
+    })
+}
+
+/// Headers every request gets unless it sets them itself, like Postman's.
+fn add_default_headers(headers: &mut HeaderMap) {
+    for (name, value) in [
+        (header::USER_AGENT, USER_AGENT),
+        (header::ACCEPT, "*/*"),
+        (header::ACCEPT_ENCODING, ACCEPT_ENCODING),
+    ] {
+        headers
+            .entry(name)
+            .or_insert_with(|| HeaderValue::from_static(value));
+    }
+}
+
+/// The request's headers plus those the HTTP stack adds while sending: `host` and
+/// `content-length` (hyper) and `cookie` (from the jar, unless the request sets one).
+/// Lowercase, as hyper writes them. Covers the first hop only, not redirects.
+fn wire_headers(request: &reqwest::Request, cookies: Option<&CookieJar>) -> Vec<(String, String)> {
+    let mut headers = Vec::new();
+    if let Some(host) = request.url().host_str() {
+        // `port()` is `None` for the scheme's default port, which is left out of `host` too.
+        let host = match request.url().port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host.to_string(),
+        };
+        headers.push(("host".to_string(), host));
+    }
+    headers.extend(header_pairs(request.headers()));
+    if !request.headers().contains_key(header::COOKIE)
+        && let Some(cookie) = cookies.and_then(|jar| jar.cookies(request.url()))
+    {
+        headers.push((
+            "cookie".to_string(),
+            String::from_utf8_lossy(cookie.as_bytes()).to_string(),
+        ));
+    }
+    if !request.headers().contains_key(header::CONTENT_LENGTH)
+        && let Some(bytes) = request.body().and_then(|b| b.as_bytes())
+    {
+        headers.push(("content-length".to_string(), bytes.len().to_string()));
+    }
+    headers
+}
+
+fn header_pairs(headers: &HeaderMap) -> Vec<(String, String)> {
+    headers
         .iter()
         .map(|(name, value)| {
             (
@@ -113,31 +217,17 @@ async fn send_inner(
                 String::from_utf8_lossy(value.as_bytes()).to_string(),
             )
         })
-        .collect();
-    let body = response
-        .bytes()
-        .await
-        .map_err(|e| map_error(e, prepared.timeout))?
-        .to_vec();
-
-    Ok(HttpResponse {
-        status: status.as_u16(),
-        status_text: status.canonical_reason().unwrap_or("").to_string(),
-        headers,
-        body,
-        elapsed: started.elapsed(),
-        final_url,
-        http_version,
-    })
+        .collect()
 }
 
-/// A new client per send keeps this simple: TLS settings can differ per collection. Cookies
+/// A client builder with the request's TLS settings and timeout; callers may tweak it before
+/// `build()`. A new client per send keeps this simple: TLS settings can differ per collection. Cookies
 /// still persist across sends because the jar is shared. (Connection reuse could be added by
 /// caching clients per collection later.)
 pub(crate) async fn build_client(
     prepared: &PreparedRequest,
     cookies: Option<Arc<CookieJar>>,
-) -> Result<reqwest::Client, SendError> {
+) -> Result<reqwest::ClientBuilder, SendError> {
     let mut certs = Vec::new();
     for path in &prepared.ca_cert_paths {
         let pem = tokio::fs::read(path).await.map_err(|e| SendError::File {
@@ -157,14 +247,13 @@ pub(crate) async fn build_client(
     if let Some(jar) = cookies {
         builder = builder.cookie_provider(jar);
     }
-    builder
+    builder = builder
         .timeout(prepared.timeout)
         .redirect(reqwest::redirect::Policy::limited(MAX_REDIRECTS))
         // Custom CAs are trusted *in addition to* the OS roots (PLAN.md §7).
         .tls_certs_merge(certs)
-        .tls_danger_accept_invalid_certs(!prepared.tls_verify)
-        .build()
-        .map_err(|e| SendError::Tls(error_chain(&e)))
+        .tls_danger_accept_invalid_certs(!prepared.tls_verify);
+    Ok(builder)
 }
 
 async fn build_multipart(parts: &[PreparedPart]) -> Result<reqwest::multipart::Form, SendError> {

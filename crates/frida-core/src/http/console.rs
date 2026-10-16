@@ -86,6 +86,11 @@ impl ConsoleEntry {
                 ))
             }
         };
+        // The headers as they went out (with `host`, `user-agent`, ...) when known.
+        let request_headers = match outcome {
+            Ok(r) if !r.request_headers.is_empty() => headers(&m, &r.request_headers),
+            _ => headers(&m, &sent.headers),
+        };
         let (response, error) = match outcome {
             Ok(r) => (
                 Some(ConsoleResponse {
@@ -109,7 +114,7 @@ impl ConsoleEntry {
             request_path: request_path.to_string(),
             method: sent.method.clone(),
             url: m.text(&sent.url),
-            request_headers: headers(&m, &sent.headers),
+            request_headers,
             request_body,
             response,
             error,
@@ -205,6 +210,7 @@ mod tests {
             elapsed: Duration::from_millis(7),
             final_url: "http://x/".into(),
             http_version: "HTTP/1.1".into(),
+            request_headers: Vec::new(),
         }
     }
 

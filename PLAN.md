@@ -658,7 +658,12 @@ Deviations from and clarifications of this plan, newest last.
 - **2026-10-16 Console panel (addition, requested by Patrick).** A bottom panel (Ctrl/Cmd+J, status bar) logs every
   send of the session like Postman's/Bruno's console: the raw request as sent and the raw response, or the error.
   Secrets are masked (same masking as history), bodies capped at 64 KB, 300 entries kept in memory. Script
-  `console.log` output (M5) will go to the same panel.
+  `console.log` output (M5) will go to the same panel. Entries expand to a "Pretty" view (sections like Postman's) or
+  a "Raw" view (the whole exchange as HTTP text, request line with path). To show *all* headers like Postman:
+  requests get default `User-Agent: frida-http/<version>`, `Accept: */*` and `Accept-Encoding: gzip, deflate, br,
+  zstd` unless set; the console records the headers as sent (plus `host`, `cookie`, `content-length`); and the main
+  send decompresses bodies itself (flate2/brotli/zstd, already in the tree via reqwest) because reqwest's own
+  decompression strips `Content-Encoding`/`Content-Length` from the response headers.
 
 ## 17. Testing strategy
 

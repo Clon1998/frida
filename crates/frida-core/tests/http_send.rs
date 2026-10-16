@@ -404,6 +404,11 @@ async fn cookies_persist_in_the_jar_across_sends() {
     let response = send_with_jar(format!("http://localhost:{}/echo", addr.port())).await;
     let reply: Value = serde_json::from_slice(&response.body).unwrap();
     assert_eq!(reply["headers"]["cookie"], "session=abc");
+    assert!(
+        response
+            .request_headers
+            .contains(&("cookie".to_string(), "session=abc".to_string()))
+    );
 
     let cookies = http::list_cookies(&jar);
     assert_eq!(cookies.len(), 1);
@@ -414,4 +419,53 @@ async fn cookies_persist_in_the_jar_across_sends() {
 
     http::clear_cookies(&jar, Some("localhost"));
     assert!(http::list_cookies(&jar).is_empty());
+}
+
+#[tokio::test]
+async fn compressed_responses_are_decoded_and_keep_their_encoding_header() {
+    let addr = server().await;
+    let response = send(&request("GET", format!("http://{addr}/gzip?x=1")))
+        .await
+        .unwrap();
+    let header = |name: &str| {
+        response
+            .headers
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v.as_str())
+    };
+    assert_eq!(header("content-encoding"), Some("gzip"));
+    let reply: Value = serde_json::from_slice(&response.body).unwrap();
+    assert_eq!(reply["query"], "x=1");
+    assert_eq!(
+        reply["headers"]["accept-encoding"],
+        "gzip, deflate, br, zstd"
+    );
+}
+
+/// The console shows `request_headers`; they must be exactly what the server received.
+#[tokio::test]
+async fn request_headers_are_recorded_as_sent() {
+    let addr = server().await;
+    let mut req = request("POST", format!("http://{addr}/echo"));
+    req.headers = vec![KeyValue::new("X-Custom", "1")];
+    req.body.mode = BodyMode::Json;
+    req.body.json = "{\"a\":1}".into();
+    let response = send(&req).await.unwrap();
+    let reply: Value = serde_json::from_slice(&response.body).unwrap();
+    let received = reply["headers"].as_object().unwrap();
+
+    let mut recorded: Vec<(String, String)> = response.request_headers.clone();
+    recorded.sort();
+    let mut expected: Vec<(String, String)> = received
+        .iter()
+        .map(|(n, v)| (n.clone(), v.as_str().unwrap().to_string()))
+        .collect();
+    expected.sort();
+    assert_eq!(recorded, expected);
+    assert!(
+        recorded
+            .iter()
+            .any(|(n, v)| n == "user-agent" && v.starts_with("frida-http/"))
+    );
 }

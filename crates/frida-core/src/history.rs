@@ -325,6 +325,7 @@ impl HistoryStore {
                 elapsed: Duration::from_millis(u64::from(summary.time_ms.unwrap_or(0))),
                 final_url: final_url.unwrap_or_default(),
                 http_version: "HTTP/1.1".into(),
+                request_headers: Vec::new(),
             };
             ResponseView::new(format!("history-{}", summary.id), &http)
         });
@@ -418,6 +419,7 @@ mod tests {
             elapsed: Duration::from_millis(42),
             final_url: "http://x/".into(),
             http_version: "HTTP/1.1".into(),
+            request_headers: Vec::new(),
         }
     }
 

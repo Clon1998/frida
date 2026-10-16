@@ -1577,7 +1577,9 @@ name = "frida-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "brotli",
  "cookie_store",
+ "flate2",
  "frida-secrets",
  "frida-testserver",
  "getrandom 0.4.3",
@@ -1598,6 +1600,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+ "zstd",
 ]
 
 [[package]]
@@ -1654,6 +1657,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
+ "flate2",
  "rcgen",
  "serde",
  "serde_json",

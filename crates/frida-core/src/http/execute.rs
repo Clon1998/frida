@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::cookies::CookieJar;
 use super::prepare::{PreparedRequest, RequestContext, prepare};
-use super::send::{HttpResponse, build_client, send};
+use super::send::{HttpResponse, SendError, build_client, send};
 use crate::auth::{OAuth2Manager, TokenInfo, apply_auth, effective_auth};
 use crate::codegen::{CurlOptions, curl_request, render_curl};
 use crate::error::Result;
@@ -64,7 +64,10 @@ pub async fn execute(input: ExecuteInput<'_>, cancel: CancellationToken) -> Resu
     let mut sensitive = resolved.report.secret_values.clone();
     if !resolved.auth.is_empty() {
         // The token endpoint is reached with the collection's TLS settings, without cookies.
-        let token_client = build_client(&prepared, None).await?;
+        let token_client = build_client(&prepared, None)
+            .await?
+            .build()
+            .map_err(|e| SendError::Tls(e.to_string()))?;
         let auth_values = apply_auth(
             &mut prepared,
             &resolved.auth,
@@ -100,7 +103,10 @@ pub async fn fetch_tokens(
     };
     // Only for the TLS settings and timeout; nothing is sent to the request's URL.
     let prepared = prepare(ctx, &resolved.request)?;
-    let client = build_client(&prepared, None).await?;
+    let client = build_client(&prepared, None)
+        .await?
+        .build()
+        .map_err(|e| SendError::Tls(e.to_string()))?;
     for scheme in &resolved.auth {
         if let AuthScheme::OAuth2(config) = scheme {
             input.oauth.fetch_new(config, &client, &cancel).await?;

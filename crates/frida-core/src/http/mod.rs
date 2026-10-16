@@ -2,6 +2,7 @@
 
 mod console;
 mod cookies;
+mod decode;
 mod execute;
 mod prepare;
 mod send;
