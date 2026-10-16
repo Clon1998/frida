@@ -1,5 +1,35 @@
 # Changelog
 
+## After M12: feedback round 3 (2026-10-17)
+
+### What was built
+- **Environments**: copy to clipboard (YAML, secret values never included), paste, and copy/move between global
+  and collections with secret values going along through the keychain.
+- **Examples menu** for pre-request scripts, post-response scripts and tests (29 examples in
+  `frida_script::snippets`). One test runs every example against the test server's new `/sample` route and checks
+  it does what its title says; test examples must also fail on a 404.
+- **Descriptions** for query/path params, headers, vars and form fields (optional, only written when set),
+  imported from OpenAPI and Bruno `@description`. Editing the URL keeps them.
+- **Fixes found by the new tests**: URL-encoded secrets leaked into history and the console; concurrent requests
+  each fetched their own OAuth2 token (a browser sign-in each for the auth code grant); an open find bar painted
+  over dialogs in WebKit; the changes tab had a second file list.
+- **More tests**: console order/levels/masking end to end, variable precedence through a real send, import round
+  trips, save idempotence for every testdata file, an explicit sandbox escape list. Playwright now also runs on
+  WebKit, the engine the app uses on macOS and Linux.
+
+### Rust things worth understanding in this round
+1. **`skip_serializing_if` for backward-compatible fields** (`model/common.rs` `KeyValue::description`). With
+   `#[serde(default)]` old files load, and with `skip_serializing_if = "String::is_empty"` the field is left out
+   when empty, so existing files are rewritten byte for byte. The TS side must then treat it as optional
+   (`app/ui/src/lib/model.ts` `Complete`).
+2. **Async mutex vs std mutex** (`auth/oauth2.rs` `fetching`). A lock held across an `.await` must be
+   `tokio::sync::Mutex`: a `std::sync::Mutex` guard would block the runtime thread (and isn't `Send`). One
+   `Arc<tokio::sync::Mutex<()>>` per token key turns concurrent fetches into one fetch plus waiters.
+3. **`flat_map` to widen a list** (`mask.rs` `Masker::new`). Each secret expands into its raw and URL-encoded
+   forms in one iterator chain; sorting longest-first afterwards keeps overlapping secrets masked as a whole.
+4. **A data table instead of code** (`frida-script/src/snippets.rs`). A `&[(&str, SnippetKind, ...)]` constant
+   keeps 29 examples readable; `snippets()` maps it to owned `Snippet`s for serde/specta.
+
 ## M12: Search, git diffs in tabs, Frida archives, UI flow tests (2026-10-16)
 
 ### What was built
