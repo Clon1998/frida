@@ -632,12 +632,16 @@ Decided with Patrick on 2026-10-16 (see the decisions log).
   Archive layout: `frida-export.yaml` + `content/…`; a workspace export moves outside collections to
   `collections/<slug>` and rewrites `frida-workspace.yaml`. Hidden files (`.git`, `.gitignore`, `.DS_Store`) are
   left out. Import refuses `..`/absolute/drive paths, symlinks, >100 MB entries, >500 MB total, >20k entries.
-- [ ] **UI flow tests with Playwright** (feedback #11): `@playwright/test` (1.64.x) drives the Vite dev server with a
+- [x] **UI flow tests with Playwright** (feedback #11): `@playwright/test` (1.64.x) drives the Vite dev server with a
   fake backend: `@tauri-apps/api/mocks` `mockIPC` serving an in-memory workspace, injected only when
   `VITE_E2E=1`, so production builds don't contain it. Core flows: open workspace → open request → edit URL/params →
   send → see the response; create/rename/delete request and folder; environments (add a variable by typing, set active,
   secrets); unsaved-changes close dialog (Save / Don't save / Cancel); OpenAPI import preview; history list; git tab
   (status → diff → stage → commit). Runs in CI on Linux (Chromium). The Rust side keeps its integration tests.
+  *Done 2026-10-16:* `app/ui/e2e/*.e2e.ts` (8 flows), fake backend `app/ui/src/e2e/fakeBackend.ts`, dev server on
+  port 5183 so it doesn't clash with `tauri dev`. The fixture fails a test on unhandled commands, page errors and
+  error toasts, so the fake can't drift silently. CI job "UI flows (Playwright)". The flows found one real bug: the
+  find bar didn't take keyboard focus when opened.
 
 **Acceptance:** search works in all three editors; the git tab replaces the diff dialog; a collection exported and
 imported into another workspace loads unchanged (integration test, plus one checking that no secret values are in the

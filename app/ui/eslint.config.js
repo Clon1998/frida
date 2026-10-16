@@ -19,6 +19,12 @@ export default tseslint.config(
     },
   },
   {
+    // Playwright tests: no React here, and its fixture callback `use` isn't a React hook.
+    files: ["e2e/**", "playwright.config.ts"],
+    languageOptions: { globals: globals.node },
+    rules: { "react-hooks/rules-of-hooks": "off" },
+  },
+  {
     // shadcn/ui files export both components and variant helpers.
     files: ["src/components/ui/**"],
     rules: { "react-refresh/only-export-components": "off" },

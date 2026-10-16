@@ -13,6 +13,9 @@ node_modules/
 dist/
 dist-ssr/
 coverage/
+# Playwright (app/ui/e2e)
+test-results/
+playwright-report/
 *.tsbuildinfo
 .vite/
 *.local
