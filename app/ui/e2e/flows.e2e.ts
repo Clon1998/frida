@@ -113,6 +113,8 @@ test("a dialog reopened while it is closing can still be used", async ({ app, br
   // during the closing animation could put the overlay on top of the content. It only shows
   // on a slow machine, so the CPU is slowed down (a Chromium feature).
   test.skip(browserName !== "chromium", "CPU throttling needs Chromium");
+  // Ten times slower, on CI machines that are slow already.
+  test.setTimeout(120_000);
   const cdp = await app.context().newCDPSession(app);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 10 });
   await openWorkspace(app);
