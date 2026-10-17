@@ -492,6 +492,33 @@ pub fn set_aws_profile(
     }
 }
 
+/// Sets (or with `None` removes) the local AWS profile of an account alias (PLAN.md M17).
+/// Applies to every workspace on this machine: the alias names an AWS account, not a file.
+#[tauri::command]
+#[specta::specta]
+pub fn set_aws_account_profile(
+    state: State<'_, AppState>,
+    account: String,
+    profile: Option<String>,
+) -> ApiResult<()> {
+    let account = account.trim().to_string();
+    if account.is_empty() {
+        return Err(ApiError::new(
+            ErrorCode::InvalidInput,
+            "the account alias is empty",
+        ));
+    }
+    let mut settings = state.local.load_settings();
+    match profile
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+    {
+        Some(p) => settings.aws_accounts.insert(account, p),
+        None => settings.aws_accounts.remove(&account),
+    };
+    Ok(state.local.save_settings(&settings)?)
+}
+
 /// "Refresh secrets": forgets the cached AWS values, so the next send fetches them again.
 #[tauri::command]
 #[specta::specta]

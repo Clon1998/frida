@@ -21,7 +21,7 @@ use crate::state::AppState;
 use crate::state::EnvScope;
 use crate::state::proxy_password_key;
 use frida_core::network::{ProxyMode, ProxySettings};
-use frida_core::secrets::AwsFetch;
+use frida_core::secrets::{AwsFetch, AwsProfiles};
 
 /// The active global and collection environment of a collection, with secret values filled in
 /// from the keychain (blocking, so off the async runtime) and from AWS Secrets Manager
@@ -35,14 +35,24 @@ pub(crate) async fn load_active_envs(
     global_proxy(state).await?;
     let (mut global, mut collection) = load_keychain_envs(state, collection_dir).await?;
     let dir_text = collection_dir.to_string_lossy().to_string();
+    // Account alias → profile (PLAN.md M17), the same on every environment.
+    let accounts = state.local.load_settings().aws_accounts;
     if let Some(env) = &mut global {
         let profile = aws_profile(state, &EnvScope::Global, &env.name)?;
-        secrets::fill_aws_secrets(env, true, profile.as_deref(), &state.aws, aws).await?;
+        let profiles = AwsProfiles {
+            environment: profile.as_deref(),
+            accounts: &accounts,
+        };
+        secrets::fill_aws_secrets(env, true, profiles, &state.aws, aws).await?;
     }
     if let Some(env) = &mut collection {
         let scope = EnvScope::Collection { dir: dir_text };
         let profile = aws_profile(state, &scope, &env.name)?;
-        secrets::fill_aws_secrets(env, false, profile.as_deref(), &state.aws, aws).await?;
+        let profiles = AwsProfiles {
+            environment: profile.as_deref(),
+            accounts: &accounts,
+        };
+        secrets::fill_aws_secrets(env, false, profiles, &state.aws, aws).await?;
     }
     Ok((global, collection))
 }

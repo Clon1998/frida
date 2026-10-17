@@ -118,6 +118,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             env::list_aws_profiles,
             env::get_aws_profile,
             env::set_aws_profile,
+            env::set_aws_account_profile,
             env::refresh_aws_secrets,
             env::delete_environment,
             env::set_secret,

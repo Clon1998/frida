@@ -54,6 +54,11 @@ pub struct Args {
     #[arg(long)]
     pub aws_profile: Option<String>,
 
+    /// The AWS profile for secrets with an account alias (`account: shared-services`), as
+    /// ALIAS=PROFILE (repeatable).
+    #[arg(long = "aws-account", value_name = "ALIAS=PROFILE", value_parser = parse_pair)]
+    pub aws_accounts: Vec<(String, String)>,
+
     /// Pause between two requests, in milliseconds.
     #[arg(long, value_name = "MS", default_value_t = 0)]
     pub delay: u32,

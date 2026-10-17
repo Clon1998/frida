@@ -18,7 +18,9 @@ pub struct ApiError {
     /// What the user can do about it, when there is something useful to say.
     pub hint: Option<String>,
     /// For AWS problems: which environment, and a command that fixes it (for a copy button).
-    pub aws: Option<AwsErrorInfo>,
+    /// Boxed because it is rare: every command returns `Result<_, ApiError>`, and keeping the
+    /// error small keeps those results small (clippy's `result_large_err`).
+    pub aws: Option<Box<AwsErrorInfo>>,
 }
 
 /// Extra details of AWS errors, so the UI can ask for a profile or offer the login command.
@@ -30,6 +32,8 @@ pub struct AwsErrorInfo {
     pub global: Option<bool>,
     /// e.g. `aws sso login --profile dev`.
     pub fix_command: Option<String>,
+    /// The account alias that needs a profile (`aws_account_required`, PLAN.md M17).
+    pub account: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
@@ -56,6 +60,8 @@ pub enum ErrorCode {
     Git,
     /// An environment with AWS secrets has no AWS profile yet: the UI asks for one.
     AwsProfileRequired,
+    /// A secret's account alias has no AWS profile on this machine yet: the UI asks for one.
+    AwsAccountRequired,
     Aws,
     /// Checking for, downloading or installing an update failed (PLAN.md M14).
     Update,
@@ -101,12 +107,25 @@ impl From<CoreError> for ApiError {
                 environment,
                 global,
             } => ApiError {
-                aws: Some(AwsErrorInfo {
+                aws: Some(Box::new(AwsErrorInfo {
                     environment,
                     global: Some(global),
                     fix_command: None,
-                }),
+                    account: None,
+                })),
                 ..ApiError::new(ErrorCode::AwsProfileRequired, message)
+            },
+            CoreError::AwsAccountRequired {
+                account,
+                environment,
+            } => ApiError {
+                aws: Some(Box::new(AwsErrorInfo {
+                    environment,
+                    global: None,
+                    fix_command: None,
+                    account: Some(account),
+                })),
+                ..ApiError::new(ErrorCode::AwsAccountRequired, message)
             },
             CoreError::Aws {
                 environment,
@@ -121,6 +140,9 @@ impl From<CoreError> for ApiError {
                     AwsError::NoCredentials { .. } => {
                         "Check the profile in ~/.aws/config, or choose another one in the environment editor."
                     }
+                    AwsError::NoClientSecret { .. } => {
+                        "This Cognito app client was created without a secret. The client credentials grant needs a client with one."
+                    }
                     AwsError::NotFound { .. } | AwsError::MissingKey { .. } => {
                         "Check the secret id, JSON key and region of the variable in the environment editor."
                     }
@@ -130,11 +152,12 @@ impl From<CoreError> for ApiError {
                     _ => "See the AWS message above.",
                 };
                 ApiError {
-                    aws: Some(AwsErrorInfo {
+                    aws: Some(Box::new(AwsErrorInfo {
                         environment,
                         global: None,
                         fix_command,
-                    }),
+                        account: None,
+                    })),
                     ..ApiError::new(ErrorCode::Aws, message).with_hint(hint)
                 }
             }

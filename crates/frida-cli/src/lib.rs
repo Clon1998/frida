@@ -9,19 +9,20 @@ pub mod args;
 mod report;
 mod secrets;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, bail};
+use frida_core::CoreError;
 use frida_core::auth::OAuth2Manager;
 use frida_core::http::{CookieJar, ScriptLog, SessionStore};
 use frida_core::mask::Masker;
-use frida_core::model::{Environment, SecretSource};
+use frida_core::model::Environment;
 use frida_core::network::{ManualProxy, ProxySettings};
 use frida_core::runner::{self, RunInput, RunOptions, RunOutcome, RunStep, RunStop, RunSummary};
-use frida_core::secrets::{AwsFetch, fill_aws_secrets};
+use frida_core::secrets::{AwsFetch, AwsProfiles, fill_aws_secrets};
 use frida_core::storage;
 use tokio_util::sync::CancellationToken;
 
@@ -328,6 +329,7 @@ async fn fill_secrets(
         .clone()
         .or_else(|| std::env::var("AWS_PROFILE").ok())
         .unwrap_or_else(|| "default".to_string());
+    let accounts: BTreeMap<String, String> = args.aws_accounts.iter().cloned().collect();
     // Created only when an environment really has AWS secrets (it reads the AWS config).
     let mut aws = None;
 
@@ -340,20 +342,30 @@ async fn fill_secrets(
                 secrets::env_names(&name)[0]
             );
         }
-        let needs_aws = env.variables.iter().any(|v| {
-            v.secret
-                && v.enabled
-                && matches!(v.source, Some(SecretSource::AwsSecretsManager { .. }))
-        });
+        // Any AWS source left after `fill_given_secrets` (given values drop their source).
+        let needs_aws = env
+            .variables
+            .iter()
+            .any(|v| v.secret && v.enabled && v.source.is_some());
         if needs_aws {
             let aws = aws.get_or_insert_with(|| {
                 let aws = frida_secrets::aws::AwsSecrets::with_sdk();
                 aws.set_proxy(proxy.for_aws());
                 aws
             });
-            fill_aws_secrets(env, global, Some(&profile), aws, AwsFetch::Fetch)
+            let profiles = AwsProfiles {
+                environment: Some(&profile),
+                accounts: &accounts,
+            };
+            fill_aws_secrets(env, global, profiles, aws, AwsFetch::Fetch)
                 .await
-                .with_context(|| format!("AWS profile {profile:?}"))?;
+                .map_err(|err| match err {
+                    CoreError::AwsAccountRequired { account, .. } => anyhow::anyhow!(
+                        "secret source uses AWS account {account:?}: pass --aws-account {account}=<profile>"
+                    ),
+                    other => anyhow::Error::new(other)
+                        .context(format!("AWS profile {profile:?}")),
+                })?;
         }
     }
     Ok(())

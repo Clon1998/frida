@@ -179,6 +179,11 @@ export const commands = {
 	 *  profile names are personal, so they don't go into the shared environment file.
 	 */
 	setAwsProfile: (scope: EnvScope, environment: string, profile: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_aws_profile", { scope, environment, profile })),
+	/**
+	 *  Sets (or with `None` removes) the local AWS profile of an account alias (PLAN.md M17).
+	 *  Applies to every workspace on this machine: the alias names an AWS account, not a file.
+	 */
+	setAwsAccountProfile: (account: string, profile: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_aws_account_profile", { account, profile })),
 	/**  "Refresh secrets": forgets the cached AWS values, so the next send fetches them again. */
 	refreshAwsSecrets: () => __TAURI_INVOKE<void>("refresh_aws_secrets"),
 	/**  Deletes an environment file and its secrets. */
@@ -362,7 +367,11 @@ export type ApiError = {
 	message: string,
 	/**  What the user can do about it, when there is something useful to say. */
 	hint: string | null,
-	/**  For AWS problems: which environment, and a command that fixes it (for a copy button). */
+	/**
+	 *  For AWS problems: which environment, and a command that fixes it (for a copy button).
+	 *  Boxed because it is rare: every command returns `Result<_, ApiError>`, and keeping the
+	 *  error small keeps those results small (clippy's `result_large_err`).
+	 */
 	aws: AwsErrorInfo | null,
 };
 
@@ -381,6 +390,11 @@ export type AppSettings = {
 	activeGlobalEnvironments?: { [key in string]: string },
 	/**  The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`. */
 	awsProfiles?: { [key in string]: string },
+	/**
+	 *  The local AWS profile per account alias (`account: shared-services` on a secret,
+	 *  PLAN.md M17). Aliases are shared through the files, profile names are per machine.
+	 */
+	awsAccounts?: { [key in string]: string },
 	/**
 	 *  When the app last asked for an update on its own (unix seconds), so it asks at most
 	 *  once a day (PLAN.md M14). `u32` because TypeScript numbers can't hold every `u64`;
@@ -453,6 +467,8 @@ export type AwsErrorInfo = {
 	global: boolean | null,
 	/**  e.g. `aws sso login --profile dev`. */
 	fixCommand: string | null,
+	/**  The account alias that needs a profile (`aws_account_required`, PLAN.md M17). */
+	account: string | null,
 };
 
 /**  AWS settings (PLAN.md §9). */
@@ -816,7 +832,9 @@ export type Environment_Serialize = {
 
 export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script" | "git" | 
 /**  An environment with AWS secrets has no AWS profile yet: the UI asks for one. */
-"aws_profile_required" | "aws" | 
+"aws_profile_required" | 
+/**  A secret's account alias has no AWS profile on this machine yet: the UI asks for one. */
+"aws_account_required" | "aws" | 
 /**  Checking for, downloading or installing an update failed (PLAN.md M14). */
 "update" | 
 /**  Something is still running that the action would interrupt. */
@@ -1390,11 +1408,51 @@ export type SecretBackendStatus = {
 	fileExists: boolean,
 };
 
+/**
+ *  Where a secret's value comes from, besides the keychain. All sources are in AWS.
+ * 
+ *  `account` (PLAN.md M17) names an AWS account alias such as `shared-services` instead of
+ *  using the environment's AWS profile. The alias, not a profile name, is in the file because
+ *  profile names differ per machine; each user maps the alias to a local profile once.
+ *  Optional fields are only written when set, so older files stay unchanged.
+ */
 export type SecretSource = SecretSource_Serialize | SecretSource_Deserialize;
 
-export type SecretSource_Deserialize = { type: "aws-secrets-manager"; secretId: string; jsonKey?: string | null; region?: string | null };
+/**
+ *  Where a secret's value comes from, besides the keychain. All sources are in AWS.
+ * 
+ *  `account` (PLAN.md M17) names an AWS account alias such as `shared-services` instead of
+ *  using the environment's AWS profile. The alias, not a profile name, is in the file because
+ *  profile names differ per machine; each user maps the alias to a local profile once.
+ *  Optional fields are only written when set, so older files stay unchanged.
+ */
+export type SecretSource_Deserialize = 
+/**  A Secrets Manager secret, or one key of a JSON secret. */
+({ type: "aws-secrets-manager"; secretId: string; jsonKey?: string | null; region?: string | null; account?: string | null }) & { apiKeyId?: never; clientId?: never; userPoolId?: never } | 
+/**  The client secret of a Cognito app client (for OAuth2 client credentials). */
+({ type: "cognito-client-secret"; 
+/**  e.g. `eu-central-1_AbCdEf`; its prefix is the default region. */
+userPoolId: string; clientId: string; region?: string | null; account?: string | null }) & { apiKeyId?: never; jsonKey?: never; secretId?: never } | 
+/**  The value of an API Gateway API key (for `x-api-key`). */
+({ type: "api-gateway-key"; apiKeyId: string; region?: string | null; account?: string | null }) & { clientId?: never; jsonKey?: never; secretId?: never; userPoolId?: never };
 
-export type SecretSource_Serialize = { type: "aws-secrets-manager"; secretId: string; jsonKey?: string | null; region?: string | null };
+/**
+ *  Where a secret's value comes from, besides the keychain. All sources are in AWS.
+ * 
+ *  `account` (PLAN.md M17) names an AWS account alias such as `shared-services` instead of
+ *  using the environment's AWS profile. The alias, not a profile name, is in the file because
+ *  profile names differ per machine; each user maps the alias to a local profile once.
+ *  Optional fields are only written when set, so older files stay unchanged.
+ */
+export type SecretSource_Serialize = 
+/**  A Secrets Manager secret, or one key of a JSON secret. */
+({ type: "aws-secrets-manager"; secretId: string; jsonKey?: string | null; region?: string | null; account?: string | null }) & { apiKeyId?: never; clientId?: never; userPoolId?: never } | 
+/**  The client secret of a Cognito app client (for OAuth2 client credentials). */
+({ type: "cognito-client-secret"; 
+/**  e.g. `eu-central-1_AbCdEf`; its prefix is the default region. */
+userPoolId: string; clientId: string; region?: string | null; account?: string | null }) & { apiKeyId?: never; jsonKey?: never; secretId?: never } | 
+/**  The value of an API Gateway API key (for `x-api-key`). */
+({ type: "api-gateway-key"; apiKeyId: string; region?: string | null; account?: string | null }) & { clientId?: never; jsonKey?: never; secretId?: never; userPoolId?: never };
 
 /**  Request-level and folder-level settings. `None` means "inherit from the parent". */
 export type Settings = {

@@ -105,6 +105,7 @@ mod tests {
             secret_id: "id".into(),
             json_key: None,
             region: None,
+            account: None,
         });
         let mut overridden = aws.clone();
         overridden.name = "awsOverridden".into();
