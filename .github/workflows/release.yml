@@ -146,6 +146,25 @@ jobs:
           mv Frida.app.tar.gz "$name"
           mv Frida.app.tar.gz.sig "$name.sig"
 
+      # The command line runner (PLAN.md M15), as a plain archive per target. No version in
+      # the name, so `releases/latest/download/frida-run-<target>.tar.gz` always works.
+      - name: Build and attach frida-run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cargo build --release --locked -p frida-cli --target ${{ matrix.target }}
+          cd "target/${{ matrix.target }}/release"
+          name="frida-run-${{ matrix.target }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "$name.zip" frida-run.exe
+            file="$name.zip"
+          else
+            tar czf "$name.tar.gz" frida-run
+            file="$name.tar.gz"
+          fi
+          gh release upload "$GITHUB_REF_NAME" "$file" --clobber --repo "$GITHUB_REPOSITORY"
+
       - name: Attach the installers to the release
         shell: bash
         env:
