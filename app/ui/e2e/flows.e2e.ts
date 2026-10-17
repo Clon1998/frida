@@ -108,6 +108,27 @@ test("closing an unsaved tab offers Save, Don't save and Cancel", async ({ app }
   await expect(app.locator(".cm-content").first()).toHaveText("{{baseUrl}}/health?full=true");
 });
 
+test("a dialog reopened while it is closing can still be used", async ({ app, browserName }) => {
+  // CI found this: Radix gave the overlay and the content their own portals, so reopening
+  // during the closing animation could put the overlay on top of the content. It only shows
+  // on a slow machine, so the CPU is slowed down (a Chromium feature).
+  test.skip(browserName !== "chromium", "CPU throttling needs Chromium");
+  const cdp = await app.context().newCDPSession(app);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 10 });
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+  await setUrl(app, "{{baseUrl}}/health?x=1");
+  const tab = app.locator("[data-tab-path='health.yaml']");
+  const dialog = app.getByRole("alertdialog");
+  for (let i = 0; i < 3; i++) {
+    await tab.getByLabel("Close tab").click();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+  }
+  await tab.getByLabel("Close tab").click();
+  await dialog.getByRole("button", { name: "Save", exact: true }).click({ timeout: 5000 });
+  await expect(tab).toHaveCount(0);
+});
+
 test("git: a saved change shows up in the changes tab and can be committed", async ({ app }) => {
   await openWorkspace(app);
   await openRequest(app, "Health");
