@@ -53,6 +53,13 @@ pub enum CoreError {
     #[error("choose an AWS profile for environment {environment:?} to read its AWS secrets")]
     AwsProfileRequired { environment: String, global: bool },
 
+    /// A secret names an AWS account alias (PLAN.md M17) that has no local profile yet.
+    #[error("choose an AWS profile for account {account:?} (used by environment {environment:?})")]
+    AwsAccountRequired {
+        account: String,
+        environment: String,
+    },
+
     #[error("environment {environment:?}, variable {variable:?}: {source}")]
     Aws {
         environment: String,

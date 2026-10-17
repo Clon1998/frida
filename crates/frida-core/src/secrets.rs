@@ -1,8 +1,9 @@
 //! Glue between environments and the secret stores of `frida-secrets` (PLAN.md §6).
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
-use frida_secrets::aws::{AwsSecretRef, AwsSecrets};
+use frida_secrets::aws::{AwsSecretRef, AwsSecrets, AwsTarget};
 use frida_secrets::{SecretKey, SecretStore};
 use sha2::{Digest, Sha256};
 
@@ -78,48 +79,66 @@ pub enum AwsFetch {
     CacheOnly,
 }
 
-/// Fills the secret variables of `env` whose source is AWS Secrets Manager (PLAN.md §9.1).
-/// `profile` is the AWS profile chosen for this environment; without one, and if the
-/// environment has AWS secrets, sending fails with [`CoreError::AwsProfileRequired`] so the UI
-/// can ask for it. With [`AwsFetch::CacheOnly`] missing values just stay unset.
+/// Which AWS profile reads which secret (PLAN.md §9.1, M17).
+#[derive(Debug, Clone, Copy)]
+pub struct AwsProfiles<'a> {
+    /// The profile chosen for the environment, for secrets without an account alias.
+    pub environment: Option<&'a str>,
+    /// Account alias → local profile, for secrets with `account: <alias>`.
+    pub accounts: &'a BTreeMap<String, String>,
+}
+
+/// Fills the secret variables of `env` whose value comes from AWS: Secrets Manager, a Cognito
+/// app client secret or an API Gateway key (PLAN.md §9.1, M17).
+///
+/// A secret with an account alias uses the profile mapped to that alias; the others use the
+/// environment's profile. A missing profile fails the send with
+/// [`CoreError::AwsProfileRequired`] or [`CoreError::AwsAccountRequired`], so the UI can ask
+/// for it. With [`AwsFetch::CacheOnly`] missing values just stay unset.
 pub async fn fill_aws_secrets(
     env: &mut Environment,
     global: bool,
-    profile: Option<&str>,
+    profiles: AwsProfiles<'_>,
     aws: &AwsSecrets,
     mode: AwsFetch,
 ) -> Result<()> {
-    let has_aws = env
-        .variables
-        .iter()
-        .any(|v| v.secret && matches!(v.source, Some(SecretSource::AwsSecretsManager { .. })));
-    if !has_aws {
-        return Ok(());
-    }
-    let Some(profile) = profile else {
-        return match mode {
-            AwsFetch::CacheOnly => Ok(()),
-            AwsFetch::Fetch => Err(CoreError::AwsProfileRequired {
-                environment: env.name.clone(),
-                global,
-            }),
-        };
-    };
     let env_name = env.name.clone();
     for var in env.variables.iter_mut().filter(|v| v.secret && v.enabled) {
-        let Some(SecretSource::AwsSecretsManager {
-            secret_id,
-            json_key,
-            region,
-        }) = &var.source
-        else {
+        let Some(source) = &var.source else {
             continue;
+        };
+        let profile = match source.account() {
+            Some(alias) => match profiles.accounts.get(alias) {
+                Some(profile) => profile.as_str(),
+                None if mode == AwsFetch::CacheOnly => continue,
+                None => {
+                    return Err(CoreError::AwsAccountRequired {
+                        account: alias.to_string(),
+                        environment: env_name,
+                    });
+                }
+            },
+            None => match profiles.environment {
+                Some(profile) => profile,
+                None if mode == AwsFetch::CacheOnly => continue,
+                None => {
+                    return Err(CoreError::AwsProfileRequired {
+                        environment: env_name,
+                        global,
+                    });
+                }
+            },
         };
         let secret = AwsSecretRef {
             profile: profile.to_string(),
-            region: region.clone(),
-            secret_id: secret_id.clone(),
-            json_key: json_key.clone(),
+            region: source.region().map(str::to_string),
+            target: aws_target(source),
+            json_key: match source {
+                SecretSource::AwsSecretsManager { json_key, .. } => {
+                    json_key.clone().filter(|k| !k.trim().is_empty())
+                }
+                _ => None,
+            },
         };
         let value = match mode {
             AwsFetch::Fetch => Some(aws.get(&secret).await),
@@ -138,6 +157,26 @@ pub async fn fill_aws_secrets(
         }
     }
     Ok(())
+}
+
+/// What `source` reads from AWS.
+fn aws_target(source: &SecretSource) -> AwsTarget {
+    match source {
+        SecretSource::AwsSecretsManager { secret_id, .. } => AwsTarget::Secret {
+            secret_id: secret_id.trim().to_string(),
+        },
+        SecretSource::CognitoClientSecret {
+            user_pool_id,
+            client_id,
+            ..
+        } => AwsTarget::CognitoClientSecret {
+            user_pool_id: user_pool_id.trim().to_string(),
+            client_id: client_id.trim().to_string(),
+        },
+        SecretSource::ApiGatewayKey { api_key_id, .. } => AwsTarget::ApiGatewayKey {
+            api_key_id: api_key_id.trim().to_string(),
+        },
+    }
 }
 
 /// Names of `env`'s secret variables that have a value in `store`. Blocking.

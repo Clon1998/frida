@@ -1,0 +1,22 @@
+version: 1
+name: prod
+variables:
+  - name: dbPassword
+    secret: true
+    source:
+      type: aws-secrets-manager
+      secretId: prod/db
+      jsonKey: password
+  - name: clientSecret
+    secret: true
+    source:
+      type: cognito-client-secret
+      userPoolId: eu-central-1_AbCdEf
+      clientId: 4tq1example
+  - name: apiKey
+    secret: true
+    source:
+      type: api-gateway-key
+      apiKeyId: a1b2c3d4e5
+      region: us-east-1
+      account: shared-services # profile chosen per machine

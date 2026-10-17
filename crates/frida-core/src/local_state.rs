@@ -28,6 +28,9 @@ pub struct AppSettings {
     pub active_global_environments: std::collections::BTreeMap<String, String>,
     /// The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`.
     pub aws_profiles: std::collections::BTreeMap<String, String>,
+    /// The local AWS profile per account alias (`account: shared-services` on a secret,
+    /// PLAN.md M17). Aliases are shared through the files, profile names are per machine.
+    pub aws_accounts: std::collections::BTreeMap<String, String>,
     /// When the app last asked for an update on its own (unix seconds), so it asks at most
     /// once a day (PLAN.md M14). `u32` because TypeScript numbers can't hold every `u64`;
     /// seconds fit until 2106.

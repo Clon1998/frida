@@ -67,9 +67,16 @@ pub struct EnvVariable {
     pub enabled: bool,
 }
 
+/// Where a secret's value comes from, besides the keychain. All sources are in AWS.
+///
+/// `account` (PLAN.md M17) names an AWS account alias such as `shared-services` instead of
+/// using the environment's AWS profile. The alias, not a profile name, is in the file because
+/// profile names differ per machine; each user maps the alias to a local profile once.
+/// Optional fields are only written when set, so older files stay unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum SecretSource {
+    /// A Secrets Manager secret, or one key of a JSON secret.
     #[serde(rename_all = "camelCase")]
     AwsSecretsManager {
         secret_id: String,
@@ -77,5 +84,48 @@ pub enum SecretSource {
         json_key: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        account: Option<String>,
     },
+    /// The client secret of a Cognito app client (for OAuth2 client credentials).
+    #[serde(rename_all = "camelCase")]
+    CognitoClientSecret {
+        /// e.g. `eu-central-1_AbCdEf`; its prefix is the default region.
+        user_pool_id: String,
+        client_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        account: Option<String>,
+    },
+    /// The value of an API Gateway API key (for `x-api-key`).
+    #[serde(rename_all = "camelCase")]
+    ApiGatewayKey {
+        api_key_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        account: Option<String>,
+    },
+}
+
+impl SecretSource {
+    /// The account alias, when the secret doesn't use the environment's profile.
+    pub fn account(&self) -> Option<&str> {
+        let account = match self {
+            Self::AwsSecretsManager { account, .. }
+            | Self::CognitoClientSecret { account, .. }
+            | Self::ApiGatewayKey { account, .. } => account,
+        };
+        account.as_deref().map(str::trim).filter(|a| !a.is_empty())
+    }
+
+    pub fn region(&self) -> Option<&str> {
+        let region = match self {
+            Self::AwsSecretsManager { region, .. }
+            | Self::CognitoClientSecret { region, .. }
+            | Self::ApiGatewayKey { region, .. } => region,
+        };
+        region.as_deref().map(str::trim).filter(|r| !r.is_empty())
+    }
 }

@@ -83,6 +83,20 @@ fn environment_round_trips() {
     insta::assert_snapshot!(yaml);
 }
 
+/// M17: the AWS source types and account aliases. Optional fields stay out of the file.
+#[test]
+fn aws_secret_sources_round_trip() {
+    let (env, yaml) = round_trip::<Environment>("environment-aws.yaml");
+    let accounts: Vec<Option<&str>> = env
+        .variables
+        .iter()
+        .map(|v| v.source.as_ref().and_then(|s| s.account()))
+        .collect();
+    assert_eq!(accounts, [None, None, Some("shared-services")]);
+    assert!(!yaml.contains("account: null") && !yaml.contains("region: null"));
+    insta::assert_snapshot!(yaml);
+}
+
 #[test]
 fn minimal_request_gets_defaults() {
     let yaml = "version: 1\nname: Ping\nmethod: GET\n";
