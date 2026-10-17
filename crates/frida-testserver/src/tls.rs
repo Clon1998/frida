@@ -69,7 +69,12 @@ fn generate_certs() -> Result<(ServerConfig, String), Box<dyn std::error::Error 
     let leaf = leaf_params.signed_by(&leaf_key, &ca)?;
 
     let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(leaf_key.serialize_der()));
-    let config = ServerConfig::builder()
+    // The provider is named explicitly: with more than one rustls backend in the build (the
+    // app's updater brings `ring`, reqwest uses `aws-lc-rs`), `ServerConfig::builder()` can't
+    // pick one and panics.
+    let provider = std::sync::Arc::new(tokio_rustls::rustls::crypto::aws_lc_rs::default_provider());
+    let config = ServerConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()?
         .with_no_client_auth()
         .with_single_cert(vec![leaf.der().clone(), ca.der().clone()], key)?;
     Ok((config, ca.pem()))
