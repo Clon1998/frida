@@ -9,6 +9,8 @@
   (`VaultStore`): one prompt per run instead of one per secret.
 - **Migration**: old per-secret items, and a dev build's vault, move to the new store the first time a secret is
   used, then are deleted (`MigratingStore`). Checked with real secrets on a signed build.
+- **Logo**: Patrick's one-line Westie drawing, traced into vector paths (`assets/logo/trace.py`, potrace) as a
+  white line on the indigo app icon, and shown on the start screen. All platform icons regenerated.
 - **Signing**: `Entitlements.plist`, `tauri.signed.conf.json` (embeds the provisioning profile), and
   `app/scripts/build-signed.sh dev|release`. The release workflow signs with the Developer ID and notarizes the
   macOS builds when the Apple secrets are set.

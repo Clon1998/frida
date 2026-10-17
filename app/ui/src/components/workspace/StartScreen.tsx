@@ -44,6 +44,16 @@ export function StartScreen() {
         <Settings />
       </Button>
       <div className="text-center">
+        {/* The Westie from the app icon (public/westie.svg), in the text colour: a CSS mask, so it
+            follows the light/dark theme. */}
+        <div
+          aria-hidden
+          className="mx-auto mb-3 h-24 w-28 bg-foreground"
+          style={{
+            mask: "url(/westie.svg) center / contain no-repeat",
+            WebkitMask: "url(/westie.svg) center / contain no-repeat",
+          }}
+        />
         <h1 className="text-3xl font-semibold tracking-tight">Frida</h1>
         <p className="text-muted-foreground">Fast Request Inspector for Developer APIs</p>
       </div>
