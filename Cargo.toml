@@ -73,6 +73,9 @@ hmac = "0.13.0"
 # AWS Secrets Manager (frida-secrets, PLAN.md §9).
 aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.120.0"
+# More AWS secret sources (PLAN.md M17): Cognito app client secrets and API Gateway keys.
+aws-sdk-cognitoidentityprovider = "1.139.0"
+aws-sdk-apigateway = "1.120.0"
 # The SDK's HTTP client, built by hand to give it a proxy (PLAN.md M16). Already in the tree.
 aws-smithy-http-client = { version = "1.5.0", features = ["rustls-aws-lc"] }
 # Already a dependency of aws-config; used directly for custom config file locations.

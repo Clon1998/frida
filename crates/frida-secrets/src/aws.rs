@@ -1,4 +1,5 @@
-//! AWS Secrets Manager as a secret source (PLAN.md §9.1).
+//! Secret values from AWS (PLAN.md §9.1, M17): Secrets Manager secrets, Cognito app client
+//! secrets and API Gateway API keys (see [`AwsTarget`]).
 //!
 //! - [`list_profiles`] reads the profile names from `~/.aws/config` and `~/.aws/credentials`
 //!   (or the files chosen in the settings, see [`AwsFiles`]).
@@ -75,20 +76,25 @@ pub enum AwsError {
     #[error("no AWS credentials found for profile {profile:?}")]
     NoCredentials { profile: String },
 
-    #[error("secret {secret_id:?} was not found (check the id and the region)")]
-    NotFound { secret_id: String },
+    /// `what` is [`AwsTarget::describe`], e.g. `secret "prod/db"`.
+    #[error("{what} was not found (check the id and the region)")]
+    NotFound { what: String },
 
-    #[error("profile {profile:?} is not allowed to read secret {secret_id:?}")]
-    AccessDenied { profile: String, secret_id: String },
+    #[error("profile {profile:?} is not allowed to read {what}")]
+    AccessDenied { profile: String, what: String },
 
-    #[error("secret {secret_id:?} is not JSON, so its key {key:?} can't be read")]
-    NotJson { secret_id: String, key: String },
+    #[error("{what} is not JSON, so its key {key:?} can't be read")]
+    NotJson { what: String, key: String },
 
-    #[error("secret {secret_id:?} has no key {key:?}")]
-    MissingKey { secret_id: String, key: String },
+    #[error("{what} has no key {key:?}")]
+    MissingKey { what: String, key: String },
 
-    #[error("asking AWS for secret {secret_id:?} took too long")]
-    Timeout { secret_id: String },
+    #[error("asking AWS for {what} took too long")]
+    Timeout { what: String },
+
+    /// The app client exists but was created without a secret.
+    #[error("{what} has no client secret")]
+    NoClientSecret { what: String },
 
     #[error("AWS error: {0}")]
     Other(String),
@@ -104,14 +110,55 @@ impl AwsError {
     }
 }
 
-/// Which secret to read, and how.
+/// What to read from AWS (PLAN.md M17).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AwsTarget {
+    /// A Secrets Manager secret string (`GetSecretValue`).
+    Secret { secret_id: String },
+    /// The client secret of a Cognito app client (`DescribeUserPoolClient`), e.g. for the OAuth2
+    /// client credentials grant.
+    CognitoClientSecret {
+        user_pool_id: String,
+        client_id: String,
+    },
+    /// The value of an API Gateway API key (`GetApiKey` with `includeValue`).
+    ApiGatewayKey { api_key_id: String },
+}
+
+impl AwsTarget {
+    /// For messages: `secret "prod/db"`, `Cognito app client "abc" of pool "eu-…"`, …
+    pub fn describe(&self) -> String {
+        match self {
+            Self::Secret { secret_id } => format!("secret {secret_id:?}"),
+            Self::CognitoClientSecret {
+                user_pool_id,
+                client_id,
+            } => format!("Cognito app client {client_id:?} of user pool {user_pool_id:?}"),
+            Self::ApiGatewayKey { api_key_id } => format!("API Gateway key {api_key_id:?}"),
+        }
+    }
+
+    /// The region when none is set: a Cognito user pool id starts with its region
+    /// (`eu-central-1_AbCdEf`). Otherwise the profile's region.
+    pub fn default_region(&self) -> Option<String> {
+        match self {
+            Self::CognitoClientSecret { user_pool_id, .. } => user_pool_id
+                .split_once('_')
+                .map(|(region, _)| region.to_string())
+                .filter(|r| !r.is_empty()),
+            _ => None,
+        }
+    }
+}
+
+/// Which value to read, and how.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AwsSecretRef {
     pub profile: String,
-    /// `None` uses the profile's region.
+    /// `None` uses [`AwsTarget::default_region`], then the profile's region.
     pub region: Option<String>,
-    pub secret_id: String,
-    /// Read this key from a JSON secret instead of using the whole string.
+    pub target: AwsTarget,
+    /// Read this key from a JSON value instead of using the whole string (Secrets Manager).
     pub json_key: Option<String>,
 }
 
@@ -164,12 +211,12 @@ pub trait SecretFetcher: Send + Sync {
         proxy: &AwsProxy,
         profile: &str,
         region: Option<&str>,
-        secret_id: &str,
+        target: &AwsTarget,
     ) -> BoxFuture<Result<String, AwsError>>;
 }
 
-/// `(profile, region, secret id)`: one AWS secret, whatever JSON key is read from it.
-type CacheKey = (String, Option<String>, String);
+/// `(profile, region, target)`: one AWS value, whatever JSON key is read from it.
+type CacheKey = (String, Option<String>, AwsTarget);
 
 /// Secret values from AWS, cached in memory (with when they were fetched). Share one per app.
 pub struct AwsSecrets {
@@ -243,8 +290,12 @@ impl AwsSecrets {
                 &files,
                 &proxy,
                 &secret.profile,
-                secret.region.as_deref(),
-                &secret.secret_id,
+                secret
+                    .region
+                    .clone()
+                    .or_else(|| secret.target.default_region())
+                    .as_deref(),
+                &secret.target,
             )
             .await?;
         // The lock is taken only after the await, never held across it.
@@ -269,7 +320,7 @@ fn cache_key(secret: &AwsSecretRef) -> CacheKey {
     (
         secret.profile.clone(),
         secret.region.clone(),
-        secret.secret_id.clone(),
+        secret.target.clone(),
     )
 }
 
@@ -279,14 +330,14 @@ fn pick(raw: &str, secret: &AwsSecretRef) -> Result<String, AwsError> {
         return Ok(raw.to_string());
     };
     let json: serde_json::Value = serde_json::from_str(raw).map_err(|_| AwsError::NotJson {
-        secret_id: secret.secret_id.clone(),
+        what: secret.target.describe(),
         key: key.to_string(),
     })?;
     match json.get(key) {
         Some(serde_json::Value::String(s)) => Ok(s.clone()),
         Some(other) => Ok(other.to_string()),
         None => Err(AwsError::MissingKey {
-            secret_id: secret.secret_id.clone(),
+            what: secret.target.describe(),
             key: key.to_string(),
         }),
     }
@@ -303,14 +354,15 @@ impl SecretFetcher for SdkFetcher {
         proxy: &AwsProxy,
         profile: &str,
         region: Option<&str>,
-        secret_id: &str,
+        target: &AwsTarget,
     ) -> BoxFuture<Result<String, AwsError>> {
         let files = files.clone();
         let http_client = http_client(proxy);
         let profile = profile.to_string();
         let region = region.map(str::to_string);
-        let secret_id = secret_id.to_string();
+        let target = target.clone();
         Box::pin(async move {
+            let what = target.describe();
             let call = async {
                 // The HTTP client is used for AWS and for the credential providers (SSO too).
                 let mut loader = aws_config::defaults(aws_config::BehaviorVersion::latest())
@@ -323,22 +375,79 @@ impl SecretFetcher for SdkFetcher {
                     loader = loader.profile_files(profile_files(&files));
                 }
                 let config = loader.load().await;
-                let client = aws_sdk_secretsmanager::Client::new(&config);
-                client.get_secret_value().secret_id(&secret_id).send().await
+                call_aws(&config, &target).await
             };
-            let output = tokio::time::timeout(Duration::from_secs(30), call)
+            tokio::time::timeout(Duration::from_secs(30), call)
                 .await
-                .map_err(|_| AwsError::Timeout {
-                    secret_id: secret_id.clone(),
-                })?
-                .map_err(|err| classify(&error_chain(&err), &profile, &secret_id))?;
+                .map_err(|_| AwsError::Timeout { what: what.clone() })?
+                .map_err(|failure| match failure {
+                    Failure::Sdk(message) => classify(&message, &profile, &what),
+                    Failure::Value(err) => err,
+                })
+        })
+    }
+}
+
+/// Why an AWS call failed: the SDK's error (to be classified) or a problem with the value.
+enum Failure {
+    Sdk(String),
+    Value(AwsError),
+}
+
+/// One call to the service behind `target`. Each SDK has its own error type, so errors are
+/// turned into their message (with causes) right here.
+async fn call_aws(config: &aws_config::SdkConfig, target: &AwsTarget) -> Result<String, Failure> {
+    let what = target.describe();
+    match target {
+        AwsTarget::Secret { secret_id } => {
+            let output = aws_sdk_secretsmanager::Client::new(config)
+                .get_secret_value()
+                .secret_id(secret_id)
+                .send()
+                .await
+                .map_err(|e| Failure::Sdk(error_chain(&e)))?;
             match (output.secret_string(), output.secret_binary()) {
                 (Some(text), _) => Ok(text.to_string()),
-                (None, Some(blob)) => String::from_utf8(blob.as_ref().to_vec())
-                    .map_err(|_| AwsError::Other("the secret is binary, not text".into())),
-                (None, None) => Err(AwsError::Other("the secret has no value".into())),
+                (None, Some(blob)) => String::from_utf8(blob.as_ref().to_vec()).map_err(|_| {
+                    Failure::Value(AwsError::Other(format!("{what} is binary, not text")))
+                }),
+                (None, None) => Err(Failure::Value(AwsError::Other(format!(
+                    "{what} has no value"
+                )))),
             }
-        })
+        }
+        AwsTarget::CognitoClientSecret {
+            user_pool_id,
+            client_id,
+        } => {
+            let output = aws_sdk_cognitoidentityprovider::Client::new(config)
+                .describe_user_pool_client()
+                .user_pool_id(user_pool_id)
+                .client_id(client_id)
+                .send()
+                .await
+                .map_err(|e| Failure::Sdk(error_chain(&e)))?;
+            output
+                .user_pool_client()
+                .and_then(|client| client.client_secret())
+                .map(str::to_string)
+                .ok_or(Failure::Value(AwsError::NoClientSecret { what }))
+        }
+        AwsTarget::ApiGatewayKey { api_key_id } => {
+            let output = aws_sdk_apigateway::Client::new(config)
+                .get_api_key()
+                .api_key(api_key_id)
+                .include_value(true)
+                .send()
+                .await
+                .map_err(|e| Failure::Sdk(error_chain(&e)))?;
+            output
+                .value()
+                .map(str::to_string)
+                .ok_or(Failure::Value(AwsError::Other(format!(
+                    "{what} has no value"
+                ))))
+        }
     }
 }
 
@@ -416,7 +525,7 @@ fn error_chain(error: &dyn std::error::Error) -> String {
 }
 
 /// Turns an SDK error message into an actionable [`AwsError`].
-pub(crate) fn classify(message: &str, profile: &str, secret_id: &str) -> AwsError {
+pub(crate) fn classify(message: &str, profile: &str, what: &str) -> AwsError {
     let lower = message.to_lowercase();
     if lower.contains("sso")
         && (lower.contains("expired")
@@ -428,15 +537,21 @@ pub(crate) fn classify(message: &str, profile: &str, secret_id: &str) -> AwsErro
             profile: profile.to_string(),
         }
     } else if lower.contains("resourcenotfound")
+        || lower.contains("notfoundexception")
         || lower.contains("can't find the specified secret")
+        || lower.contains("user pool client")
+            && (lower.contains("does not exist") || lower.contains("not found"))
     {
         AwsError::NotFound {
-            secret_id: secret_id.to_string(),
+            what: what.to_string(),
         }
-    } else if lower.contains("accessdenied") || lower.contains("not authorized") {
+    } else if lower.contains("accessdenied")
+        || lower.contains("not authorized")
+        || lower.contains("unauthorizedoperation")
+    {
         AwsError::AccessDenied {
             profile: profile.to_string(),
-            secret_id: secret_id.to_string(),
+            what: what.to_string(),
         }
     } else if lower.contains("no credentials")
         || lower.contains("credentialsnotloaded")
@@ -525,9 +640,11 @@ mod tests {
 
     use super::*;
 
-    /// Counts calls and answers from a fixed map.
+    /// Counts calls, remembers the regions asked for, and answers from a fixed map keyed by
+    /// the secret id, the Cognito client id or the API key id.
     struct FakeFetcher {
         calls: AtomicUsize,
+        regions: Mutex<Vec<Option<String>>>,
         answers: HashMap<String, Result<String, AwsError>>,
     }
 
@@ -537,13 +654,22 @@ mod tests {
             _: &AwsFiles,
             _: &AwsProxy,
             _: &str,
-            _: Option<&str>,
-            id: &str,
+            region: Option<&str>,
+            target: &AwsTarget,
         ) -> BoxFuture<Result<String, AwsError>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            self.regions
+                .lock()
+                .unwrap()
+                .push(region.map(str::to_string));
+            let id = match target {
+                AwsTarget::Secret { secret_id } => secret_id,
+                AwsTarget::CognitoClientSecret { client_id, .. } => client_id,
+                AwsTarget::ApiGatewayKey { api_key_id } => api_key_id,
+            };
             let answer = self.answers.get(id).cloned().unwrap_or_else(|| {
                 Err(AwsError::NotFound {
-                    secret_id: id.into(),
+                    what: target.describe(),
                 })
             });
             Box::pin(async move { answer })
@@ -554,7 +680,9 @@ mod tests {
         AwsSecretRef {
             profile: "dev".into(),
             region: None,
-            secret_id: id.into(),
+            target: AwsTarget::Secret {
+                secret_id: id.into(),
+            },
             json_key: key.map(str::to_string),
         }
     }
@@ -562,7 +690,10 @@ mod tests {
     fn fake() -> Arc<FakeFetcher> {
         Arc::new(FakeFetcher {
             calls: AtomicUsize::new(0),
+            regions: Mutex::new(Vec::new()),
             answers: HashMap::from([
+                ("app-client".to_string(), Ok("cl1ent-s3cret".to_string())),
+                ("key-id".to_string(), Ok("ap1-key".to_string())),
                 ("plain".to_string(), Ok("s3cr3t".to_string())),
                 (
                     "json".to_string(),
@@ -627,6 +758,61 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn cognito_and_api_gateway_values_are_cached_per_target() {
+        let fetcher = fake();
+        let aws = AwsSecrets::new(fetcher.clone());
+        let cognito = AwsSecretRef {
+            profile: "dev".into(),
+            region: None,
+            target: AwsTarget::CognitoClientSecret {
+                user_pool_id: "eu-central-1_AbC123".into(),
+                client_id: "app-client".into(),
+            },
+            json_key: None,
+        };
+        let api_key = AwsSecretRef {
+            region: Some("us-east-1".into()),
+            target: AwsTarget::ApiGatewayKey {
+                api_key_id: "key-id".into(),
+            },
+            ..cognito.clone()
+        };
+        assert_eq!(aws.get(&cognito).await.unwrap(), "cl1ent-s3cret");
+        assert_eq!(aws.get(&api_key).await.unwrap(), "ap1-key");
+        assert_eq!(aws.get(&cognito).await.unwrap(), "cl1ent-s3cret");
+        assert_eq!(
+            fetcher.calls.load(Ordering::SeqCst),
+            2,
+            "one fetch per target"
+        );
+        // The pool id names its region; an explicit region wins.
+        assert_eq!(
+            *fetcher.regions.lock().unwrap(),
+            [
+                Some("eu-central-1".to_string()),
+                Some("us-east-1".to_string())
+            ]
+        );
+        assert_eq!(
+            AwsTarget::Secret {
+                secret_id: "x".into()
+            }
+            .default_region(),
+            None
+        );
+        let missing = AwsSecretRef {
+            target: AwsTarget::ApiGatewayKey {
+                api_key_id: "nope".into(),
+            },
+            ..api_key
+        };
+        assert_eq!(
+            aws.get(&missing).await.unwrap_err().to_string(),
+            "API Gateway key \"nope\" was not found (check the id and the region)"
+        );
+    }
+
     #[test]
     fn sdk_errors_become_actionable() {
         let sso = classify(
@@ -652,6 +838,16 @@ mod tests {
             ),
             AwsError::NotFound { .. }
         ));
+        // API Gateway and Cognito say it their own way.
+        for message in [
+            "service error: NotFoundException: Invalid API Key identifier specified",
+            "service error: ResourceNotFoundException: User pool client abc does not exist.",
+        ] {
+            assert!(
+                matches!(classify(message, "dev", "x"), AwsError::NotFound { .. }),
+                "{message}"
+            );
+        }
         assert!(matches!(
             classify(
                 "service error: AccessDeniedException: User is not authorized",
