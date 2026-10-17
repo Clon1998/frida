@@ -8,6 +8,11 @@ name: Release
 # (Developer ID .p12, base64), APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
 # KEYCHAIN_PASSWORD (any random string), APPLE_API_ISSUER, APPLE_API_KEY, APPLE_API_KEY_P8 (the
 # .p8 file's content) and FRIDA_RELEASE_PROFILE ("Frida Release" provisioning profile, base64).
+#
+# In-app updates (PLAN.md M14) need TAURI_SIGNING_PRIVATE_KEY (the content of the key from
+# `pnpm tauri signer generate`) and TAURI_SIGNING_PRIVATE_KEY_PASSWORD; the matching public key
+# is `plugins.updater.pubkey` in tauri.conf.json. With them, every installer gets a `.sig` and
+# the release gets a `latest.json`, which installed apps read once the release is published.
 on:
   push:
     tags: ["v*"]
@@ -64,6 +69,8 @@ jobs:
     env:
       # Only to decide whether to sign (step `if:` can't read `secrets` directly).
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      # Just "true"/"false", so the key itself is only visible to the build step.
+      HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -108,9 +115,17 @@ jobs:
           echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
           echo "SIGNED_CONFIG=--config src-tauri/tauri.signed.conf.json" >> "$GITHUB_ENV"
 
+      - name: Enable updater artifacts
+        if: env.HAS_UPDATER_KEY == 'true'
+        shell: bash
+        run: echo "UPDATER_CONFIG=--config src-tauri/tauri.updater.conf.json" >> "$GITHUB_ENV"
+
       - name: Build app bundles
         working-directory: app
         env:
+          # Signs the updater artifacts (Tauri's own signature, not Apple's).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Read by the Tauri CLI (macOS only): it imports the certificate into a temporary
           # keychain, signs, and notarizes with the App Store Connect API key.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -119,7 +134,17 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-        run: pnpm tauri build --target ${{ matrix.target }} ${{ env.SIGNED_CONFIG }}
+        run: pnpm tauri build --target ${{ matrix.target }} ${{ env.SIGNED_CONFIG }} ${{ env.UPDATER_CONFIG }}
+
+      # Both macOS builds produce `Frida.app.tar.gz`; give each its architecture so they don't
+      # overwrite each other in the release (update-manifest.sh expects these names).
+      - name: Name the macOS update archive
+        if: runner.os == 'macOS' && env.HAS_UPDATER_KEY == 'true'
+        run: |
+          cd "target/${{ matrix.target }}/release/bundle/macos"
+          name="Frida_${GITHUB_REF_NAME#v}_${{ startsWith(matrix.target, 'aarch64') && 'aarch64' || 'x86_64' }}.app.tar.gz"
+          mv Frida.app.tar.gz "$name"
+          mv Frida.app.tar.gz.sig "$name.sig"
 
       - name: Attach the installers to the release
         shell: bash
@@ -130,6 +155,29 @@ jobs:
           files=()
           while IFS= read -r f; do files+=("$f"); done < <(find . -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' -o -name '*.AppImage' \
-               -o -name '*.deb' -o -name '*.rpm' \))
+               -o -name '*.deb' -o -name '*.rpm' -o -name '*.app.tar.gz' -o -name '*.sig' \))
           echo "Uploading: ${files[*]}"
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+  # latest.json for in-app updates, built from the uploaded signatures. Only after every build
+  # succeeded, so the manifest never points at a missing installer.
+  manifest:
+    name: Update manifest
+    needs: build
+    runs-on: ubuntu-22.04
+    env:
+      HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        if: env.HAS_UPDATER_KEY == 'true'
+      - name: Write and attach latest.json
+        if: env.HAS_UPDATER_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/assets"
+          gh release download "$GITHUB_REF_NAME" --pattern '*.sig' --dir "$RUNNER_TEMP/assets"
+          gh release view "$GITHUB_REF_NAME" --json body -q .body > "$RUNNER_TEMP/notes.md"
+          app/scripts/update-manifest.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/assets" "$RUNNER_TEMP/notes.md" > latest.json
+          cat latest.json
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber
