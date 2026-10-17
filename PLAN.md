@@ -27,7 +27,7 @@ decisions change.
 
 ### Non-goals (for now)
 - WebSockets, GraphQL, gRPC, MCP, SSE.
-- HTTP proxy support, PAC files.
+- PAC files (a manual or system HTTP proxy is planned in M16).
 - Git merge or conflict resolution UI. Conflicts are resolved in the user's normal git tooling.
 - Postman import.
 - Cloud sync, accounts, telemetry.
@@ -693,6 +693,77 @@ A dev-signed build was checked on Patrick's Mac: valid signature, entitlements m
 Migration of real secrets in the signed app checked by Patrick (one last prompt per old secret, none after a
 restart). Open: GitHub signing secrets and the first notarized release.*
 
+### M14: Auto-update
+Signed releases exist since M13; users should not have to reinstall every version by hand.
+- [ ] `tauri-plugin-updater` with Tauri's own update signature (a key pair from `tauri signer generate`; the public
+  key goes into `tauri.conf.json`, the private key and its password into GitHub secrets
+  `TAURI_SIGNING_PRIVATE_KEY`/`..._PASSWORD`). Independent of the Apple signing.
+- [ ] Release workflow: build the updater artifacts (macOS `.app.tar.gz`, Windows NSIS, Linux AppImage, each with
+  its `.sig`) and a `latest.json` manifest, attached to the release. The app reads
+  `https://github.com/Clon1998/frida/releases/latest/download/latest.json`, so only **published** releases are
+  offered (drafts stay invisible).
+- [ ] UI: check on start (at most once a day, can be switched off in Settings), then a quiet notice "Frida X is
+  available" with the release notes, **Install and restart** and **Later**. Settings → "Check for updates" by hand.
+  Unsaved tabs are asked about before restarting (the close dialog). The `.deb` and `.msi` installs show "download
+  the new version" instead (the updater can't replace them).
+- [ ] Never during a run or a send; the download can be cancelled.
+
+**Acceptance:** an installed 0.2.x finds a published 0.3.0, installs it and restarts into it on macOS (signed) and
+Windows; a tampered `latest.json` signature is rejected.
+
+### M15: CLI runner (`frida-run`) with JUnit output
+Run collections in CI with the same engine as the app's runner (M11).
+- [ ] New crate `crates/frida-cli`, binary **`frida-run`** (not `frida`: that name belongs to the frida toolkit;
+  confirm the name when starting). Uses `frida_core::runner`, no Tauri.
+- [ ] `frida-run <collection dir> [--folder <path>] [--env <name>] [--global-env <name>] [--var name=value]...
+  [--delay <ms>] [--bail] [--reporter cli|junit|json] [--output <file>] [--insecure]`. Exit code 0 when everything
+  passed, 1 when a test or script failed, 2 for errors (request not sent, bad arguments).
+- [ ] Secrets without a keychain: `--secret name=value`, or environment variables `FRIDA_SECRET_<VAR>` (CI secret
+  stores inject those), or AWS sources with `AWS_PROFILE` / the usual AWS env credentials. Secret values are
+  masked in all output, as in the app.
+- [ ] Reporters: readable terminal output (one line per request, failures with details), JUnit XML (one testsuite
+  per folder, one testcase per request test; errors as `<error>`), JSON (the run results).
+- [ ] Release: `frida-run` binaries for macOS/Windows/Linux attached to each release; `cargo install --path
+  crates/frida-cli` documented. A sample GitHub Actions step in the README.
+
+**Acceptance:** `frida-run testdata/scripting --env dev --reporter junit` against the test server produces valid
+JUnit XML that GitHub's test reporting shows; a failing test exits with 1; a secret given via `FRIDA_SECRET_*`
+never appears in the output.
+
+### M16: HTTP proxy
+Company networks often only allow traffic through a proxy (moved out of the non-goals, see the decisions log).
+- [ ] Settings → Network: **System proxy** (default: the OS settings and `HTTP(S)_PROXY`/`NO_PROXY`), **No proxy**,
+  or **Manual**: proxy URL (`http://`/`https://`/`socks5://`), optional username + password (password in the
+  keychain), and a bypass list (`localhost`, `*.internal`, CIDRs).
+- [ ] Applies to every request Frida makes: sends, OAuth2 token calls, `fri.sendRequest`, and the AWS SDK.
+  Per collection: a "Don't use the proxy" switch for local APIs.
+- [ ] Proxy errors are explained (unreachable proxy, 407 authentication required) with a hint to the settings.
+- [ ] The console and history show whether a request went through the proxy (never the proxy password).
+- [ ] PAC files: only if the system proxy needs them and the OS resolves them for us; otherwise still a non-goal.
+- [ ] `frida-testserver` gets a small forward proxy (HTTP + CONNECT, optional Basic auth) for integration tests.
+
+**Acceptance:** with a manual proxy, sends, OAuth2 and scripts go through the test proxy (with and without
+authentication); the bypass list and the per-collection switch skip it; a wrong proxy password gives the 407 hint.
+
+### M17: More AWS secret sources and per-secret AWS accounts
+Patrick hasn't been able to test the AWS integration (M8) against real accounts yet; this milestone ends with that.
+- [ ] New secret sources next to Secrets Manager:
+  - **Cognito app client secret**: `userPoolId` + `clientId` → `DescribeUserPoolClient` → `ClientSecret`. For
+    OAuth2 client credentials with Cognito (pairs with the Cognito preset, §9.2).
+  - **API Gateway API key**: `apiKeyId` → `GetApiKey(includeValue)` → the key value. For `x-api-key` auth.
+  - Both cached like Secrets Manager values (§9.1), with the same actionable errors (SSO login, missing permission:
+    `cognito-idp:DescribeUserPoolClient`, `apigateway:GET`).
+- [ ] **Per-secret AWS account**: a secret source may name an account alias (`account: shared-services`) instead of
+  using the environment's profile. Aliases, not profile names, go into the YAML because profile names differ per
+  machine; each user maps alias → local profile once (local state, like the environment profile today). The UI asks
+  for an unmapped alias on first use.
+- [ ] Environment editor: source picker "Keychain / Secrets Manager / Cognito client secret / API Gateway key",
+  the fields for each, and the account alias.
+- [ ] Manual check with Patrick's real AWS accounts: Secrets Manager (incl. JSON key), SSO profile expiry and the
+  login hint, a Cognito client secret feeding the OAuth2 preset, an API Gateway key, two accounts in one env.
+
+**Acceptance:** fake-SDK tests for both new sources and the alias mapping; the manual check above passes.
+
 ### Later (backlog, not scheduled)
 - `frida-cli` headless runner (`frida run <collection> --env dev`).
 - Declarative assertions (Bruno `assert` style).
@@ -922,6 +993,11 @@ Deviations from and clarifications of this plan, newest last.
   descriptions by param name, also from the saved request when a param vanishes while the URL is being typed.
   Collection, folder and request docs already existed (Docs tab). In the UI's `Complete<T>`, `description` stays
   optional because Rust leaves empty ones out.
+
+- **2026-10-17 M14–M17 planned (decided with Patrick).** Next: auto-update (M14), a CLI runner with JUnit output (M15),
+  an HTTP proxy (M16, moved out of the non-goals) and more AWS sources with per-secret accounts (M17). Not needed for
+  now: declarative assertions, Postman import, OpenAPI re-sync, more codegen targets. AWS profiles are per
+  environment today; per-secret accounts use aliases so the YAML stays machine-independent.
 
 ## 17. Testing strategy
 
