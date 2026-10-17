@@ -1,5 +1,15 @@
 # Changelog
 
+## After M16: auth tests and a masking fix (2026-10-17)
+
+- **End-to-end tests for every auth method**: Basic, Bearer and API keys (header and query) as the server receives
+  them, OAuth2 with custom token placement, the authorization code grant with and without PKCE, refetching
+  without a refresh token, falling back after a rejected refresh, "Get new token" and "Clear", and OAuth2 through
+  `frida-run`.
+- **Fix**: a post-response script that printed an OAuth2 token (or another auth value) showed it in the console
+  and in `frida-run -v`. Script output is now masked with those values as well.
+- The update public key is in `tauri.conf.json`; M14 waits only for a release.
+
 ## M16: HTTP proxy (2026-10-17)
 
 ### What was built

@@ -1070,6 +1070,16 @@ Deviations from and clarifications of this plan, newest last.
   covered by an integration test). The per-collection switch doesn't affect AWS calls. CLI: `--proxy URL` (login
   in the URL, masked), `--proxy-bypass`, `--no-proxy`; default is the environment.
 
+- **2026-10-17 Auth test audit (asked by Patrick).** Every auth method now has an end-to-end test against the
+  mock provider (`crates/frida-core/tests/auth.rs`): Basic, Bearer and query API keys as the server sees them,
+  "no auth" overriding the collection, OAuth2 token placement in another header and in the query, authorization
+  code with and without PKCE (checked in the browser URL), refetch without a refresh token, fallback after a
+  rejected refresh, "Get new token" and "Clear", plus `frida-run` with OAuth2 and a secret from
+  `FRIDA_SECRET_*`. The mock got the clients `no-refresh` and `refresh-fails`. The audit found a leak: OAuth2
+  tokens and other auth values printed by a post-response script were not masked in the script log (console,
+  `frida-run -v`); the pipeline now masks them too (`Pipeline::sensitive`). The Cognito preset has no Rust logic
+  (it only fills URLs in the UI; `cognito.test.ts`).
+
 ## 17. Testing strategy
 
 - **Unit tests** in each crate cover the resolver, YAML round-trips, auth header building, curl gen/parse, `.bru` parser and OpenAPI mapping.
