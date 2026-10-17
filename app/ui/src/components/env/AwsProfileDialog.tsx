@@ -12,12 +12,15 @@ import {
 import { showError, unwrap } from "@/lib/api";
 import { useDialogs } from "@/stores/dialogs";
 import { scopeOf } from "@/stores/envs";
+import { useWorkspace } from "@/stores/workspace";
 import { cn } from "cn";
 import { useAwsProfiles } from "./useAwsProfiles";
 
 /**
- * Asks which AWS profile an environment's AWS secrets are read with (first use, PLAN.md §9.1).
- * The choice is remembered locally and can be changed in the environment editor.
+ * Asks which AWS profile an environment's AWS secrets are read with (first use, PLAN.md §9.1),
+ * or, for secrets with an account alias, which profile that account is on this machine (M17).
+ * The choice is remembered locally: per environment (environment editor) or per alias
+ * (Settings → AWS).
  */
 export function AwsProfileDialog() {
   const request = useDialogs((s) => s.awsProfile);
@@ -25,7 +28,7 @@ export function AwsProfileDialog() {
   return (
     <Dialog open={request !== null} onOpenChange={(o) => !o && close()}>
       <DialogContent className="sm:max-w-md">
-        {request && <ProfileForm key={request.environment} />}
+        {request && <ProfileForm key={`${request.environment}|${request.account ?? ""}`} />}
       </DialogContent>
     </Dialog>
   );
@@ -38,11 +41,18 @@ function ProfileForm() {
   const [chosen, setChosen] = useState<string | null>(null);
   if (!request) return null;
 
-  const confirm = async () => {
-    if (!chosen) return;
+  // Takes the profile as an argument: a double click calls this before `chosen` is updated.
+  const confirm = async (profile: string | null) => {
+    if (!profile) return;
     try {
-      const scope = scopeOf(request.global ? "global" : "collection", request.dir);
-      await unwrap(commands.setAwsProfile(scope, request.environment, chosen));
+      if (request.account) {
+        await unwrap(commands.setAwsAccountProfile(request.account, profile));
+        // Settings → AWS lists the mappings.
+        await useWorkspace.getState().loadSettings();
+      } else {
+        const scope = scopeOf(request.global ? "global" : "collection", request.dir);
+        await unwrap(commands.setAwsProfile(scope, request.environment, profile));
+      }
       close();
       request.then();
     } catch (e) {
@@ -53,10 +63,15 @@ function ProfileForm() {
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Choose an AWS profile</DialogTitle>
+        <DialogTitle>
+          {request.account
+            ? `Choose a profile for AWS account “${request.account}”`
+            : "Choose an AWS profile"}
+        </DialogTitle>
         <DialogDescription>
-          Environment “{request.environment}” reads secrets from AWS Secrets Manager. Which profile
-          should Frida use? You can change it later in the environment editor.
+          {request.account
+            ? `Secrets in environment “${request.environment}” are read from the AWS account “${request.account}”. Which of your profiles belongs to it? This applies to every environment that uses the account; change it in Settings → AWS.`
+            : `Environment “${request.environment}” reads secrets from AWS. Which profile should Frida use? You can change it later in the environment editor.`}
         </DialogDescription>
       </DialogHeader>
       {profiles === null ? (
@@ -77,7 +92,7 @@ function ProfileForm() {
               onClick={() => setChosen(p.name)}
               onDoubleClick={() => {
                 setChosen(p.name);
-                void confirm();
+                void confirm(p.name);
               }}
               className={cn(
                 "flex items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-accent",
@@ -96,7 +111,7 @@ function ProfileForm() {
         <Button variant="ghost" onClick={close}>
           Cancel
         </Button>
-        <Button disabled={!chosen} onClick={() => void confirm()}>
+        <Button disabled={!chosen} onClick={() => void confirm(chosen)}>
           Use profile and send
         </Button>
       </DialogFooter>

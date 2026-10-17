@@ -32,6 +32,7 @@ import {
 import { showError, unwrap } from "@/lib/api";
 import { useUi } from "@/stores/ui";
 import { useUpdate } from "@/stores/update";
+import { useAwsProfiles } from "@/components/env/useAwsProfiles";
 import { useWorkspace } from "@/stores/workspace";
 import { cn } from "cn";
 
@@ -226,8 +227,14 @@ export function SettingsDialog() {
                   />
                 </Row>
                 <Row
+                  label="Accounts"
+                  hint="Secrets can name an AWS account alias (e.g. shared-services) instead of using the environment's profile. Here you choose which of your profiles each alias is."
+                >
+                  <AwsAccounts />
+                </Row>
+                <Row
                   label="Keep fetched secrets"
-                  hint="Secret values from AWS Secrets Manager are kept in memory (never on disk) for this long, then fetched again."
+                  hint="Secret values from AWS (Secrets Manager, Cognito, API Gateway) are kept in memory (never on disk) for this long, then fetched again."
                 >
                   <div className="flex items-center gap-2">
                     <NumberSelect
@@ -527,6 +534,77 @@ function ProxyPassword() {
           Remove
         </Button>
       )}
+    </div>
+  );
+}
+
+/** Account alias → AWS profile on this machine (PLAN.md M17), from `settings.json`. */
+function AwsAccounts() {
+  const accounts = useWorkspace((s) => s.settings?.awsAccounts) ?? {};
+  const loadSettings = useWorkspace((s) => s.loadSettings);
+  const profiles = useAwsProfiles();
+  const [alias, setAlias] = useState("");
+  const save = async (account: string, profile: string | null) => {
+    try {
+      await unwrap(commands.setAwsAccountProfile(account, profile));
+      await loadSettings();
+      // Values fetched with another profile may differ.
+      await commands.refreshAwsSecrets();
+    } catch (e) {
+      showError(e);
+    }
+  };
+  const entries = Object.entries(accounts);
+  const profileSelect = (value: string | null, onChange: (p: string) => void, label: string) => (
+    <Select value={value ?? undefined} onValueChange={onChange}>
+      <SelectTrigger size="sm" className="w-48" aria-label={label}>
+        <SelectValue placeholder="Choose a profile" />
+      </SelectTrigger>
+      <SelectContent>
+        {(profiles ?? []).map((p) => (
+          <SelectItem key={p.name} value={p.name}>
+            {p.name}
+            {p.sso ? " (SSO)" : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  return (
+    <div className="flex flex-col gap-2">
+      {entries.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          None yet. Frida asks the first time a secret uses an alias.
+        </p>
+      )}
+      {entries.map(([account, profile]) => (
+        <div key={account} className="flex flex-wrap items-center gap-2">
+          <span className="w-40 truncate font-mono text-xs" title={account}>
+            {account}
+          </span>
+          {profileSelect(profile, (p) => void save(account, p), `Profile for ${account}`)}
+          <Button size="sm" variant="ghost" onClick={() => void save(account, null)}>
+            Remove
+          </Button>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          className="h-8 w-40 font-mono text-xs"
+          placeholder="new alias"
+          value={alias}
+          spellCheck={false}
+          onChange={(e) => setAlias(e.target.value)}
+        />
+        {profileSelect(
+          null,
+          (p) => {
+            if (!alias.trim()) return;
+            void save(alias.trim(), p).then(() => setAlias(""));
+          },
+          "Profile for the new alias",
+        )}
+      </div>
     </div>
   );
 }

@@ -215,3 +215,55 @@ test("param descriptions are saved and survive editing the URL", async ({ app })
   await expect(panel.getByLabel("Description").first()).toHaveValue("Related data to include");
   await expect(panel.getByLabel("Description").last()).toHaveValue("The order's id");
 });
+
+test("a secret from a Cognito app client with an account alias, mapped in the settings (M17)", async ({
+  app,
+}) => {
+  await openWorkspace(app);
+  await app.getByTitle("Environments", { exact: true }).click();
+  await app.getByRole("menuitem", { name: /Configure collection environments/ }).click();
+  await app.getByRole("tab", { name: /^Secrets/ }).click();
+
+  await app.getByPlaceholder("Add secret").click();
+  await app.keyboard.type("clientSecret");
+  const row = app.locator("tr", { has: app.locator('input[value="clientSecret"]') });
+  await row.getByLabel("Secret source").click();
+  await app.getByRole("option", { name: "AWS · Cognito client secret" }).click();
+  await row.getByPlaceholder("user pool id (eu-central-1_…)").fill("eu-central-1_AbC123");
+  await row.getByPlaceholder("app client id").fill("4tq1example");
+  await row.getByPlaceholder("account (optional)").fill("shared-services");
+  const saveButton = app.getByRole("main").getByRole("button", { name: "Save", exact: true });
+  await saveButton.click();
+  await expect(saveButton).toBeDisabled();
+
+  const variable = (await backend(app)).environments[0].variables.find(
+    (v: { name: string }) => v.name === "clientSecret",
+  );
+  expect(variable).toMatchObject({
+    secret: true,
+    value: null,
+    source: {
+      type: "cognito-client-secret",
+      userPoolId: "eu-central-1_AbC123",
+      clientId: "4tq1example",
+      region: null,
+      account: "shared-services",
+    },
+  });
+
+  // Switching the source type keeps the region and the account alias.
+  await row.getByLabel("Secret source").click();
+  await app.getByRole("option", { name: "AWS · API Gateway key" }).click();
+  await expect(row.getByPlaceholder("account (optional)")).toHaveValue("shared-services");
+  await expect(row.getByPlaceholder("API key id")).toHaveValue("");
+
+  // The alias gets its profile in Settings → AWS (per machine).
+  await app.keyboard.press("ControlOrMeta+,");
+  const dialog = app.getByRole("dialog");
+  await dialog.getByRole("button", { name: "AWS" }).click();
+  await dialog.getByPlaceholder("new alias").fill("shared-services");
+  await dialog.getByLabel("Profile for the new alias").click();
+  await app.getByRole("option", { name: "shared-sso (SSO)" }).click();
+  await expect(dialog.getByText("shared-services", { exact: true })).toBeVisible();
+  expect((await backend(app)).settings.awsAccounts).toEqual({ "shared-services": "shared-sso" });
+});

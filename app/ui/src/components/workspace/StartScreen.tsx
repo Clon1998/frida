@@ -79,7 +79,7 @@ export function StartScreen() {
         </li>
         <li>
           <span className="font-medium text-foreground">Secrets</span> stay in your OS keychain (or
-          AWS Secrets Manager), never in the files.
+          come from AWS), never in the files.
         </li>
         <li>
           Coming from Postman or Bruno? Import an OpenAPI file or a Bruno collection from the

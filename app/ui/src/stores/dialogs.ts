@@ -13,7 +13,14 @@ interface DialogsState {
    * "Choose an AWS profile" for an environment with AWS secrets (PLAN.md §9.1), opened when a
    * send needs one; `then` retries the send.
    */
-  awsProfile: { dir: string; environment: string; global: boolean; then: () => void } | null;
+  awsProfile: {
+    dir: string;
+    environment: string;
+    global: boolean;
+    /** Set when a secret's account alias needs a profile, rather than the environment. */
+    account?: string;
+    then: () => void;
+  } | null;
   openAwsProfile: (request: NonNullable<DialogsState["awsProfile"]>) => void;
   /**
    * "Import Frida archive…": `dir`/`parent` is where a folder or request archive goes (`dir`

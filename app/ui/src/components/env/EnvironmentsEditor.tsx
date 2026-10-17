@@ -346,8 +346,32 @@ interface EnvFormProps {
 }
 
 type AwsSource = NonNullable<EnvVar["source"]>;
+type SourceKind = "keychain" | AwsSource["type"];
 
-/** Where an AWS-backed secret comes from: secret id, optional JSON key and region. */
+/** The secret sources (PLAN.md §9.1, M17), as offered in the "Source" column. */
+const SOURCE_KINDS: { value: AwsSource["type"]; label: string }[] = [
+  { value: "aws-secrets-manager", label: "Secrets Manager" },
+  { value: "cognito-client-secret", label: "Cognito client secret" },
+  { value: "api-gateway-key", label: "API Gateway key" },
+];
+
+/** An empty source of `kind`, keeping the region and account of `previous` when switching. */
+function newSource(kind: AwsSource["type"], previous: AwsSource | null): AwsSource {
+  const shared = { region: previous?.region ?? null, account: previous?.account ?? null };
+  switch (kind) {
+    case "aws-secrets-manager":
+      return { type: kind, secretId: "", jsonKey: null, ...shared };
+    case "cognito-client-secret":
+      return { type: kind, userPoolId: "", clientId: "", ...shared };
+    case "api-gateway-key":
+      return { type: kind, apiKeyId: "", ...shared };
+  }
+}
+
+/**
+ * The fields of an AWS-backed secret: what to read (per source type), plus the optional region
+ * and account alias (the alias picks another AWS profile than the environment's, M17).
+ */
 function AwsSourceFields({
   source,
   onChange,
@@ -355,28 +379,68 @@ function AwsSourceFields({
   source: AwsSource;
   onChange: (source: AwsSource) => void;
 }) {
+  // `{ ...source, field }` keeps the type: each branch below only sets fields of its own kind.
+  const set = (patch: Partial<AwsSource>) => onChange({ ...source, ...patch } as AwsSource);
+  const optional = (value: string) => value.trim() || null;
   // Side by side when the cell is wide enough (20rem), else stacked (a container query on the
   // cell, not the window).
   return (
     <div className="@container">
       <div className="flex flex-col divide-y @xs:flex-row @xs:divide-x @xs:divide-y-0">
-        <CellInput
-          className="@xs:flex-[2]"
-          placeholder="secret id or ARN"
-          value={source.secretId}
-          onChange={(e) => onChange({ ...source, secretId: e.target.value })}
-        />
+        {source.type === "aws-secrets-manager" && (
+          <>
+            <CellInput
+              className="@xs:flex-[2]"
+              placeholder="secret id or ARN"
+              value={source.secretId}
+              onChange={(e) => set({ secretId: e.target.value })}
+            />
+            <CellInput
+              className="@xs:flex-1"
+              placeholder="JSON key (optional)"
+              value={source.jsonKey ?? ""}
+              onChange={(e) => set({ jsonKey: optional(e.target.value) })}
+            />
+          </>
+        )}
+        {source.type === "cognito-client-secret" && (
+          <>
+            <CellInput
+              className="@xs:flex-[2]"
+              placeholder="user pool id (eu-central-1_…)"
+              value={source.userPoolId}
+              onChange={(e) => set({ userPoolId: e.target.value })}
+            />
+            <CellInput
+              className="@xs:flex-[2]"
+              placeholder="app client id"
+              value={source.clientId}
+              onChange={(e) => set({ clientId: e.target.value })}
+            />
+          </>
+        )}
+        {source.type === "api-gateway-key" && (
+          <CellInput
+            className="@xs:flex-[2]"
+            placeholder="API key id"
+            value={source.apiKeyId}
+            onChange={(e) => set({ apiKeyId: e.target.value })}
+          />
+        )}
         <CellInput
           className="@xs:flex-1"
-          placeholder="JSON key (optional)"
-          value={source.jsonKey ?? ""}
-          onChange={(e) => onChange({ ...source, jsonKey: e.target.value || null })}
-        />
-        <CellInput
-          className="@xs:flex-1"
-          placeholder="region (profile's)"
+          placeholder={
+            source.type === "cognito-client-secret" ? "region (pool's)" : "region (profile's)"
+          }
           value={source.region ?? ""}
-          onChange={(e) => onChange({ ...source, region: e.target.value || null })}
+          onChange={(e) => set({ region: optional(e.target.value) })}
+        />
+        <CellInput
+          className="@xs:flex-1"
+          placeholder="account (optional)"
+          title="An AWS account alias, e.g. shared-services. Each person picks the profile for it once; without one, the environment's profile is used."
+          value={source.account ?? ""}
+          onChange={(e) => set({ account: optional(e.target.value) })}
         />
       </div>
     </div>
@@ -619,15 +683,16 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
           <TabsTrigger value="secrets">Secrets ({secretCount})</TabsTrigger>
         </TabsList>
       </Tabs>
-      {draft.variables.some((v) => v.secret && v.source) && (
+      {/* Secrets with an account alias use that account's profile (Settings → AWS). */}
+      {draft.variables.some((v) => v.secret && v.source && !v.source.account) && (
         <AwsProfilePicker scope={scope} environment={original.name} />
       )}
       {secrets && (
         <p className="-mt-1 text-xs text-muted-foreground">
           Secret values are stored in {keychain ? "the OS keychain" : "an encrypted file"} on this
           machine. Only the names are saved in the environment file, so teammates see which secrets
-          they need to fill in. A secret can also come from AWS Secrets Manager (choose
-          &quot;AWS&quot; as its source).
+          they need to fill in. A secret can also come from AWS: a Secrets Manager secret, a Cognito
+          app client secret or an API Gateway key (choose it as the source).
         </p>
       )}
 
@@ -692,19 +757,11 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
               {secrets && (
                 <GridCell>
                   <Select
-                    value={v.source ? "aws" : "keychain"}
+                    value={(v.source?.type ?? "keychain") satisfies SourceKind}
                     disabled={isNew}
-                    onValueChange={(kind) =>
+                    onValueChange={(kind: SourceKind) =>
                       updateVar(index, {
-                        source:
-                          kind === "aws"
-                            ? {
-                                type: "aws-secrets-manager",
-                                secretId: "",
-                                jsonKey: null,
-                                region: null,
-                              }
-                            : null,
+                        source: kind === "keychain" ? null : newSource(kind, v.source ?? null),
                       })
                     }
                   >
@@ -719,7 +776,11 @@ function EnvForm({ dir, scope, entry, onRenamed, onDuplicate }: EnvFormProps) {
                       <SelectItem value="keychain">
                         {keychain ? "Keychain" : "Local file"}
                       </SelectItem>
-                      <SelectItem value="aws">AWS</SelectItem>
+                      {SOURCE_KINDS.map((k) => (
+                        <SelectItem key={k.value} value={k.value}>
+                          AWS · {k.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </GridCell>

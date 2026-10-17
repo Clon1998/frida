@@ -664,7 +664,20 @@ const handlers: Record<string, (args: any) => unknown> = {
   },
   reveal_secret: ({ environment, variable }) =>
     state.secrets.get(`${environment}/${variable}`) ?? null,
-  list_aws_profiles: () => [],
+  list_aws_profiles: () => [
+    { name: "work", sso: true, region: "eu-central-1" },
+    { name: "shared-sso", sso: true, region: null },
+  ],
+  get_aws_profile: () => null,
+  set_aws_profile: () => null,
+  refresh_aws_secrets: () => null,
+  set_aws_account_profile: ({ account, profile }) => {
+    const others = Object.entries(state.settings.awsAccounts ?? {}).filter(([a]) => a !== account);
+    state.settings.awsAccounts = Object.fromEntries(
+      profile ? [...others, [account, profile]] : others,
+    );
+    return null;
+  },
   list_cookies: () => [],
   clear_cookies: () => null,
   clear_runtime_vars: () => null,

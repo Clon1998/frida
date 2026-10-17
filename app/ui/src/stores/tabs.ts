@@ -438,12 +438,19 @@ export const useTabs = create<TabsState>((set, get) => {
       } catch (e) {
         const error = toApiError(e);
         updateRequestTab(dir, path, (t) => ({ ...t, response: null, error, requestId: null }));
-        // First use of an environment with AWS secrets: ask for its profile, then send again.
-        if (error.code === "aws_profile_required" && error.aws) {
+        // First use of an environment (or an account alias) with AWS secrets: ask for the
+        // profile, then send again.
+        const aws = error.aws;
+        if (
+          aws &&
+          (error.code === "aws_profile_required" ||
+            (error.code === "aws_account_required" && aws.account))
+        ) {
           useDialogs.getState().openAwsProfile({
             dir,
-            environment: error.aws.environment,
-            global: error.aws.global ?? false,
+            environment: aws.environment,
+            global: aws.global ?? false,
+            account: aws.account ?? undefined,
             then: () => void get().send(dir, path),
           });
         }

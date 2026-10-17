@@ -11,7 +11,14 @@ export type Complete<T> = T extends (infer U)[]
   : T extends object
     ? // `as` filters keys while keeping the mapping "homomorphic", so `-?` also removes the
       // `undefined` that optional fields carry (an `Exclude<keyof T, ...>` key list wouldn't).
-      { [K in keyof T as K extends SkippedWhenEmpty ? never : K]-?: Complete<T[K]> } & {
+      // Keys whose type can only be `undefined` are dropped: tauri-specta marks the fields of
+      // the *other* variants of a tagged enum as `field?: never`, and `-?` would turn those
+      // into impossible required fields.
+      {
+        [
+          K in keyof T as K extends SkippedWhenEmpty ? never : T[K] extends undefined ? never : K
+        ]-?: Complete<T[K]>;
+      } & {
         [K in keyof T as K extends SkippedWhenEmpty ? K : never]?: T[K];
       }
     : T;

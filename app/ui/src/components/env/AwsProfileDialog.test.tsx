@@ -76,4 +76,51 @@ describe("AWS profile prompt (PLAN.md §15, M8)", () => {
     await waitFor(() => expect(calls.filter((c) => c === "send_request")).toHaveLength(2));
     expect(useDialogs.getState().awsProfile).toBeNull();
   });
+
+  it("asks which profile an account alias is, by double click (M17)", async () => {
+    let mapped: { account: string; profile: string } | null = null;
+    const calls: string[] = [];
+    mockIPC((cmd, args) => {
+      calls.push(cmd);
+      if (cmd === "read_request") return request;
+      if (cmd === "send_request") {
+        if (mapped === null) {
+          throw {
+            code: "aws_account_required",
+            message: "choose an AWS profile for account",
+            hint: null,
+            aws: {
+              environment: "prod",
+              global: null,
+              fixCommand: null,
+              account: "shared-services",
+            },
+          };
+        }
+        return null;
+      }
+      if (cmd === "list_aws_profiles") return [{ name: "shared-sso", sso: true, region: null }];
+      if (cmd === "set_aws_account_profile") {
+        mapped = args as { account: string; profile: string };
+        return null;
+      }
+      if (cmd === "get_settings") return { preferences: {} };
+      return null;
+    });
+
+    await useTabs.getState().openTab("/col", "get.yaml");
+    await useTabs.getState().send("/col", "get.yaml");
+    expect(useDialogs.getState().awsProfile?.account).toBe("shared-services");
+
+    render(<AwsProfileDialog />);
+    expect(screen.getByText("Choose a profile for AWS account “shared-services”")).toBeTruthy();
+    // A double click picks and confirms at once (it used to do nothing).
+    fireEvent.doubleClick(await screen.findByText("shared-sso"));
+
+    await waitFor(() =>
+      expect(mapped).toEqual({ account: "shared-services", profile: "shared-sso" }),
+    );
+    await waitFor(() => expect(calls.filter((c) => c === "send_request")).toHaveLength(2));
+    expect(calls).not.toContain("set_aws_profile");
+  });
 });
