@@ -470,3 +470,42 @@ async fn request_headers_are_recorded_as_sent() {
             .any(|(n, v)| n == "user-agent" && v.starts_with("frida-http/"))
     );
 }
+
+/// `Session::skip_tls_verify` (`frida-run --insecure`) overrides a collection that verifies.
+#[tokio::test]
+async fn a_session_can_skip_tls_verification() {
+    use frida_core::auth::OAuth2Manager;
+    use frida_core::http::{ExecuteInput, SessionStore};
+
+    let server = frida_testserver::spawn_tls().await.unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    frida_core::storage::save_collection(dir.path(), &Collection::new("Test")).unwrap();
+    let req = request(
+        "GET",
+        format!("https://localhost:{}/echo", server.addr.port()),
+    );
+    let oauth = OAuth2Manager::new(std::sync::Arc::new(|_| Ok(())));
+
+    for skip in [false, true] {
+        let store = SessionStore {
+            skip_tls_verify: skip,
+            ..SessionStore::default()
+        };
+        let input = ExecuteInput {
+            collection_dir: dir.path(),
+            request_rel: "test.yaml",
+            request: &req,
+            collection_env: None,
+            global_env: None,
+            session: store.session(None),
+            cookies: None,
+            oauth: &oauth,
+        };
+        let result = http::execute(input, CancellationToken::new(), &|_| {}).await;
+        match (skip, result) {
+            (false, Err(err)) => assert!(err.to_string().contains("TLS"), "{err}"),
+            (true, Ok(executed)) => assert_eq!(executed.response.status, 200),
+            (skip, other) => panic!("skip={skip}: unexpected {:?}", other.err()),
+        }
+    }
+}

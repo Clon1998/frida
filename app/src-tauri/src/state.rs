@@ -227,6 +227,8 @@ impl AppState {
             env_overrides: &store.env_overrides,
             global_overrides: &self.global_overrides,
             workspace_dir,
+            // The app always follows the collection's TLS settings.
+            skip_tls_verify: false,
         }
     }
 

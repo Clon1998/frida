@@ -1,10 +1,10 @@
 //! Masking secret values (PLAN.md §6) before data leaves the request pipeline: history, the
 //! console and curl export never contain them.
 
-pub(crate) const MASK: &str = "***";
+pub const MASK: &str = "***";
 
 /// Replaces known secret values with `***` in text and in UTF-8 bodies.
-pub(crate) struct Masker {
+pub struct Masker {
     /// Longest first, so a secret containing another one is masked as a whole.
     secrets: Vec<String>,
 }
@@ -13,7 +13,7 @@ impl Masker {
     /// Masks each value in `sensitive` and its URL-encoded forms: a secret in the query string
     /// travels encoded (`a b/ä` → `a%20b/%C3%A4`), and servers echo it back that way, e.g. in
     /// the final URL or a response body.
-    pub(crate) fn new(sensitive: &[String]) -> Self {
+    pub fn new(sensitive: &[String]) -> Self {
         let mut secrets: Vec<String> = sensitive
             .iter()
             .filter(|s| !s.is_empty())
@@ -24,7 +24,7 @@ impl Masker {
         Self { secrets }
     }
 
-    pub(crate) fn text(&self, text: &str) -> String {
+    pub fn text(&self, text: &str) -> String {
         let mut out = text.to_string();
         for secret in &self.secrets {
             out = out.replace(secret.as_str(), MASK);
@@ -34,7 +34,7 @@ impl Masker {
 
     /// Text bodies are masked; binary bodies are kept as they are (a secret could only be found
     /// in them by accident, and replacing bytes would corrupt them).
-    pub(crate) fn bytes(&self, bytes: &[u8]) -> Vec<u8> {
+    pub fn bytes(&self, bytes: &[u8]) -> Vec<u8> {
         match std::str::from_utf8(bytes) {
             Ok(text) => self.text(text).into_bytes(),
             Err(_) => bytes.to_vec(),

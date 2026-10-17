@@ -14,7 +14,7 @@ pub mod http;
 pub mod import;
 pub mod jsonpath;
 pub mod local_state;
-mod mask;
+pub mod mask;
 pub mod model;
 pub mod runner;
 pub mod secrets;

@@ -49,6 +49,9 @@ pub struct Session<'a> {
     pub global_overrides: &'a EnvOverrides,
     /// Where global environments live (for `setGlobalEnvVar(..., { persist: true })`).
     pub workspace_dir: Option<&'a Path>,
+    /// Don't verify TLS certificates for any request of this session, whatever the
+    /// collection says (`frida-run --insecure`, like `curl -k`).
+    pub skip_tls_verify: bool,
 }
 
 /// Owns the session state for one collection (the app keeps one per collection; tests and a
@@ -58,6 +61,8 @@ pub struct SessionStore {
     pub runtime: Mutex<RuntimeVars>,
     pub env_overrides: EnvOverrides,
     pub global_overrides: EnvOverrides,
+    /// See [`Session::skip_tls_verify`].
+    pub skip_tls_verify: bool,
 }
 
 impl SessionStore {
@@ -79,6 +84,7 @@ impl SessionStore {
             env_overrides: &self.env_overrides,
             global_overrides: &self.global_overrides,
             workspace_dir,
+            skip_tls_verify: self.skip_tls_verify,
         }
     }
 }
@@ -130,9 +136,15 @@ pub async fn execute_as(
         limits: frida_script::ScriptLimits::default(),
         mode,
     };
+    let mut collection = storage::load_collection(input.collection_dir)?;
+    // Everything below reads the TLS settings from here: the request, OAuth2 token calls and
+    // `fri.sendRequest`.
+    if session.skip_tls_verify {
+        collection.settings.tls.verify = false;
+    }
     let mut pipeline = Pipeline {
         collection_dir: input.collection_dir,
-        collection: storage::load_collection(input.collection_dir)?,
+        collection,
         folders: storage::load_folder_chain(input.collection_dir, input.request_rel)?,
         request: input.request.clone(),
         collection_env: input.collection_env.map(|e| session.env_overrides.apply(e)),
