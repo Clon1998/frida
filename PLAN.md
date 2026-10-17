@@ -719,26 +719,32 @@ Windows; a tampered `latest.json` signature is rejected.
 in `frida_core::local_state` (unit-tested); the update dialog and Settings → Updates (`pnpm e2e`: check by hand, save
 unsaved tabs, install; switch off). `release.yml` builds and signs updater artifacts and attaches `latest.json`
 (`app/scripts/update-manifest.sh`) when `TAURI_SIGNING_PRIVATE_KEY` is set. A test pins the strict updater config.
-Note: 0.2.0 has no updater, so 0.2.0 users install 0.3.0 by hand once; the end-to-end check is 0.3.0 → 0.3.1.*
+Note: 0.2.0 has no updater, so 0.2.0 users install 0.3.0 by hand once; the end-to-end check is 0.3.0 → 0.3.1.
+Acceptance postponed by Patrick (2026-10-17) until the key exists and releases are cut; M15 started meanwhile.*
 
 ### M15: CLI runner (`frida-run`) with JUnit output
 Run collections in CI with the same engine as the app's runner (M11).
-- [ ] New crate `crates/frida-cli`, binary **`frida-run`** (not `frida`: that name belongs to the frida toolkit;
+- [x] New crate `crates/frida-cli`, binary **`frida-run`** (not `frida`: that name belongs to the frida toolkit;
   confirm the name when starting). Uses `frida_core::runner`, no Tauri.
-- [ ] `frida-run <collection dir> [--folder <path>] [--env <name>] [--global-env <name>] [--var name=value]...
+- [x] `frida-run <collection dir> [--folder <path>] [--env <name>] [--global-env <name>] [--var name=value]...
   [--delay <ms>] [--bail] [--reporter cli|junit|json] [--output <file>] [--insecure]`. Exit code 0 when everything
   passed, 1 when a test or script failed, 2 for errors (request not sent, bad arguments).
-- [ ] Secrets without a keychain: `--secret name=value`, or environment variables `FRIDA_SECRET_<VAR>` (CI secret
+- [x] Secrets without a keychain: `--secret name=value`, or environment variables `FRIDA_SECRET_<VAR>` (CI secret
   stores inject those), or AWS sources with `AWS_PROFILE` / the usual AWS env credentials. Secret values are
   masked in all output, as in the app.
-- [ ] Reporters: readable terminal output (one line per request, failures with details), JUnit XML (one testsuite
+- [x] Reporters: readable terminal output (one line per request, failures with details), JUnit XML (one testsuite
   per folder, one testcase per request test; errors as `<error>`), JSON (the run results).
-- [ ] Release: `frida-run` binaries for macOS/Windows/Linux attached to each release; `cargo install --path
+- [x] Release: `frida-run` binaries for macOS/Windows/Linux attached to each release; `cargo install --path
   crates/frida-cli` documented. A sample GitHub Actions step in the README.
 
 **Acceptance:** `frida-run testdata/scripting --env dev --reporter junit` against the test server produces valid
 JUnit XML that GitHub's test reporting shows; a failing test exits with 1; a secret given via `FRIDA_SECRET_*`
 never appears in the output.
+*Status 2026-10-17: done (automated): `crates/frida-cli/tests/cli.rs` runs the binary against the test server: JUnit
+for `testdata/scripting` (exit 0), a failing test (exit 1) with a `FRIDA_SECRET_*` secret echoed into the test
+message, the script log and the JSON report (masked everywhere), `--secret` with JUnit on stdout, errors (exit 2),
+`--insecure` against the HTTPS server, `--bail`. Unit tests for arguments, secrets, terminal lines and the JUnit
+layout. Whether GitHub shows the report is checked with the first release (`docs/cli.md` has the workflow step).*
 
 ### M16: HTTP proxy
 Company networks often only allow traffic through a proxy (moved out of the non-goals, see the decisions log).
@@ -1020,6 +1026,20 @@ Deviations from and clarifications of this plan, newest last.
   test server names its provider, otherwise rustls can't choose and panics. Release notes in `latest.json` are the
   draft's notes at build time; edits made before publishing don't reach it (rerun the manifest job if needed).
   Development builds never check on their own and can't install.
+
+- **2026-10-17 CLI runner (M15).** Binary name `frida-run` as planned. Arguments with `clap` 4.6 (derive), the
+  standard Rust CLI parser. Additions to the planned flags: `--workspace` (global environments; default: the
+  nearest `frida-workspace.yaml` above the collection), `--aws-profile` (default `AWS_PROFILE`, else `default`, so
+  plain AWS env credentials work), `-v/--verbose` (script `console.log` to stderr). `FRIDA_SECRET_<name>` also
+  matches the upper-case form (`FRIDA_SECRET_CLIENTSECRET`), since Windows and many CI systems are
+  case-insensitive or upper-case only; a given secret wins over its AWS source. `--var` sets runtime variables (the
+  top layer). Core changes: `Session::skip_tls_verify` (for `--insecure`, applied to the collection the pipeline
+  loads, so requests, token calls and `fri.sendRequest` all follow it) and `frida_core::mask` is public so the CLI
+  masks like history and the console (plus each send's auth values). JUnit XML is written by hand (no XML crate).
+  With `--reporter junit|json` and no `--output`, progress lines go to stderr so stdout is only the report. Exit 2
+  also for Ctrl+C, a `setNextRequest` loop or an unknown request name; `--bail` stops after the first failed or
+  unsent request. Release archives are named without the version (`frida-run-<target>.tar.gz`) for stable
+  `releases/latest/download` URLs. The auth code grant prints the sign-in URL instead of opening a browser.
 
 ## 17. Testing strategy
 

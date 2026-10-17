@@ -1,5 +1,33 @@
 # Changelog
 
+## M15: CLI runner `frida-run` (2026-10-17)
+
+### What was built
+- **`frida-run`** (`crates/frida-cli`): runs a collection or folder with the app's runner engine, with the
+  collection and global environments, `--var` overrides, `--delay`, `--bail` and `--insecure`. Reference:
+  [cli.md](cli.md).
+- **Secrets without a keychain**: `--secret name=value`, `FRIDA_SECRET_<name>` environment variables, AWS Secrets
+  Manager with `--aws-profile`/`AWS_PROFILE`. Every line, report and script log is masked.
+- **Reporters**: terminal lines as each request finishes (failing tests below), JUnit XML (suite per folder, case
+  per test) and JSON. Exit codes 0 / 1 (test failed) / 2 (error).
+- **Releases** attach `frida-run-<target>.tar.gz`/`.zip` for all four targets; `cargo install --path
+  crates/frida-cli` works too.
+- M14's acceptance (a real update) is postponed until the update key exists.
+
+### Rust things worth understanding in this milestone
+1. **A library plus a thin binary** (`crates/frida-cli/src/main.rs`, `lib.rs`). `main` only parses and calls
+   `frida_cli::run`; the logic is in the library, so unit tests reach it. Integration tests run the real binary
+   with `env!("CARGO_BIN_EXE_frida-run")`, which Cargo sets to the freshly built executable.
+2. **`#[derive(Parser)]`** (`args.rs`). clap reads the struct at compile time: fields become options, doc
+   comments become `--help` text, `value_parser = parse_pair` plugs in our own `NAME=VALUE` parsing. Like picocli's
+   annotations, but checked by the compiler.
+3. **Closures that borrow mutably** (`lib.rs`, `on_step`). The step callback pushes into a local `Vec` and sets
+   `bailed`; that is fine because the closure is only used during `runner::run(...)`, so the borrows end before we
+   read the values. `&mut T` is `Send` when `T` is, which the runner requires.
+4. **`impl Write` for our own type** (`Progress`). Implementing `std::io::Write` (two methods) lets the reporter
+   write to "stdout or stderr, decided at runtime" and to a `Vec<u8>` in tests through the same `&mut dyn Write`,
+   like an `OutputStream` subclass.
+
 ## M14: Auto-update (2026-10-17, waiting for the update key and a first release)
 
 ### What was built

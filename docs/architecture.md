@@ -21,8 +21,8 @@ feature end to end. The rules behind this layout are in [CLAUDE.md](../CLAUDE.md
 ```
 
 - **The UI never touches the network, files, git or secrets.** It calls a command and renders the result.
-- **The crates never depend on Tauri.** They can be tested with plain `cargo test` and reused by the planned CLI
-  (PLAN.md M15).
+- **The crates never depend on Tauri.** They can be tested with plain `cargo test` and are reused by the CLI
+  (`frida-run`, `crates/frida-cli`).
 - `app/src-tauri` only translates: it reads the arguments, finds the open workspace in `AppState`, calls a crate
   and maps errors to an `ApiError`.
 
@@ -34,6 +34,7 @@ feature end to end. The rules behind this layout are in [CLAUDE.md](../CLAUDE.md
 | `frida-script` | Runs one script in a fresh QuickJS runtime with time and memory limits. The `fri`/`req`/`res`/`expect` API is plain JavaScript in `prelude.js` | `src/lib.rs`, `src/prelude.js` |
 | `frida-secrets` | The `SecretStore` trait and its implementations (OS keychain, encrypted file, macOS data protection keychain, cache, migration), plus the async AWS Secrets Manager provider | `src/lib.rs` |
 | `frida-git` | `Repo`: status, stage, commit, push, pull, branches, file versions. One function runs `git`, with an allow-list of subcommands and forbidden flags | `src/lib.rs`, `src/run.rs` |
+| `frida-cli` | `frida-run`, the command line runner: arguments, secrets from flags/env/AWS, terminal/JUnit/JSON reports, on top of `frida_core::runner` | `src/lib.rs` |
 | `frida-testserver` | Dev-only axum server: echo, slow, redirects, gzip, cookies, status codes, a mock OAuth2 provider, HTTPS with a throwaway CA | `src/lib.rs` |
 
 Inside `frida-core`:
@@ -70,7 +71,8 @@ Inside `frida-core`:
    to an in-memory response cache, and a `ResponseView` (a size-limited, displayable version) goes to the UI.
 
 The **inspector** uses the same code up to step 4 (`http::inspect`), without running scripts or sending.
-The **runner** calls the same pipeline per request (`http::execute_as` with `ExecutionMode::Runner`).
+The **runner** calls the same pipeline per request (`http::execute_as` with `ExecutionMode::Runner`); both the
+app's Runner tab and `frida-run` use it.
 
 ## State
 

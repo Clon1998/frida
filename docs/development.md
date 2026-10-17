@@ -62,6 +62,14 @@ It echoes every request as JSON (method, path, query, headers, body, multipart p
 Open `testdata/sample-workspace` in the app (**Open workspace…**) for ready-made requests against it: every
 method, every body type, variables, scripting and an image.
 
+### The CLI
+
+```sh
+cargo run -p frida-cli -- testdata/scripting --env dev --var baseUrl=http://localhost:8787
+```
+
+See [cli.md](cli.md) for the options.
+
 ### Logs
 
 Logs go to `logs/` in the app data folder (see [file-format.md](file-format.md#what-is-not-in-these-files)) and to

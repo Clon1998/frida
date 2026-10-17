@@ -38,8 +38,11 @@ your operating system's keychain.
   preview, dark and light themes, keyboard-first (Cmd/Ctrl+K quick open).
 - **Updates itself**: a signed update check once a day (can be switched off), installed only when you say so.
 
-Not supported (yet): WebSockets, GraphQL, gRPC, SSE, Postman import. A CLI runner for CI and HTTP proxy support are
-planned, see the [roadmap](PLAN.md#15-milestones).
+- **`frida-run` for CI**: run a collection from the command line with JUnit or JSON output and exit codes;
+  secrets from environment variables. [CLI](docs/cli.md)
+
+Not supported (yet): WebSockets, GraphQL, gRPC, SSE, Postman import. HTTP proxy support is planned, see the
+[roadmap](PLAN.md#15-milestones).
 
 ## Install
 
@@ -86,6 +89,7 @@ and *Scripting*.
 |---|---|
 | [User guide](docs/user-guide.md) | Concepts, variables, secrets, auth, runner, import/export, git, shortcuts |
 | [Scripting & tests](docs/scripting.md) | The `fri`/`req`/`res`/`expect` API and what differs from Bruno |
+| [frida-run](docs/cli.md) | Running collections in CI: options, secrets, JUnit, exit codes |
 | [File format](docs/file-format.md) | What the YAML files look like and what stays on your machine |
 | [Architecture](docs/architecture.md) | Crates, the send pipeline, Rust ↔ TypeScript bindings, adding a feature |
 | [Development](docs/development.md) | Setup, running, tests, CI |

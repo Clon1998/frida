@@ -31,6 +31,7 @@ cd app/ui && pnpm install && pnpm typecheck && pnpm lint && pnpm test
 cd app/ui && pnpm e2e              # UI flows in Chromium against a fake backend (first: pnpm exec playwright install chromium webkit)
 cd app && pnpm tauri dev       # run the app
 cargo run -p frida-testserver  # local echo server on :8787 for manual testing (testdata/sample-workspace uses it)
+cargo run -p frida-cli -- testdata/scripting --env dev --var baseUrl=http://localhost:8787   # frida-run, the CLI runner
 cd app && pnpm tauri build     # bundle
 cd app && scripts/build-signed.sh dev   # macOS: signed bundle (data protection keychain), see README
 ```
