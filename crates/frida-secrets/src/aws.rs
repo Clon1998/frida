@@ -80,8 +80,13 @@ pub enum AwsError {
     #[error("{what} was not found (check the id and the region)")]
     NotFound { what: String },
 
-    #[error("profile {profile:?} is not allowed to read {what}")]
-    AccessDenied { profile: String, what: String },
+    /// `permission` is the IAM action the profile's role needs.
+    #[error("profile {profile:?} is not allowed to read {what} (it needs {permission})")]
+    AccessDenied {
+        profile: String,
+        what: String,
+        permission: String,
+    },
 
     #[error("{what} is not JSON, so its key {key:?} can't be read")]
     NotJson { what: String, key: String },
@@ -135,6 +140,15 @@ impl AwsTarget {
                 client_id,
             } => format!("Cognito app client {client_id:?} of user pool {user_pool_id:?}"),
             Self::ApiGatewayKey { api_key_id } => format!("API Gateway key {api_key_id:?}"),
+        }
+    }
+
+    /// The IAM permission reading this needs, for "access denied" messages.
+    pub fn permission(&self) -> &'static str {
+        match self {
+            Self::Secret { .. } => "secretsmanager:GetSecretValue",
+            Self::CognitoClientSecret { .. } => "cognito-idp:DescribeUserPoolClient",
+            Self::ApiGatewayKey { .. } => "apigateway:GET",
         }
     }
 
@@ -381,7 +395,7 @@ impl SecretFetcher for SdkFetcher {
                 .await
                 .map_err(|_| AwsError::Timeout { what: what.clone() })?
                 .map_err(|failure| match failure {
-                    Failure::Sdk(message) => classify(&message, &profile, &what),
+                    Failure::Sdk(message) => classify(&message, &profile, &target),
                     Failure::Value(err) => err,
                 })
         })
@@ -525,8 +539,9 @@ fn error_chain(error: &dyn std::error::Error) -> String {
 }
 
 /// Turns an SDK error message into an actionable [`AwsError`].
-pub(crate) fn classify(message: &str, profile: &str, what: &str) -> AwsError {
+pub(crate) fn classify(message: &str, profile: &str, target: &AwsTarget) -> AwsError {
     let lower = message.to_lowercase();
+    let what = target.describe();
     if lower.contains("sso")
         && (lower.contains("expired")
             || lower.contains("token")
@@ -542,16 +557,15 @@ pub(crate) fn classify(message: &str, profile: &str, what: &str) -> AwsError {
         || lower.contains("user pool client")
             && (lower.contains("does not exist") || lower.contains("not found"))
     {
-        AwsError::NotFound {
-            what: what.to_string(),
-        }
+        AwsError::NotFound { what }
     } else if lower.contains("accessdenied")
         || lower.contains("not authorized")
         || lower.contains("unauthorizedoperation")
     {
         AwsError::AccessDenied {
             profile: profile.to_string(),
-            what: what.to_string(),
+            what,
+            permission: target.permission().to_string(),
         }
     } else if lower.contains("no credentials")
         || lower.contains("credentialsnotloaded")
@@ -813,12 +827,39 @@ mod tests {
         );
     }
 
+    fn db() -> AwsTarget {
+        AwsTarget::Secret {
+            secret_id: "db".into(),
+        }
+    }
+
+    #[test]
+    fn access_denied_names_the_missing_permission() {
+        let key = AwsTarget::ApiGatewayKey {
+            api_key_id: "k1".into(),
+        };
+        let err = classify(
+            "service error: AccessDeniedException: User is not authorized to perform: apigateway:GET",
+            "dev",
+            &key,
+        );
+        assert_eq!(
+            err.to_string(),
+            "profile \"dev\" is not allowed to read API Gateway key \"k1\" (it needs apigateway:GET)"
+        );
+        let cognito = AwsTarget::CognitoClientSecret {
+            user_pool_id: "p".into(),
+            client_id: "c".into(),
+        };
+        assert_eq!(cognito.permission(), "cognito-idp:DescribeUserPoolClient");
+    }
+
     #[test]
     fn sdk_errors_become_actionable() {
         let sso = classify(
             "dispatch failure: other: the credential provider was not enabled: SSO token for profile dev has expired",
             "dev",
-            "db",
+            &db(),
         );
         assert_eq!(
             sso,
@@ -834,7 +875,7 @@ mod tests {
             classify(
                 "service error: ResourceNotFoundException: Secrets Manager can't find the specified secret.",
                 "dev",
-                "db"
+                &db()
             ),
             AwsError::NotFound { .. }
         ));
@@ -844,7 +885,7 @@ mod tests {
             "service error: ResourceNotFoundException: User pool client abc does not exist.",
         ] {
             assert!(
-                matches!(classify(message, "dev", "x"), AwsError::NotFound { .. }),
+                matches!(classify(message, "dev", &db()), AwsError::NotFound { .. }),
                 "{message}"
             );
         }
@@ -852,7 +893,7 @@ mod tests {
             classify(
                 "service error: AccessDeniedException: User is not authorized",
                 "dev",
-                "db"
+                &db()
             ),
             AwsError::AccessDenied { .. }
         ));
@@ -860,7 +901,7 @@ mod tests {
             classify(
                 "failed to load credentials: no credentials in the property bag",
                 "dev",
-                "db"
+                &db()
             ),
             AwsError::NoCredentials { .. }
         ));

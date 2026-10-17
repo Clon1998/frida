@@ -86,7 +86,7 @@ fn environment_round_trips() {
 /// M17: the AWS source types and account aliases. Optional fields stay out of the file.
 #[test]
 fn aws_secret_sources_round_trip() {
-    let (env, yaml) = round_trip::<Environment>("environment-aws.yaml");
+    let (env, yaml) = round_trip::<Environment>("environments/prod.yaml");
     let accounts: Vec<Option<&str>> = env
         .variables
         .iter()
