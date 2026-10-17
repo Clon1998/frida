@@ -46,6 +46,12 @@ export const commands = {
 	 *  are corrected; returns what was saved.
 	 */
 	savePreferences: (preferences: Preferences) => typedError<Preferences, ApiError>(__TAURI_INVOKE("save_preferences", { preferences })),
+	/**  Stores the proxy password in the keychain, or removes it (`None`). Never in a file. */
+	setProxyPassword: (password: string | null) => typedError<null, ApiError>(__TAURI_INVOKE("set_proxy_password", { password })),
+	/**  Whether a proxy password is stored (the settings show "set", never the value). */
+	hasProxyPassword: () => typedError<boolean, ApiError>(__TAURI_INVOKE("has_proxy_password")),
+	/**  "Don't use the proxy" for one collection, on this computer only (local state). */
+	setCollectionBypassProxy: (dir: string, bypass: boolean) => typedError<null, ApiError>(__TAURI_INVOKE("set_collection_bypass_proxy", { dir, bypass })),
 	/**
 	 *  The version of the git program at `path` (`None`: `git` from the PATH), for "Test" in the
 	 *  settings. Doesn't change the setting.
@@ -542,6 +548,11 @@ export type CollectionState = {
 	activeEnvironment?: string | null,
 	/**  The AWS profile per collection environment (PLAN.md §9.1), for AWS-backed secrets. */
 	awsProfiles?: { [key in string]: string },
+	/**
+	 *  "Don't use the proxy" for this collection on this computer (PLAN.md M16), e.g. for
+	 *  APIs on the local network.
+	 */
+	bypassProxy?: boolean,
 };
 
 export type CollectionSummary = {
@@ -605,6 +616,11 @@ export type ConsoleEntry_Deserialize = {
 	/**  `None` when there was no response (see `error`). */
 	response: ConsoleResponse_Deserialize | null,
 	error: string | null,
+	/**
+	 *  `via proxy http://proxy:8080` when the request went through a manual proxy (never
+	 *  with the proxy's login).
+	 */
+	proxy: string | null,
 };
 
 export type ConsoleEntry_Serialize = {
@@ -619,6 +635,11 @@ export type ConsoleEntry_Serialize = {
 	/**  `None` when there was no response (see `error`). */
 	response: ConsoleResponse_Serialize | null,
 	error: string | null,
+	/**
+	 *  `via proxy http://proxy:8080` when the request went through a manual proxy (never
+	 *  with the proxy's login).
+	 */
+	proxy: string | null,
 };
 
 /**
@@ -799,7 +820,9 @@ export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already
 /**  Checking for, downloading or installing an update failed (PLAN.md M14). */
 "update" | 
 /**  Something is still running that the action would interrupt. */
-"busy";
+"busy" | 
+/**  The proxy couldn't be reached or refused the login (PLAN.md M16). */
+"proxy";
 
 /**  What to export. Paths are absolute folders; `rel` is collection-relative (as in the tree). */
 export type ExportSource = { kind: "workspace"; workspaceDir: string } | { kind: "collection"; collectionDir: string } | { kind: "folder"; collectionDir: string; rel: string } | { kind: "request"; collectionDir: string; rel: string };
@@ -898,6 +921,8 @@ export type HistoryEntry_Deserialize = {
 	requestBodyTruncated: boolean,
 	/**  The response in the same shape as a live one. Its `id` is `history-<id>`. */
 	response: ResponseView_Deserialize | null,
+	/**  `via proxy …` when the request went through a manual proxy. */
+	proxy: string | null,
 };
 
 /**  A full entry, opened read-only. */
@@ -909,6 +934,8 @@ export type HistoryEntry_Serialize = {
 	requestBodyTruncated: boolean,
 	/**  The response in the same shape as a live one. Its `id` is `history-<id>`. */
 	response: ResponseView_Serialize | null,
+	/**  `via proxy …` when the request went through a manual proxy. */
+	proxy: string | null,
 };
 
 /**  A row in the history list. */
@@ -1089,6 +1116,31 @@ export type Preferences = {
 	aws?: AwsPreferences,
 	/**  Look for a new Frida version on start (at most once a day). */
 	checkForUpdates?: boolean,
+	/**  The HTTP proxy (PLAN.md M16). Its password is in the keychain, not here. */
+	proxy?: ProxyPreferences,
+};
+
+export type ProxyMode = 
+/**  The operating system's settings and the `HTTP(S)_PROXY`/`NO_PROXY` variables. */
+"system" | 
+/**  Never use a proxy. */
+"none" | 
+/**  The proxy in [`ProxyPreferences::url`]. */
+"manual";
+
+/**  What the Settings dialog stores (in `settings.json`, without the password). */
+export type ProxyPreferences = {
+	mode?: ProxyMode,
+	/**  `http://host:port`, `https://host:port` or `socks5://host:port` (manual mode). */
+	url?: string,
+	/**  Login for the proxy, empty for none. The password is in the keychain. */
+	username?: string,
+	/**
+	 *  Hosts that are reached directly: names (`localhost`), domains with their subdomains
+	 *  (`*.internal` or `.internal`), IP addresses and CIDR ranges (`10.0.0.0/8`), separated
+	 *  by commas, spaces or new lines.
+	 */
+	bypass?: string,
 };
 
 export type Request = Request_Serialize | Request_Deserialize;

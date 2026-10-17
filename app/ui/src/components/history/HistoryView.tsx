@@ -58,6 +58,7 @@ export function HistoryView({ dir, path }: { dir: string; path: string }) {
       </div>
       <p className="border-b bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
         Read-only. Secret values were replaced by *** before saving.
+        {entry.proxy && ` Sent ${entry.proxy}.`}
       </p>
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
         <ResizablePanel defaultSize="45" minSize={200}>

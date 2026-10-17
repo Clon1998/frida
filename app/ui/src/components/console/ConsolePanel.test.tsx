@@ -27,6 +27,7 @@ const entry: ConsoleEntry = {
     finalUrl: "http://192.168.20.32/server/webcams/list",
   },
   error: null,
+  proxy: null,
 };
 
 describe("ConsolePanel", () => {
@@ -46,6 +47,15 @@ describe("ConsolePanel", () => {
     const raw = document.querySelector("pre")?.textContent ?? "";
     expect(raw).toContain("GET /server/webcams/list HTTP/1.1\nhost: 192.168.20.32\n");
     expect(raw).toContain("HTTP/1.1 200 OK\ncontent-encoding: gzip\n\n{");
+  });
+
+  it("says when a request went through the proxy", () => {
+    const viaProxy = { ...entry, id: "2", proxy: "via proxy http://proxy.corp:3128" };
+    useConsole.setState({ items: [{ kind: "http", id: "2", entry: viaProxy }], view: "pretty" });
+    render(<ConsolePanel />);
+    fireEvent.click(screen.getByText(entry.url));
+    expect(screen.getByText("Proxy")).toBeTruthy();
+    expect(screen.getByText("via proxy http://proxy.corp:3128")).toBeTruthy();
   });
 });
 

@@ -241,6 +241,7 @@ function PrettyView({ entry }: { entry: ConsoleEntry }) {
   } else {
     general.push(["Error", entry.error ?? "no response"]);
   }
+  if (entry.proxy) general.push(["Proxy", entry.proxy]);
   general.push(["Request", `${entry.requestName} (${entry.requestPath})`]);
   return (
     <div className="max-h-96 overflow-auto bg-muted/30 pb-1 select-text">

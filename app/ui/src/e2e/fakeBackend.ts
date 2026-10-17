@@ -119,8 +119,11 @@ function initialState() {
         gitPath: null,
         aws: { configFile: null, credentialsFile: null, cacheMinutes: 15 },
         checkForUpdates: true,
+        proxy: { mode: "system", url: "", username: "", bypass: "localhost, 127.0.0.1, ::1" },
       },
     } as AppSettings,
+    /** The proxy password "in the keychain". */
+    proxyPassword: null as string | null,
     /** What `check_for_update` finds (set by a test through `offerUpdate`). */
     update: null as UpdateInfo | null,
     /** How often `install_update` ran (the real one restarts the app). */
@@ -469,7 +472,17 @@ const handlers: Record<string, (args: any) => unknown> = {
   },
   cancel_update: () => {},
   get_settings: () => state.settings,
-  save_preferences: ({ preferences }) => (state.settings.preferences = preferences),
+  save_preferences: ({ preferences }) => {
+    // Like Rust: a manual proxy URL must be http(s) or socks5 with a host.
+    const proxy = preferences.proxy;
+    if (proxy?.mode === "manual" && proxy.url && !/^(https?|socks5h?):\/\/[^/\s]+/.test(proxy.url))
+      throw {
+        code: "invalid_input",
+        message: `the proxy URL "${proxy.url}" is not valid`,
+        hint: null,
+      };
+    return (state.settings.preferences = preferences);
+  },
   forget_workspace: ({ dir }) => {
     state.settings.recentWorkspaces = state.settings.recentWorkspaces?.filter((d) => d !== dir);
     return state.settings;
@@ -495,11 +508,31 @@ const handlers: Record<string, (args: any) => unknown> = {
       expandedFolders: [],
       activeEnvironment: null,
       awsProfiles: {},
+      bypassProxy: false,
     },
+  // Like the real `save_view_state`: the proxy switch is set separately and kept.
   save_collection_state: ({ collectionId, collectionState }) => {
-    state.collectionStates.set(collectionId, collectionState);
+    const bypassProxy = state.collectionStates.get(collectionId)?.bypassProxy ?? false;
+    state.collectionStates.set(collectionId, { ...collectionState, bypassProxy });
     return null;
   },
+  set_collection_bypass_proxy: ({ bypass }) => {
+    const id = state.collection.id;
+    const current = state.collectionStates.get(id) ?? {
+      openTabs: [],
+      activeTab: null,
+      expandedFolders: [],
+      activeEnvironment: null,
+      awsProfiles: {},
+    };
+    state.collectionStates.set(id, { ...current, bypassProxy: bypass });
+    return null;
+  },
+  set_proxy_password: ({ password }) => {
+    state.proxyPassword = password;
+    return null;
+  },
+  has_proxy_password: () => state.proxyPassword !== null,
   read_collection: () => state.collection,
   save_collection: ({ collection }) => {
     state.collection = collection;
@@ -676,6 +709,7 @@ const handlers: Record<string, (args: any) => unknown> = {
     requestBody: null,
     requestBodyTruncated: false,
     response: state.historyResponses.get(id) ?? null,
+    proxy: null,
   }),
   restore_history_entry: ({ id }) => {
     const entry = state.history.find((h) => h.id === id);

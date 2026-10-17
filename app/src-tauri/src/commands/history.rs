@@ -8,7 +8,7 @@ use frida_core::model::Request;
 use frida_core::storage;
 use tauri::State;
 
-use super::http::load_active_envs;
+use super::http::{load_active_envs, proxy_for};
 use crate::error::{ApiError, ApiResult, ErrorCode, blocking};
 use crate::state::AppState;
 use frida_core::secrets::AwsFetch;
@@ -77,6 +77,7 @@ pub async fn export_curl(
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::CacheOnly).await?;
     let store = state.session_store(&root);
+    let proxy = proxy_for(&state, &root).await?;
     let workspace_dir = state.workspace_dir().ok();
     let input = ExecuteInput {
         collection_dir: &root,
@@ -84,7 +85,7 @@ pub async fn export_curl(
         request: &request,
         collection_env: collection_env.as_ref(),
         global_env: global_env.as_ref(),
-        session: state.session(&store, workspace_dir.as_deref()),
+        session: state.session(&store, workspace_dir.as_deref(), &proxy),
         cookies: None,
         oauth: &state.oauth,
     };

@@ -7,6 +7,8 @@ import {
   type AwsPreferences,
   commands,
   type Preferences,
+  type ProxyMode,
+  type ProxyPreferences,
   type ThemePreference,
 } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -26,22 +29,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { unwrap } from "@/lib/api";
+import { showError, unwrap } from "@/lib/api";
 import { useUi } from "@/stores/ui";
 import { useUpdate } from "@/stores/update";
 import { useWorkspace } from "@/stores/workspace";
 import { cn } from "cn";
 
-type Section = "appearance" | "git" | "aws" | "history" | "updates";
+type Section = "appearance" | "network" | "git" | "aws" | "history" | "updates";
 
 /**
  * The generated type marks every field optional (`#[serde(default)]`: they may be missing in
  * `settings.json`), but Rust always sends all of them.
  */
-type Prefs = Required<Omit<Preferences, "aws">> & { aws: Required<AwsPreferences> };
+type Prefs = Required<Omit<Preferences, "aws" | "proxy">> & {
+  aws: Required<AwsPreferences>;
+  proxy: Required<ProxyPreferences>;
+};
+
+const PROXY_MODES: { value: ProxyMode; label: string }[] = [
+  { value: "system", label: "System settings" },
+  { value: "none", label: "No proxy" },
+  { value: "manual", label: "Manual" },
+];
 
 const SECTIONS: { value: Section; label: string }[] = [
   { value: "appearance", label: "Appearance" },
+  { value: "network", label: "Network" },
   { value: "git", label: "Git" },
   { value: "aws", label: "AWS" },
   { value: "history", label: "History" },
@@ -159,6 +172,13 @@ export function SettingsDialog() {
                   />
                 </Row>
               </Rows>
+            )}
+
+            {section === "network" && (
+              <NetworkSettings
+                proxy={prefs.proxy}
+                onChange={(patch) => update({ proxy: { ...prefs.proxy, ...patch } })}
+              />
             )}
 
             {section === "git" && (
@@ -359,6 +379,154 @@ function PathInput({
       <Button size="sm" variant="outline" onClick={() => void browse()}>
         <FolderOpen /> Browse…
       </Button>
+    </div>
+  );
+}
+
+/**
+ * The HTTP proxy (PLAN.md M16) for every request Frida makes: sends, OAuth2 token calls,
+ * `fri.sendRequest` and AWS. The password goes to the keychain, never into `settings.json`.
+ */
+function NetworkSettings({
+  proxy,
+  onChange,
+}: {
+  proxy: Prefs["proxy"];
+  onChange: (patch: Partial<Prefs["proxy"]>) => void;
+}) {
+  return (
+    <Rows>
+      <Row label="Proxy">
+        <div className="flex flex-wrap gap-1">
+          {PROXY_MODES.map((m) => (
+            <Button
+              key={m.value}
+              size="sm"
+              variant={proxy.mode === m.value ? "default" : "outline"}
+              onClick={() => onChange({ mode: m.value })}
+            >
+              {m.label}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {proxy.mode === "system" &&
+            "Uses the operating system's proxy settings and the HTTPS_PROXY / NO_PROXY variables. AWS calls only see the variables."}
+          {proxy.mode === "none" && "Every request goes directly to the server."}
+          {proxy.mode === "manual" &&
+            "Sends, OAuth2 token requests, script requests and AWS calls go through this proxy. Collections can opt out in their settings."}
+        </p>
+      </Row>
+      {proxy.mode === "manual" && (
+        <>
+          <Row label="Proxy URL" hint="http://host:port, https://host:port or socks5://host:port.">
+            <TextSetting
+              key={`url:${proxy.url}`}
+              value={proxy.url}
+              placeholder="http://proxy.example.com:8080"
+              onChange={(url) => onChange({ url })}
+            />
+          </Row>
+          <Row label="Username" hint="Leave empty if the proxy needs no login.">
+            <TextSetting
+              key={`user:${proxy.username}`}
+              value={proxy.username}
+              placeholder="(none)"
+              onChange={(username) => onChange({ username })}
+            />
+          </Row>
+          {proxy.username !== "" && (
+            <Row label="Password" hint="Stored in the system keychain.">
+              <ProxyPassword />
+            </Row>
+          )}
+          <Row
+            label="Don't use the proxy for"
+            hint="Host names, *.domain for a domain with its subdomains, IP addresses and ranges like 10.0.0.0/8. Separate them with commas or new lines."
+          >
+            <Textarea
+              key={`bypass:${proxy.bypass}`}
+              className="min-h-16 font-mono text-xs"
+              defaultValue={proxy.bypass}
+              spellCheck={false}
+              onBlur={(e) => {
+                if (e.target.value !== proxy.bypass) onChange({ bypass: e.target.value });
+              }}
+            />
+          </Row>
+        </>
+      )}
+    </Rows>
+  );
+}
+
+/** A text setting, saved when leaving the field or pressing Enter. */
+function TextSetting({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  const commit = () => {
+    if (text.trim() !== value) onChange(text.trim());
+  };
+  return (
+    <Input
+      className="h-8 font-mono text-xs"
+      value={text}
+      placeholder={placeholder}
+      spellCheck={false}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+      }}
+    />
+  );
+}
+
+/** The proxy password: shows whether one is stored, never the value. */
+function ProxyPassword() {
+  const [stored, setStored] = useState<boolean | null>(null);
+  const [text, setText] = useState("");
+  useEffect(() => {
+    void unwrap(commands.hasProxyPassword()).then(setStored, () => setStored(false));
+  }, []);
+  const save = async (password: string | null) => {
+    try {
+      await unwrap(commands.setProxyPassword(password));
+      setStored(password !== null);
+      setText("");
+      toast.success(password === null ? "Proxy password removed" : "Proxy password saved");
+    } catch (e) {
+      showError(e);
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        type="password"
+        className="h-8 w-56"
+        value={text}
+        placeholder={stored ? "•••••••• (saved)" : "Password"}
+        autoComplete="off"
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && text) void save(text);
+        }}
+      />
+      <Button size="sm" variant="outline" disabled={!text} onClick={() => void save(text)}>
+        Save
+      </Button>
+      {stored && (
+        <Button size="sm" variant="ghost" onClick={() => void save(null)}>
+          Remove
+        </Button>
+      )}
     </div>
   );
 }

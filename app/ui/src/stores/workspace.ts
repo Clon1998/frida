@@ -107,6 +107,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
         withPreferences(await unwrap(commands.savePreferences(preferences)));
       } catch (e) {
         showError(e);
+        // Show what is really saved again (e.g. after a refused proxy URL).
+        await get().loadSettings();
       }
     },
 

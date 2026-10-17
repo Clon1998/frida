@@ -61,6 +61,8 @@ pub enum ErrorCode {
     Update,
     /// Something is still running that the action would interrupt.
     Busy,
+    /// The proxy couldn't be reached or refused the login (PLAN.md M16).
+    Proxy,
 }
 
 impl ApiError {
@@ -169,6 +171,11 @@ impl From<SendError> for ApiError {
                 "Add the server's CA certificate in the collection settings, or turn off TLS verification there.",
             ),
             SendError::File { .. } => ApiError::new(ErrorCode::Io, message),
+            SendError::Proxy { .. } => ApiError::new(ErrorCode::Proxy, message).with_hint(
+                "Check the proxy address in Settings → Network, or turn off the proxy for this collection in its settings.",
+            ),
+            SendError::ProxyAuth { .. } => ApiError::new(ErrorCode::Proxy, message)
+                .with_hint("Check the proxy's username and password in Settings → Network."),
             SendError::Other(_) => ApiError::new(ErrorCode::Http, message),
         }
     }

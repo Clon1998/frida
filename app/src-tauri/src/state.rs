@@ -9,6 +9,7 @@ use frida_core::auth::OAuth2Manager;
 use frida_core::history::HistoryStore;
 use frida_core::http::{CookieJar, EnvOverrides, ResponseCache, Session, SessionStore};
 use frida_core::local_state::{LocalStore, Preferences};
+use frida_core::network::ProxySettings;
 use frida_core::storage;
 use frida_core::watch::FsWatcher;
 use frida_secrets::aws::AwsFiles;
@@ -51,6 +52,14 @@ pub struct AppState {
     pub update: Mutex<Option<tauri_plugin_updater::Update>>,
     /// Cancels the update download while it runs.
     pub update_cancel: Mutex<Option<CancellationToken>>,
+    /// The proxy from Settings → Network with its password, built on first use and dropped
+    /// when the settings or the password change (PLAN.md M16).
+    pub proxy: Mutex<Option<ProxySettings>>,
+}
+
+/// Where the proxy password is kept in the keychain. Not tied to a workspace or environment.
+pub fn proxy_password_key() -> frida_secrets::SecretKey {
+    frida_secrets::SecretKey::new("app", "network", "proxyPassword")
 }
 
 /// Where secret values are kept on this machine (PLAN.md §6).
@@ -159,6 +168,7 @@ impl AppState {
             in_flight: Mutex::new(HashMap::new()),
             update: Mutex::new(None),
             update_cancel: Mutex::new(None),
+            proxy: Mutex::new(None),
             responses: Mutex::new(ResponseCache::default()),
             watcher: Mutex::new(None),
             secrets,
@@ -177,6 +187,8 @@ impl AppState {
     /// Makes the parts of the settings that live outside the UI take effect: which git program
     /// runs, and the AWS files and cache time. Called at startup and after every change.
     pub fn apply_preferences(&self, preferences: &Preferences) {
+        // Rebuilt on the next send (it may need the password from the keychain).
+        *self.proxy.lock().expect("proxy lock poisoned") = None;
         frida_git::set_executable(preferences.git_path.as_ref().map(PathBuf::from));
         self.aws.configure(
             Duration::from_secs(u64::from(preferences.aws.cache_minutes) * 60),
@@ -221,6 +233,7 @@ impl AppState {
         &'a self,
         store: &'a SessionStore,
         workspace_dir: Option<&'a Path>,
+        proxy: &'a ProxySettings,
     ) -> Session<'a> {
         Session {
             runtime: &store.runtime,
@@ -229,6 +242,7 @@ impl AppState {
             workspace_dir,
             // The app always follows the collection's TLS settings.
             skip_tls_verify: false,
+            proxy,
         }
     }
 

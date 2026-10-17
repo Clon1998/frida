@@ -19,6 +19,8 @@ use super::env::{active_environments, aws_profile};
 use crate::error::{ApiError, ApiResult, ErrorCode, blocking};
 use crate::state::AppState;
 use crate::state::EnvScope;
+use crate::state::proxy_password_key;
+use frida_core::network::{ProxyMode, ProxySettings};
 use frida_core::secrets::AwsFetch;
 
 /// The active global and collection environment of a collection, with secret values filled in
@@ -29,6 +31,8 @@ pub(crate) async fn load_active_envs(
     collection_dir: &Path,
     aws: AwsFetch,
 ) -> ApiResult<(Option<Environment>, Option<Environment>)> {
+    // Also hands the current proxy to the AWS client before it is used below.
+    global_proxy(state).await?;
     let (mut global, mut collection) = load_keychain_envs(state, collection_dir).await?;
     let dir_text = collection_dir.to_string_lossy().to_string();
     if let Some(env) = &mut global {
@@ -41,6 +45,41 @@ pub(crate) async fn load_active_envs(
         secrets::fill_aws_secrets(env, false, profile.as_deref(), &state.aws, aws).await?;
     }
     Ok((global, collection))
+}
+
+/// The proxy for the requests of the collection in `collection_dir`: the one from Settings →
+/// Network, or none when the collection's "Don't use the proxy" switch is on (PLAN.md M16).
+pub(crate) async fn proxy_for(state: &AppState, collection_dir: &Path) -> ApiResult<ProxySettings> {
+    let global = global_proxy(state).await?;
+    let id = storage::load_collection(collection_dir)?.id;
+    if state.local.load_collection_state(&id)?.bypass_proxy {
+        return Ok(ProxySettings::Off);
+    }
+    Ok(global)
+}
+
+/// The proxy from Settings → Network, built once and cached in [`AppState::proxy`]. The
+/// password is read from the keychain off the async runtime, and only for a proxy with a
+/// username. The AWS client gets the same settings.
+pub(crate) async fn global_proxy(state: &AppState) -> ApiResult<ProxySettings> {
+    if let Some(cached) = state.proxy.lock().expect("proxy lock poisoned").clone() {
+        return Ok(cached);
+    }
+    let prefs = state.local.load_settings().preferences.proxy;
+    let needs_password = prefs.mode == ProxyMode::Manual && !prefs.username.trim().is_empty();
+    let password = if needs_password {
+        let store = state.secrets.store();
+        blocking(move || Ok(store.get(&proxy_password_key())?)).await?
+    } else {
+        None
+    };
+    let settings = ProxySettings::from_preferences(&prefs, password).map_err(|e| {
+        ApiError::new(ErrorCode::InvalidInput, e.to_string())
+            .with_hint("Fix the proxy in Settings → Network.")
+    })?;
+    state.aws.set_proxy(settings.for_aws());
+    *state.proxy.lock().expect("proxy lock poisoned") = Some(settings.clone());
+    Ok(settings)
 }
 
 async fn load_keychain_envs(
@@ -96,6 +135,7 @@ pub async fn send_request(
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
+    let proxy = proxy_for(&state, &root).await?;
     let workspace_dir = state.workspace_dir().ok();
     let cancel = CancellationToken::new();
     state
@@ -111,7 +151,7 @@ pub async fn send_request(
         request: &request,
         collection_env: collection_env.as_ref(),
         global_env: global_env.as_ref(),
-        session: state.session(&store, workspace_dir.as_deref()),
+        session: state.session(&store, workspace_dir.as_deref(), &proxy),
         cookies: Some(state.cookie_jar(&root)),
         oauth: &state.oauth,
     };
@@ -221,6 +261,8 @@ fn record_history(
                 request_body: None,
                 response: None,
                 error: Some(err.to_string()),
+                // A proxy problem is named in the error itself.
+                proxy: None,
             },
             Vec::new(),
         ),
@@ -252,6 +294,7 @@ pub async fn inspect_request(
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::CacheOnly).await?;
     let store = state.session_store(&root);
+    let proxy = proxy_for(&state, &root).await?;
     let workspace_dir = state.workspace_dir().ok();
     let report = http::inspect(&ExecuteInput {
         collection_dir: &root,
@@ -259,7 +302,7 @@ pub async fn inspect_request(
         request: &request,
         collection_env: collection_env.as_ref(),
         global_env: global_env.as_ref(),
-        session: state.session(&store, workspace_dir.as_deref()),
+        session: state.session(&store, workspace_dir.as_deref(), &proxy),
         cookies: None,
         oauth: &state.oauth,
     })?;
@@ -298,6 +341,7 @@ pub async fn fetch_oauth2_tokens(
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
+    let proxy = proxy_for(&state, &root).await?;
     let workspace_dir = state.workspace_dir().ok();
     let (request, request_rel) = request_or_stand_in(request, path);
     let cancel = CancellationToken::new();
@@ -313,7 +357,7 @@ pub async fn fetch_oauth2_tokens(
             request: &request,
             collection_env: collection_env.as_ref(),
             global_env: global_env.as_ref(),
-            session: state.session(&store, workspace_dir.as_deref()),
+            session: state.session(&store, workspace_dir.as_deref(), &proxy),
             cookies: None,
             oauth: &state.oauth,
         },

@@ -172,6 +172,64 @@ test("updates: switching off the automatic check is saved", async ({ app }) => {
     .toBe(false);
 });
 
+test("network: a manual proxy with login and bypass list is saved, a bad URL refused", async ({
+  app,
+}) => {
+  await app.getByRole("button", { name: "Settings" }).click();
+  await app.getByRole("button", { name: "Network" }).click();
+  const dialog = app.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Manual" }).click();
+
+  const url = dialog.getByRole("group", { name: "Proxy URL" }).getByRole("textbox");
+  await url.fill("proxy.corp:3128");
+  await url.press("Enter");
+  await expectErrorToast(app, "is not valid");
+  await expect.poll(async () => (await backend(app)).settings.preferences.proxy.url).toBe("");
+
+  await url.fill("http://proxy.corp:3128");
+  await url.press("Enter");
+  const user = dialog.getByRole("group", { name: "Username" }).getByRole("textbox");
+  await user.fill("ann");
+  await user.press("Enter");
+  const password = dialog.getByRole("group", { name: "Password" });
+  await password.getByPlaceholder("Password").fill("s3cret");
+  await password.getByRole("button", { name: "Save" }).click();
+  await expect(password.getByPlaceholder("•••••••• (saved)")).toBeVisible();
+
+  const bypass = dialog
+    .getByRole("group", { name: "Don't use the proxy for" })
+    .getByRole("textbox");
+  await bypass.fill("localhost, *.internal");
+  await url.click(); // leave the field
+
+  const saved = await backend(app);
+  expect(saved.settings.preferences.proxy).toEqual({
+    mode: "manual",
+    url: "http://proxy.corp:3128",
+    username: "ann",
+    bypass: "localhost, *.internal",
+  });
+  expect(saved.proxyPassword).toBe("s3cret");
+  // The password never goes into the settings.
+  expect(JSON.stringify(saved.settings)).not.toContain("s3cret");
+});
+
+test("collection settings: the proxy switch is saved on this computer and survives tab changes", async ({
+  app,
+}) => {
+  await openWorkspace(app);
+  await app.getByRole("button", { name: "Collection settings" }).click();
+  await app.getByRole("tab", { name: "Settings" }).click();
+  await app.getByRole("checkbox", { name: "Don't use the proxy" }).click();
+  const bypass = async () =>
+    Object.values(
+      (await backend(app)).collectionStates as Record<string, { bypassProxy?: boolean }>,
+    )[0]?.bypassProxy;
+  await expect.poll(bypass).toBe(true);
+  await openRequest(app, "Health");
+  await expect.poll(bypass).toBe(true);
+});
+
 test("folder settings: headers and auth are saved to the folder", async ({ app }) => {
   await openWorkspace(app);
   await app.locator("aside").getByText("Orders", { exact: true }).click({ button: "right" });

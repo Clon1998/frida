@@ -1,4 +1,5 @@
 import { open as openFile } from "@tauri-apps/plugin-dialog";
+import { useEffect, useState } from "react";
 import { useSubTab } from "@/stores/subTabs";
 import { FolderOpen, Trash2 } from "lucide-react";
 import { KeyValueTable } from "@/components/request/KeyValueTable";
@@ -18,6 +19,49 @@ import { CookiesSection } from "./CookiesSection";
 import type { Auth } from "@/bindings";
 import { AuthEditor } from "./AuthEditor";
 import { ScriptsSection, TestsNote, TextSection, VarsSection } from "./sections";
+
+/**
+ * "Don't use the proxy" (PLAN.md M16). Unlike everything else in this tab it is saved at once
+ * and only on this computer (like the proxy itself), not in `collection.yaml`.
+ */
+function ProxySwitch({ dir, collectionId }: { dir: string; collectionId: string }) {
+  const [bypass, setBypass] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void unwrap(commands.getCollectionState(collectionId)).then(
+      (state) => !cancelled && setBypass(state.bypassProxy ?? false),
+      () => !cancelled && setBypass(false),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [collectionId]);
+  const change = async (next: boolean) => {
+    setBypass(next);
+    try {
+      await unwrap(commands.setCollectionBypassProxy(dir, next));
+    } catch (e) {
+      setBypass(!next);
+      showError(e);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="flex items-center gap-2">
+        <Checkbox
+          checked={bypass ?? false}
+          disabled={bypass === null}
+          onCheckedChange={(checked) => void change(checked === true)}
+        />
+        Don&apos;t use the proxy
+      </label>
+      <span className="text-xs text-muted-foreground">
+        For APIs on this computer or the local network. Applies on this computer only and is saved
+        right away.
+      </span>
+    </div>
+  );
+}
 
 /** Collection settings, opened as a tab. Saved in `collection.yaml`, shared through git. */
 export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab }) {
@@ -156,6 +200,7 @@ export function CollectionEditor({ dir, tab }: { dir: string; tab: CollectionTab
                   for local development.
                 </p>
               )}
+              <ProxySwitch dir={dir} collectionId={collection.id} />
               <div className="flex flex-col gap-1.5">
                 <span>Extra CA certificates</span>
                 <span className="text-xs text-muted-foreground">

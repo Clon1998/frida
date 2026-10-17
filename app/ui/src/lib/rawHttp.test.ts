@@ -25,6 +25,7 @@ const entry: ConsoleEntry = {
     finalUrl: "https://api.example.com/orders",
   },
   error: null,
+  proxy: null,
 };
 
 describe("raw HTTP formatting", () => {

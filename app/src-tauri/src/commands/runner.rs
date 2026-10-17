@@ -8,7 +8,7 @@ use tauri::State;
 use tauri_specta::Event;
 use tokio_util::sync::CancellationToken;
 
-use super::http::{load_active_envs, log_to_console};
+use super::http::{load_active_envs, log_to_console, proxy_for};
 use crate::ScriptLogged;
 use crate::error::ApiResult;
 use crate::state::AppState;
@@ -53,6 +53,7 @@ pub async fn run_collection(
     let items = runner::plan_run(&root, &folder)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
+    let proxy = proxy_for(&state, &root).await?;
     let workspace_dir = state.workspace_dir().ok();
     let cancel = CancellationToken::new();
     state
@@ -105,7 +106,7 @@ pub async fn run_collection(
             collection_dir: &root,
             collection_env: collection_env.as_ref(),
             global_env: global_env.as_ref(),
-            session: state.session(&store, workspace_dir.as_deref()),
+            session: state.session(&store, workspace_dir.as_deref(), &proxy),
             cookies: Some(state.cookie_jar(&root)),
             oauth: &state.oauth,
         },
