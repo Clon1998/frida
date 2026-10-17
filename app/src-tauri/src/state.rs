@@ -47,6 +47,10 @@ pub struct AppState {
     /// Request history. `Arc` so it can be moved into `spawn_blocking` closures. `None` if the
     /// database couldn't be opened (history is then simply off; sending still works).
     pub history: Option<Arc<HistoryStore>>,
+    /// The update found by the last check, ready for "Install and restart" (PLAN.md M14).
+    pub update: Mutex<Option<tauri_plugin_updater::Update>>,
+    /// Cancels the update download while it runs.
+    pub update_cancel: Mutex<Option<CancellationToken>>,
 }
 
 /// Where secret values are kept on this machine (PLAN.md §6).
@@ -153,6 +157,8 @@ impl AppState {
             local: LocalStore::new(app_data_dir),
             workspace: Mutex::new(None),
             in_flight: Mutex::new(HashMap::new()),
+            update: Mutex::new(None),
+            update_cancel: Mutex::new(None),
             responses: Mutex::new(ResponseCache::default()),
             watcher: Mutex::new(None),
             secrets,

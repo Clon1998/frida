@@ -13,4 +13,5 @@ pub mod git;
 pub mod history;
 pub mod http;
 pub mod runner;
+pub mod update;
 pub mod workspace;

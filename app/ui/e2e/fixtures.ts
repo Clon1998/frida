@@ -92,6 +92,22 @@ export const backend = (page: Page): Promise<any> =>
     (globalThis as unknown as { __fridaE2E: { state: () => unknown } }).__fridaE2E.state(),
   );
 
+/** Makes the fake backend's "Check for updates" find `version`. */
+export const offerUpdate = (page: Page, version: string) =>
+  page.evaluate(
+    (v) =>
+      (
+        globalThis as unknown as { __fridaE2E: { offerUpdate: (info: unknown) => void } }
+      ).__fridaE2E.offerUpdate({
+        version: v,
+        currentVersion: "0.2.0",
+        notes: "## What's Changed\n* feat: auto-update",
+        date: "2026-10-20T10:00:00Z",
+        installBlocker: null,
+      }),
+    version,
+  );
+
 /** Changes a request in the fake backend as if edited outside Frida, and sends `fs-changed`. */
 export const changeOnDisk = (page: Page, path: string, patch: Record<string, unknown>) =>
   page.evaluate(

@@ -12,6 +12,9 @@ use crate::error::{CoreError, Result};
 /// How many recently opened workspaces are remembered.
 pub const MAX_RECENT_WORKSPACES: usize = 10;
 
+/// The automatic update check runs at most this often (PLAN.md M14).
+pub const UPDATE_CHECK_INTERVAL_SECS: u32 = 24 * 60 * 60;
+
 /// `settings.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(default, rename_all = "camelCase")]
@@ -25,6 +28,10 @@ pub struct AppSettings {
     pub active_global_environments: std::collections::BTreeMap<String, String>,
     /// The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`.
     pub aws_profiles: std::collections::BTreeMap<String, String>,
+    /// When the app last asked for an update on its own (unix seconds), so it asks at most
+    /// once a day (PLAN.md M14). `u32` because TypeScript numbers can't hold every `u64`;
+    /// seconds fit until 2106.
+    pub last_update_check: Option<u32>,
     /// What the user chooses in the Settings dialog. The fields above are state the app keeps
     /// by itself.
     pub preferences: Preferences,
@@ -45,6 +52,8 @@ pub struct Preferences {
     /// The git program. `None` runs `git` from the PATH.
     pub git_path: Option<String>,
     pub aws: AwsPreferences,
+    /// Look for a new Frida version on start (at most once a day).
+    pub check_for_updates: bool,
 }
 
 impl Default for Preferences {
@@ -57,6 +66,7 @@ impl Default for Preferences {
             history_size: crate::history::DEFAULT_RETENTION as u32,
             git_path: None,
             aws: AwsPreferences::default(),
+            check_for_updates: true,
         }
     }
 }
@@ -93,6 +103,7 @@ impl Preferences {
                 credentials_file: path(&self.aws.credentials_file),
                 cache_minutes: clamp(self.aws.cache_minutes, &Self::AWS_CACHE_MINUTES),
             },
+            check_for_updates: self.check_for_updates,
         }
     }
 }
@@ -146,6 +157,19 @@ impl AppSettings {
     pub fn forget_workspace(&mut self, workspace: &str) {
         self.recent_workspaces.retain(|w| w != workspace);
         self.pinned_workspaces.retain(|w| w != workspace);
+    }
+
+    /// Whether the app should look for an update on its own at `now` (unix seconds): switched on
+    /// in the settings and not done in the last 24 hours. A clock that went backwards counts as
+    /// due, so a wrong timestamp can't switch the check off for good.
+    pub fn update_check_due(&self, now: u32) -> bool {
+        if !self.preferences.check_for_updates {
+            return false;
+        }
+        match self.last_update_check {
+            Some(last) if last <= now => now - last >= UPDATE_CHECK_INTERVAL_SECS,
+            _ => true,
+        }
     }
 
     /// Pins or unpins `workspace`.
@@ -293,6 +317,21 @@ mod tests {
         assert_eq!(prefs.aws.config_file.as_deref(), Some("/x/config"));
         assert_eq!(prefs.aws.cache_minutes, 1);
         assert_eq!(Preferences::default().sanitized(), Preferences::default());
+    }
+
+    #[test]
+    fn update_check_runs_at_most_once_a_day() {
+        let day = UPDATE_CHECK_INTERVAL_SECS;
+        let mut settings = AppSettings::default();
+        assert!(settings.update_check_due(1_000), "never checked");
+
+        settings.last_update_check = Some(1_000);
+        assert!(!settings.update_check_due(1_000 + day - 1));
+        assert!(settings.update_check_due(1_000 + day));
+        assert!(settings.update_check_due(10), "clock went backwards");
+
+        settings.preferences.check_for_updates = false;
+        assert!(!settings.update_check_due(1_000 + 2 * day), "switched off");
     }
 
     #[test]

@@ -49,11 +49,14 @@ pub struct ScriptLogged {
 /// It's a separate function so both [`run`] and the `export_bindings` test can use it.
 /// The `tauri::Wry` type parameter is the concrete webview runtime Tauri uses on desktop.
 fn specta_builder() -> Builder<tauri::Wry> {
-    use commands::{app, archive, collection, env, git, history, http, runner, workspace};
+    use commands::{app, archive, collection, env, git, history, http, runner, update, workspace};
 
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             app::get_about_info,
+            update::check_for_update,
+            update::install_update,
+            update::cancel_update,
             app::get_settings,
             app::list_snippets,
             app::save_preferences,
@@ -148,7 +151,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             FsChanged,
             ConsoleLogged,
             ScriptLogged,
-            runner::RunProgress
+            runner::RunProgress,
+            update::UpdateProgress
         ])
 }
 
@@ -165,6 +169,13 @@ fn export_bindings(builder: &Builder<tauri::Wry>) -> anyhow::Result<()> {
 
 /// Starts the desktop app. Called from `main.rs`.
 pub fn run() {
+    // Two TLS backends end up in the build: reqwest's `aws-lc-rs` and the updater's `ring`.
+    // Whoever needs TLS first without naming one would install "theirs" as the process
+    // default, so sends could switch backend after the first update check. Choosing it here,
+    // before anything runs, keeps every connection on the same one. (`install_default` only
+    // fails if a default is already set, which is fine.)
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
     let builder = specta_builder();
 
     // Regenerate bindings on every debug start so the UI types never drift from Rust.
@@ -174,6 +185,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);

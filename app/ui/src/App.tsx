@@ -4,7 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/workspace/AppShell";
 import { StartScreen } from "@/components/workspace/StartScreen";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { applyAppearance, applyTheme } from "@/lib/theme";
+import { useUpdate } from "@/stores/update";
 import { useWorkspace } from "@/stores/workspace";
 
 export default function App() {
@@ -20,11 +22,16 @@ export default function App() {
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
+  // Rust decides whether the check is due (switched on, once a day, not in dev builds).
+  useEffect(() => {
+    void useUpdate.getState().checkOnStart();
+  }, []);
 
   return (
     <TooltipProvider>
       {hasWorkspace ? <AppShell /> : <StartScreen />}
       <SettingsDialog />
+      <UpdateDialog />
       <Toaster position="bottom-right" />
     </TooltipProvider>
   );

@@ -57,6 +57,10 @@ pub enum ErrorCode {
     /// An environment with AWS secrets has no AWS profile yet: the UI asks for one.
     AwsProfileRequired,
     Aws,
+    /// Checking for, downloading or installing an update failed (PLAN.md M14).
+    Update,
+    /// Something is still running that the action would interrupt.
+    Busy,
 }
 
 impl ApiError {

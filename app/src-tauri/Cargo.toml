@@ -32,6 +32,12 @@ specta-typescript = { workspace = true }
 tauri-specta = { workspace = true }
 tauri-plugin-dialog = "2.8.3"
 tauri-plugin-opener = "2.7.2"
+# In-app updates (PLAN.md M14), verified with Tauri's own update signature.
+tauri-plugin-updater = "2.14.0"
+# Formats the release date of an update (already in the tree through Tauri).
+time = { version = "0.3.55", features = ["formatting"] }
+# Only to choose the TLS backend once for the whole process (see `run` in lib.rs).
+rustls = { version = "0.23.46", default-features = false, features = ["aws_lc_rs"] }
 tokio-util = { workspace = true }
 uuid = { workspace = true }
 

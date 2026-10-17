@@ -7,6 +7,34 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 export const commands = {
 	/**  Returns the product name and core library version. */
 	getAboutInfo: () => __TAURI_INVOKE<AboutInfo>("get_about_info"),
+	/**
+	 *  Looks for a newer version. `manual` is "Check for updates" in the settings; otherwise this
+	 *  is the check on start, which does nothing unless it's switched on and due (once a day) and
+	 *  never runs in development builds. Returns `None` when Frida is up to date (or the automatic
+	 *  check was skipped).
+	 */
+	checkForUpdate: (manual: boolean) => typedError<{
+	version: string,
+	currentVersion: string,
+	/**  The release notes (Markdown), when the release has any. */
+	notes: string | null,
+	/**  When the release was published, RFC 3339. */
+	date: string | null,
+	/**
+	 *  Why this copy of Frida can't update itself (a development build, or a bare binary
+	 *  without an installer). `None`: "Install and restart" works.
+	 */
+	installBlocker: string | null,
+} | null, ApiError>(__TAURI_INVOKE("check_for_update", { manual })),
+	/**
+	 *  Downloads and installs the update found by the last [`check_for_update`], then restarts
+	 *  Frida. Progress arrives as [`UpdateProgress`] events; [`cancel_update`] stops the download.
+	 *  Refused while requests or runs are in flight. On Windows the installer closes the app
+	 *  itself.
+	 */
+	installUpdate: () => typedError<null, ApiError>(__TAURI_INVOKE("install_update")),
+	/**  Stops a running update download. Installing (after the download) can't be stopped. */
+	cancelUpdate: () => __TAURI_INVOKE<void>("cancel_update"),
 	getSettings: () => __TAURI_INVOKE<AppSettings>("get_settings"),
 	/**
 	 *  The script and test examples for the editors' "Examples" menu (`frida_script::snippets`;
@@ -298,6 +326,7 @@ export const events = {
 	fsChanged: makeEvent<FsChanged>("fs-changed"),
 	runProgress: makeEvent<RunProgress_Deserialize>("run-progress"),
 	scriptLogged: makeEvent<ScriptLogged>("script-logged"),
+	updateProgress: makeEvent<UpdateProgress>("update-progress"),
 };
 
 /* Types */
@@ -346,6 +375,12 @@ export type AppSettings = {
 	activeGlobalEnvironments?: { [key in string]: string },
 	/**  The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`. */
 	awsProfiles?: { [key in string]: string },
+	/**
+	 *  When the app last asked for an update on its own (unix seconds), so it asks at most
+	 *  once a day (PLAN.md M14). `u32` because TypeScript numbers can't hold every `u64`;
+	 *  seconds fit until 2106.
+	 */
+	lastUpdateCheck?: number | null,
 	/**
 	 *  What the user chooses in the Settings dialog. The fields above are state the app keeps
 	 *  by itself.
@@ -760,7 +795,11 @@ export type Environment_Serialize = {
 
 export type ErrorCode = "io" | "invalid_file" | "unsupported_version" | "already_exists" | "not_found" | "invalid_input" | "invalid_url" | "timeout" | "cancelled" | "connect" | "tls" | "http" | "no_workspace" | "secret_locked" | "wrong_password" | "secret" | "auth" | "script" | "git" | 
 /**  An environment with AWS secrets has no AWS profile yet: the UI asks for one. */
-"aws_profile_required" | "aws";
+"aws_profile_required" | "aws" | 
+/**  Checking for, downloading or installing an update failed (PLAN.md M14). */
+"update" | 
+/**  Something is still running that the action would interrupt. */
+"busy";
 
 /**  What to export. Paths are absolute folders; `rel` is collection-relative (as in the tree). */
 export type ExportSource = { kind: "workspace"; workspaceDir: string } | { kind: "collection"; collectionDir: string } | { kind: "folder"; collectionDir: string; rel: string } | { kind: "request"; collectionDir: string; rel: string };
@@ -1048,6 +1087,8 @@ export type Preferences = {
 	/**  The git program. `None` runs `git` from the PATH. */
 	gitPath?: string | null,
 	aws?: AwsPreferences,
+	/**  Look for a new Frida version on start (at most once a day). */
+	checkForUpdates?: boolean,
 };
 
 export type Request = Request_Serialize | Request_Deserialize;
@@ -1414,6 +1455,28 @@ export type TreeNode = { kind: "folder"; path: string; name: string; seq: number
  *  whole tree, so one broken file (e.g. a git merge conflict) doesn't lock the user out.
  */
 { kind: "invalid"; path: string; error: string };
+
+/**  A newer version that can be installed (or, see `install_blocker`, only downloaded by hand). */
+export type UpdateInfo = {
+	version: string,
+	currentVersion: string,
+	/**  The release notes (Markdown), when the release has any. */
+	notes: string | null,
+	/**  When the release was published, RFC 3339. */
+	date: string | null,
+	/**
+	 *  Why this copy of Frida can't update itself (a development build, or a bare binary
+	 *  without an installer). `None`: "Install and restart" works.
+	 */
+	installBlocker: string | null,
+};
+
+/**  Emitted while an update downloads. `total` is `None` when the server doesn't say. */
+export type UpdateProgress = {
+	/**  Bytes. `u32` (up to 4 GB) because TypeScript numbers can't hold every `u64`. */
+	downloaded: number,
+	total: number | null,
+};
 
 /**  Where in the request a variable is used. */
 export type UsageLocation = { kind: "url" } | { kind: "pathParam"; name: string } | { kind: "header"; name: string } | { kind: "body" } | { kind: "auth" } | 

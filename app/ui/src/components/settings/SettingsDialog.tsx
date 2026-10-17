@@ -10,6 +10,7 @@ import {
   type ThemePreference,
 } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -27,10 +28,11 @@ import {
 } from "@/components/ui/select";
 import { unwrap } from "@/lib/api";
 import { useUi } from "@/stores/ui";
+import { useUpdate } from "@/stores/update";
 import { useWorkspace } from "@/stores/workspace";
 import { cn } from "cn";
 
-type Section = "appearance" | "git" | "aws" | "history";
+type Section = "appearance" | "git" | "aws" | "history" | "updates";
 
 /**
  * The generated type marks every field optional (`#[serde(default)]`: they may be missing in
@@ -43,6 +45,7 @@ const SECTIONS: { value: Section; label: string }[] = [
   { value: "git", label: "Git" },
   { value: "aws", label: "AWS" },
   { value: "history", label: "History" },
+  { value: "updates", label: "Updates" },
 ];
 
 const THEMES: { value: ThemePreference; label: string }[] = [
@@ -244,6 +247,26 @@ export function SettingsDialog() {
                 </Row>
               </Rows>
             )}
+
+            {section === "updates" && (
+              <Rows>
+                <Row
+                  label="Automatic check"
+                  hint="Looks for a new version on GitHub when Frida starts, at most once a day. Nothing is installed without asking."
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={prefs.checkForUpdates}
+                      onCheckedChange={(checked) => update({ checkForUpdates: checked === true })}
+                    />
+                    Check for updates on start
+                  </label>
+                </Row>
+                <Row label="Version">
+                  <UpdateCheck />
+                </Row>
+              </Rows>
+            )}
           </div>
         </div>
       </DialogContent>
@@ -336,6 +359,37 @@ function PathInput({
       <Button size="sm" variant="outline" onClick={() => void browse()}>
         <FolderOpen /> Browse…
       </Button>
+    </div>
+  );
+}
+
+/** The running version and "Check for updates" by hand. */
+function UpdateCheck() {
+  const [version, setVersion] = useState<string | null>(null);
+  const phase = useUpdate((s) => s.phase);
+  const available = useUpdate((s) => s.available);
+  const checkNow = useUpdate((s) => s.checkNow);
+  const setDialogOpen = useUpdate((s) => s.setDialogOpen);
+  useEffect(() => {
+    void commands.getAboutInfo().then((about) => setVersion(about.coreVersion));
+  }, []);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Frida {version ?? "…"}</span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={phase !== "idle"}
+        onClick={() => void checkNow()}
+      >
+        {phase === "checking" && <Loader2 className="animate-spin" />}
+        Check for updates
+      </Button>
+      {available && (
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          Frida {available.version} available…
+        </Button>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import type {
   Request,
   ResponseView,
   TreeNode,
+  UpdateInfo,
   WorkspaceOverview,
 } from "@/bindings";
 
@@ -117,8 +118,13 @@ function initialState() {
         historySize: 500,
         gitPath: null,
         aws: { configFile: null, credentialsFile: null, cacheMinutes: 15 },
+        checkForUpdates: true,
       },
     } as AppSettings,
+    /** What `check_for_update` finds (set by a test through `offerUpdate`). */
+    update: null as UpdateInfo | null,
+    /** How often `install_update` ran (the real one restarts the app). */
+    updateInstalls: 0,
     workspaceOpen: false,
     collection,
     folders,
@@ -455,6 +461,13 @@ const handlers: Record<string, (args: any) => unknown> = {
     },
   ],
   get_about_info: () => ({ productName: "Frida", coreVersion: "e2e" }),
+  // The check on start finds nothing, so a notice never gets in the way of other tests.
+  check_for_update: ({ manual }) => (manual ? state.update : null),
+  install_update: async () => {
+    await emit("update-progress", { downloaded: 512, total: 1024 });
+    state.updateInstalls += 1;
+  },
+  cancel_update: () => {},
   get_settings: () => state.settings,
   save_preferences: ({ preferences }) => (state.settings.preferences = preferences),
   forget_workspace: ({ dir }) => {
@@ -791,6 +804,10 @@ export function installFakeBackend() {
       const current = state.requests.get(path);
       if (current) state.requests.set(path, { ...current, ...patch });
       await emit("fs-changed", { paths: [`${COLLECTION}/${path}`] });
+    },
+    /** Makes "Check for updates" find `info`. */
+    offerUpdate: (info: UpdateInfo) => {
+      state.update = info;
     },
     /** A plain copy for the tests (`Map`s don't survive `page.evaluate`). */
     state: () => ({

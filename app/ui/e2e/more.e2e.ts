@@ -7,6 +7,7 @@ import {
   changeOnDisk,
   expect,
   expectErrorToast,
+  offerUpdate,
   openRequest,
   openWorkspace,
   setUrl,
@@ -138,6 +139,37 @@ test("settings: theme and editor font size apply at once", async ({ app }) => {
     theme: "dark",
     editorFontSize: 16,
   });
+});
+
+test("updates: check by hand, save unsaved tabs, install", async ({ app }) => {
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+  await setUrl(app, "http://localhost:8787/changed");
+
+  await app.keyboard.press("ControlOrMeta+,");
+  await app.getByRole("button", { name: "Updates" }).click();
+  await app.getByRole("button", { name: "Check for updates" }).click();
+  await expect(app.getByText("Frida is up to date")).toBeVisible();
+
+  await offerUpdate(app, "9.9.9");
+  await app.getByRole("button", { name: "Check for updates" }).click();
+  const dialog = app.getByRole("dialog", { name: "Frida 9.9.9 is available" });
+  await expect(dialog).toContainText("feat: auto-update");
+  await expect(dialog).toContainText("Unsaved changes in Health");
+
+  await dialog.getByRole("button", { name: "Save and install" }).click();
+  await expect.poll(async () => (await backend(app)).updateInstalls).toBe(1);
+  const saved = Object.values((await backend(app)).requests) as { name: string; url: string }[];
+  expect(saved.find((r) => r.name === "Health")?.url).toBe("http://localhost:8787/changed");
+});
+
+test("updates: switching off the automatic check is saved", async ({ app }) => {
+  await app.getByRole("button", { name: "Settings" }).click();
+  await app.getByRole("button", { name: "Updates" }).click();
+  await app.getByRole("checkbox").click();
+  await expect
+    .poll(async () => (await backend(app)).settings.preferences.checkForUpdates)
+    .toBe(false);
 });
 
 test("folder settings: headers and auth are saved to the folder", async ({ app }) => {
