@@ -1,5 +1,31 @@
 # Changelog
 
+## M13: macOS data protection keychain and signed releases (2026-10-17)
+
+### What was built
+- **No more keychain prompts in signed builds**: secrets live in the data protection ("iOS-style") keychain, in
+  Frida's own access group `Q4XB68D4T7.io.github.clon1998.frida` (`frida_secrets::ProtectedStore`).
+- **Dev builds** (`pnpm tauri dev`, unsigned bundles) keep all secrets in one login-keychain item
+  (`VaultStore`): one prompt per run instead of one per secret.
+- **Migration**: old per-secret items, and a dev build's vault, move to the new store the first time a secret is
+  used, then are deleted (`MigratingStore`). Checked with real secrets on a signed build.
+- **Signing**: `Entitlements.plist`, `tauri.signed.conf.json` (embeds the provisioning profile), and
+  `app/scripts/build-signed.sh dev|release`. The release workflow signs with the Developer ID and notarizes the
+  macOS builds when the Apple secrets are set.
+
+### Rust things worth understanding in this milestone
+1. **Platform-specific code with `#[cfg(target_os = "macos")]`** (`frida-secrets/src/lib.rs`, `app/src-tauri/src/state.rs`
+   `os_keychain`). The `protected` module and the `security-framework` dependency
+   (`[target.'cfg(target_os = "macos")'.dependencies]`) only exist in macOS builds; Windows and Linux compile the
+   other branch. Like a Maven profile per OS, but checked by the compiler.
+2. **Composition over a trait object** (`MigratingStore`, `VaultStore`, `CachedStore`). Each wraps a
+   `Box<dyn SecretStore>` and is itself a `SecretStore`, so the app stacks them: cache → migrate → protected
+   keychain, with the vault → old items as the fallback. The decorator pattern from Java, with the same trait
+   everywhere.
+3. **OS error codes as values** (`protected.rs`). The keychain answers with `OSStatus` codes; `errSecItemNotFound`
+   (-25300) is a normal "no value", anything else (e.g. the missing entitlement in an unsigned build) is a real
+   error. `available()` turns that into a startup check without any prompt.
+
 ## After M12: feedback round 3 (2026-10-17)
 
 ### What was built
