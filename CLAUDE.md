@@ -32,6 +32,7 @@ cd app/ui && pnpm e2e              # UI flows in Chromium against a fake backend
 cd app && pnpm tauri dev       # run the app
 cargo run -p frida-testserver  # local echo server on :8787 for manual testing (testdata/sample-workspace uses it)
 cd app && pnpm tauri build     # bundle
+cd app && scripts/build-signed.sh dev   # macOS: signed bundle (data protection keychain), see README
 ```
 A milestone is only done when all of these pass.
 

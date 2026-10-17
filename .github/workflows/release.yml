@@ -3,6 +3,11 @@ name: Release
 # Pushing a tag like `v0.2.0` builds the installers for every platform and attaches them to a
 # draft GitHub Release. Review the draft (notes are generated from the commits), then publish it.
 # The tag must match the version in app/src-tauri/tauri.conf.json and Cargo.toml.
+#
+# macOS signing and notarization use these repository secrets (PLAN.md M13): APPLE_CERTIFICATE
+# (Developer ID .p12, base64), APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+# KEYCHAIN_PASSWORD (any random string), APPLE_API_ISSUER, APPLE_API_KEY, APPLE_API_KEY_P8 (the
+# .p8 file's content) and FRIDA_RELEASE_PROFILE ("Frida Release" provisioning profile, base64).
 on:
   push:
     tags: ["v*"]
@@ -56,6 +61,9 @@ jobs:
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
+    env:
+      # Only to decide whether to sign (step `if:` can't read `secrets` directly).
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
     steps:
       - uses: actions/checkout@v7
 
@@ -84,9 +92,34 @@ jobs:
         working-directory: app
         run: pnpm install --frozen-lockfile
 
+      # macOS: signed with the Developer ID certificate, with the "Frida Release" provisioning
+      # profile embedded (data protection keychain, PLAN.md M13), and notarized. Without the
+      # secrets (e.g. in a fork) the build stays unsigned.
+      - name: Prepare macOS signing
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE != ''
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          FRIDA_RELEASE_PROFILE: ${{ secrets.FRIDA_RELEASE_PROFILE }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          mkdir -p app/src-tauri/signing
+          echo "$FRIDA_RELEASE_PROFILE" | base64 --decode > app/src-tauri/signing/embedded.provisionprofile
+          printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          echo "SIGNED_CONFIG=--config src-tauri/tauri.signed.conf.json" >> "$GITHUB_ENV"
+
       - name: Build app bundles
         working-directory: app
-        run: pnpm tauri build --target ${{ matrix.target }}
+        env:
+          # Read by the Tauri CLI (macOS only): it imports the certificate into a temporary
+          # keychain, signs, and notarizes with the App Store Connect API key.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: pnpm tauri build --target ${{ matrix.target }} ${{ env.SIGNED_CONFIG }}
 
       - name: Attach the installers to the release
         shell: bash

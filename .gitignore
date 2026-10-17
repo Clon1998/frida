@@ -5,6 +5,8 @@
 *.pending-snap
 
 # --- Tauri ---
+# Provisioning profile copied in for signed builds (app/scripts/build-signed.sh)
+app/src-tauri/signing/
 # Generated at build time (JSON schemas for capabilities)
 app/src-tauri/gen/
 

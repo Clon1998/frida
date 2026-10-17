@@ -92,6 +92,21 @@ The builds aren't code-signed yet (planned for later), so the OS warns about the
   `xattr -dr com.apple.quarantine /Applications/Frida.app`. Apps you build locally aren't affected.
 - **Windows:** SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
 
+### Signed macOS builds on your Mac
+
+Builds from `pnpm tauri dev` and plain `pnpm tauri build` are unsigned. On macOS they keep all
+secrets in one login-keychain item, so the keychain asks once per run. A signed build uses the
+data protection keychain instead and never asks. It needs the certificates and provisioning
+profiles from PLAN.md M13 (profiles in `~/.frida-signing/`):
+
+```
+cd app
+scripts/build-signed.sh dev       # Apple Development: runs on the Macs in the "Frida Dev" profile
+scripts/build-signed.sh release   # Developer ID + notarization (needs APPLE_API_* variables)
+```
+
+Existing secrets move to the new keychain the first time they are used (one last prompt each).
+
 ### Releases
 
 Pushing a version tag builds the installers for all platforms and attaches them to a **draft**
@@ -103,10 +118,10 @@ GitHub Release (`.github/workflows/release.yml`):
 3. When the workflow is done, review the draft release on GitHub (its notes are generated from
    the commits) and publish it.
 
-The installers are not code-signed yet, so the first start needs one extra step:
+The **macOS** release builds are signed with a Developer ID and notarized (when the signing secrets
+are set, see the comment at the top of `release.yml`), so they open normally and store secrets in
+the data protection keychain without password prompts. The other installers aren't signed yet:
 
-- **macOS**: right-click Frida in Applications → *Open* → *Open*, or run
-  `xattr -dr com.apple.quarantine /Applications/Frida.app`.
 - **Windows**: SmartScreen shows "Windows protected your PC": *More info* → *Run anyway*.
 - **Linux**: make the AppImage executable (`chmod +x Frida_*.AppImage`), or install the `.deb`.
 

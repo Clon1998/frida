@@ -671,20 +671,26 @@ Developer account). Decided with Patrick on 2026-10-16.
   the `.p8` stays outside the repo (CI: GitHub secret).
 
 **Work:**
-- [ ] `frida-secrets`: a `ProtectedStore` on macOS using `keyring`'s Apple store with the `protected` feature
+- [x] `frida-secrets`: a `ProtectedStore` on macOS using `keyring`'s Apple store with the `protected` feature
   (`apple-native-keyring-store::protected`, access group `<TeamID>.io.github.clon1998.frida`), behind the
   existing `CachedStore`. Chosen at startup if the protected store works; otherwise the legacy keychain as today.
-- [ ] Migration (decided: automatic): on the first read of a secret missing from the new store, read the legacy item
+- [x] Migration (decided: automatic): on the first read of a secret missing from the new store, read the legacy item
   once, write it to the new store and delete the legacy item (one last prompt per old item).
-- [ ] Tauri bundle config: signing identity, entitlements (application identifier / keychain access group) and the
+- [x] Tauri bundle config: signing identity, entitlements (application identifier / keychain access group) and the
   embedded provisioning profile (`Contents/embedded.provisionprofile`). Check the current Tauri 2 docs for the exact
   config keys and the CI env variables (`APPLE_CERTIFICATE`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY`, …).
-- [ ] Release workflow: sign and notarize the macOS builds on `v*` tags.
-- [ ] `pnpm tauri dev` runs an unbundled binary without the profile, so it can't use the protected store
+- [x] Release workflow: sign and notarize the macOS builds on `v*` tags.
+- [x] `pnpm tauri dev` runs an unbundled binary without the profile, so it can't use the protected store
   (decided): the legacy keychain with all secrets in **one** vault item, so one prompt per run.
 
 **Acceptance:** a signed build stores and reads secrets without any keychain prompt; existing secrets survive
 (migrated or clearly asked for again); Windows and Linux behave as before.
+*Status 2026-10-17: built. `frida_secrets::{ProtectedStore, VaultStore, MigratingStore}`; `security-framework` used directly
+(the `keyring` protected store is a thin layer over it). Signed build: `Entitlements.plist`, `tauri.signed.conf.json`
+(profile via `bundle.macOS.files` → `Contents/embedded.provisionprofile`), `app/scripts/build-signed.sh dev|release`.
+A dev-signed build was checked on Patrick's Mac: valid signature, entitlements match the profile, and the app logs
+"secrets: data protection keychain". Release workflow signs + notarizes when the secrets are set (not run yet).
+Open: migration of real secrets in the signed app (Patrick), first notarized release.*
 
 ### Later (backlog, not scheduled)
 - `frida-cli` headless runner (`frida run <collection> --env dev`).
