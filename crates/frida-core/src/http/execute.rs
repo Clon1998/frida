@@ -160,6 +160,7 @@ pub async fn execute_as(
         cancel: cancel.clone(),
         ctx: &script_ctx,
         proxy: session.proxy.clone(),
+        sensitive: Vec::new(),
     };
 
     let pre = pipeline.run_pre().await.map_err(CoreError::Script)?;
@@ -208,6 +209,7 @@ pub async fn execute_as(
     // The URL may contain secrets, so it is only logged at debug level (CLAUDE.md).
     tracing::debug!(method = %prepared.method, "sending request");
     let response = send(&prepared, input.cookies.clone(), cancel).await?;
+    pipeline.sensitive = sensitive.clone();
     let (scripts, post_flow) = pipeline.run_post(&prepared, &response).await;
     // Pre-request scripts may have asked too; the post-response scripts have the last word.
     let mut flow = pre.flow;

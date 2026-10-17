@@ -148,6 +148,10 @@ pub(crate) struct Pipeline<'a> {
     pub ctx: &'a ScriptContext<'a>,
     /// For `fri.sendRequest`, like the request itself.
     pub proxy: ProxySettings,
+    /// Secret values that only appear while sending (OAuth2 tokens, API keys and passwords
+    /// from auth, secrets inside other variables). Set before the post-response scripts run,
+    /// so a script that prints a token shows `***`.
+    pub sensitive: Vec<String>,
 }
 
 impl Pipeline<'_> {
@@ -159,6 +163,7 @@ impl Pipeline<'_> {
             .flat_map(|env| env.variables.iter())
             .filter(|v| v.secret)
             .filter_map(|v| v.value.clone())
+            .chain(self.sensitive.iter().cloned())
             .collect()
     }
 
