@@ -11,7 +11,8 @@ the functions below are supported (`bru.setVar(...)` and `fri.setVar(...)` are t
 ## Where scripts live and when they run
 
 Scripts are saved in the YAML files (`scripts.pre`, `scripts.post`, `tests`) of the collection,
-each folder and each request, and edited in their **Script** and **Tests** tabs.
+each folder and each request, and edited in their **Script** and **Tests** tabs. The **Examples**
+menu of the script and test editors inserts ready-made snippets (log in and store a token, check a status, ...).
 
 On every send:
 
@@ -160,4 +161,5 @@ Calling these throws an error that says so:
 - `fri.cookies.*`, `fri.getOauth2CredentialVar`, `fri.resetOauth2Credential`, `fri.getSecretVar`
 - `fri.runRequest`, `fri.cwd`, `req.setMaxRedirects`, `req.onFail`
 - `req.headerList` / `res.headerList` (Postman-style property lists)
-- Bruno's declarative `assert` blocks (planned together with the Bruno importer).
+- Declarative `assert` blocks. When a Bruno collection is imported, its `assert` rows are converted into
+  `test(...)` calls instead.

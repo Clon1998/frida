@@ -1,150 +1,129 @@
-# Frida
+<p align="center">
+  <img src="assets/app-icon.svg" width="96" alt="Frida logo: a Westie drawn in one white line">
+</p>
 
-*Fast Request Inspector for Developer APIs*: a local-first desktop HTTP client (a Bruno/Postman
-alternative) built with Rust, Tauri 2 and React. Requests are plain YAML files that live in your git
-repo. See [PLAN.md](PLAN.md) for the full scope and roadmap, and [docs/CHANGELOG.md](docs/CHANGELOG.md)
-for what has been built so far.
+<h1 align="center">Frida</h1>
 
-## Prerequisites
+<p align="center">
+  <em>Fast Request Inspector for Developer APIs</em><br>
+  A local-first desktop HTTP client. Your requests are plain YAML files in your git repo.
+</p>
 
-| Tool | Version | Notes |
-|---|---|---|
-| Rust | stable (via [rustup](https://rustup.rs)) | `rustup update stable` |
-| Node.js | 24 | |
-| pnpm | 12 | `npm install -g pnpm@12` |
+---
 
-Plus the platform's webview and build tools:
+Frida is an alternative to Postman and Bruno, built with Rust, Tauri 2 and React. There is no account, no cloud and
+no telemetry: collections are folders of YAML files that you commit next to your code, and secret values stay in
+your operating system's keychain.
 
-- **macOS:** Xcode Command Line Tools (`xcode-select --install`).
-- **Windows:** [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-  ("Desktop development with C++"). WebView2 already ships with Windows 10 and 11.
-- **Linux (Debian/Ubuntu):**
-  ```sh
-  sudo apt-get install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
-  ```
+## Features
 
-Then install the JavaScript dependencies once:
+- **Files, not a database.** One YAML file per request, with clean diffs. Workspaces → collections → folders →
+  requests, with headers, auth, variables and scripts inherited down the tree. [File format](docs/file-format.md)
+- **Environments and variables** on six layers (runtime, request, folder, collection environment, collection,
+  global environment). The **variable inspector** shows every `{{variable}}` a request uses, its value, where it
+  comes from and what it shadows.
+- **Secrets stay out of git.** Only `secret: true` is written; values live in the macOS Keychain, Windows
+  Credential Manager or Linux Secret Service, or come from **AWS Secrets Manager**. They are masked in the
+  console, history and curl exports.
+- **Auth**: Basic, Bearer, API key, OAuth2 (client credentials, password, authorization code + PKCE, Cognito
+  preset), and combinations such as OAuth2 + API key. Tokens are cached and refreshed.
+- **Scripts and tests** in JavaScript (sandboxed QuickJS), compatible with Bruno's `bru`/`req`/`res` API.
+  [Scripting reference](docs/scripting.md)
+- **Collection runner**: run a collection or folder in order, with scripts that skip, jump or stop.
+- **Import** OpenAPI 3.0/3.1, Bruno collections (`.bru` and YAML) and curl commands. **Export** curl (bash or
+  PowerShell) and Frida archives.
+- **Git panel**: status, side-by-side diffs, stage, commit, push, fast-forward pull, branch switch, using your own
+  `git` and SSH keys.
+- History, a console with the raw exchange, cookie jars, response search and JSONPath filter, image and HTML
+  preview, dark and light themes, keyboard-first (Cmd/Ctrl+K quick open).
 
-```sh
-cd app && pnpm install
-```
+Not supported (yet): WebSockets, GraphQL, gRPC, SSE, Postman import. Proxies, auto-update and a CLI runner are
+planned, see the [roadmap](PLAN.md#15-milestones).
 
-## Run it without an installer (development)
+## Install
 
-```sh
-cd app
-pnpm tauri dev
-```
+Installers are attached to [GitHub Releases](https://github.com/Clon1998/frida/releases) (the first public
+release is still being prepared; until then, build it yourself or grab a CI build, see
+[Development](docs/development.md#ci)):
 
-This starts the Vite dev server and the app window. UI changes reload instantly, and Rust changes
-rebuild and restart the app automatically. The first start compiles all Rust dependencies and takes a
-few minutes; later starts take seconds.
+| Platform | File |
+|---|---|
+| macOS (Apple silicon / Intel) | `Frida_<version>_aarch64.dmg` / `Frida_<version>_x64.dmg` (signed and notarized) |
+| Windows | `Frida_<version>_x64-setup.exe` or `.msi` |
+| Linux | `.AppImage`, `.deb` or `.rpm` |
+
+The Windows and Linux builds aren't code-signed yet. On Windows, SmartScreen asks once: **More info → Run anyway**.
+On Linux, make the AppImage executable with `chmod +x`.
+
+## Getting started
+
+1. Start Frida and choose **New workspace…** (a new folder) or **Open workspace…** (an existing one).
+2. Add a collection: **New collection…** creates one inside the workspace, **Add existing collection…** picks a
+   folder anywhere (for example in your API's repo). Or import one from OpenAPI, Bruno or a Frida archive.
+3. Add a request, type a URL, press **Cmd/Ctrl+Enter**.
+4. Create an environment (the environment button in the breadcrumb bar, or **Cmd/Ctrl+E**), add `baseUrl`, and use
+   `{{baseUrl}}` in your URLs.
+5. Commit the collection folder to git. Your colleagues get the same requests; each of them enters the secret
+   values once on their machine.
+
+The [user guide](docs/user-guide.md) explains all of it in more detail.
 
 ### Try it with the sample workspace
 
-1. In a second terminal, start the local echo server:
-   ```sh
-   cargo run -p frida-testserver
-   ```
-   It listens on `http://localhost:8787` and echoes every request back as JSON.
-2. In the app, choose **Open workspace…** and select `testdata/sample-workspace`.
-3. Send the requests under *Methods* and *Body types*. *Get image* shows the image preview, and
-   *Slow request* is there to try cancelling.
-
-## Build and install the app
-
-### Build an installer on your own machine
+From a clone of this repository:
 
 ```sh
-cd app
-pnpm tauri build
+cargo run -p frida-testserver      # an echo server on http://localhost:8787
 ```
 
-The installers end up in `target/release/bundle/`:
+Then open `testdata/sample-workspace` in Frida and send the requests under *Methods*, *Body types*, *Variables*
+and *Scripting*.
 
-| OS | Output |
+## Documentation
+
+| Document | For |
 |---|---|
-| macOS | `macos/Frida.app` and `dmg/Frida_<version>_<arch>.dmg` |
-| Windows | `msi/*.msi` and `nsis/*-setup.exe` |
-| Linux | `deb/*.deb`, `rpm/*.rpm` and `appimage/*.AppImage` |
+| [User guide](docs/user-guide.md) | Concepts, variables, secrets, auth, runner, import/export, git, shortcuts |
+| [Scripting & tests](docs/scripting.md) | The `fri`/`req`/`res`/`expect` API and what differs from Bruno |
+| [File format](docs/file-format.md) | What the YAML files look like and what stays on your machine |
+| [Architecture](docs/architecture.md) | Crates, the send pipeline, Rust ↔ TypeScript bindings, adding a feature |
+| [Development](docs/development.md) | Setup, running, tests, CI |
+| [Releasing](docs/releasing.md) | Versioning, the release workflow, macOS signing |
+| [PLAN.md](PLAN.md) | The specification, milestones and decisions log |
+| [Changelog](docs/CHANGELOG.md) | What each milestone added |
 
-On macOS you can drag `Frida.app` straight into `/Applications`, or open the `.dmg`.
+## Development
 
-Useful variations:
+You need Rust (stable), Node.js 24, pnpm 12 and your platform's webview build tools
+([details](docs/development.md#prerequisites)). Then:
 
 ```sh
-pnpm tauri build --bundles app     # macOS: only Frida.app, skip the slower .dmg step
-pnpm tauri build --no-bundle       # just the executable: target/release/frida-http
+cd app && pnpm install
+pnpm tauri dev                     # the app, with hot reload for the UI
 ```
 
-### Download an installer from CI
-
-The build matrix in GitHub Actions doesn't run on every push. To get installers:
-
-1. Go to **Actions → CI → Run workflow** on GitHub (or open a pull request).
-2. When the run finishes, download the artifact for your platform (`frida-http-macos-arm64`,
-   `frida-http-macos-x64`, `frida-http-windows-x64`, `frida-http-linux-x64`) from the run's summary page.
-
-The builds aren't code-signed yet (planned for later), so the OS warns about them:
-
-- **macOS:** the first open is blocked. Go to **System Settings → Privacy & Security** and click
-  **Open Anyway**, or remove the quarantine flag:
-  `xattr -dr com.apple.quarantine /Applications/Frida.app`. Apps you build locally aren't affected.
-- **Windows:** SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
-
-### Signed macOS builds on your Mac
-
-Builds from `pnpm tauri dev` and plain `pnpm tauri build` are unsigned. On macOS they keep all
-secrets in one login-keychain item, so the keychain asks once per run. A signed build uses the
-data protection keychain instead and never asks. It needs the certificates and provisioning
-profiles from PLAN.md M13 (profiles in `~/.frida-signing/`):
-
-```
-cd app
-scripts/build-signed.sh dev       # Apple Development: runs on the Macs in the "Frida Dev" profile
-scripts/build-signed.sh release   # Developer ID + notarization (needs APPLE_API_* variables)
-```
-
-Existing secrets move to the new keychain the first time they are used (one last prompt each).
-
-### Releases
-
-Pushing a version tag builds the installers for all platforms and attaches them to a **draft**
-GitHub Release (`.github/workflows/release.yml`):
-
-1. Set the same version in `app/src-tauri/tauri.conf.json` and in `[workspace.package]` of
-   `Cargo.toml`, and commit.
-2. `git tag v0.2.0 && git push origin v0.2.0`
-3. When the workflow is done, review the draft release on GitHub (its notes are generated from
-   the commits) and publish it.
-
-The **macOS** release builds are signed with a Developer ID and notarized (when the signing secrets
-are set, see the comment at the top of `release.yml`), so they open normally and store secrets in
-the data protection keychain without password prompts. The other installers aren't signed yet:
-
-- **Windows**: SmartScreen shows "Windows protected your PC": *More info* → *Run anyway*.
-- **Linux**: make the AppImage executable (`chmod +x Frida_*.AppImage`), or install the `.deb`.
-
-## Where Frida keeps its local data
-
-Settings, open tabs and logs are stored per machine (never in your repo):
-
-- **macOS:** `~/Library/Application Support/io.github.clon1998.frida/`
-- **Windows:** `%APPDATA%\io.github.clon1998.frida\`
-- **Linux:** `~/.local/share/io.github.clon1998.frida/`
-
-Logs are in the `logs/` subfolder. Set `RUST_LOG=debug` before starting the app for more detail.
-
-## Checks
-
-These are the same checks CI runs. A change is only done when they all pass:
+Checks that CI runs (and every change must pass):
 
 ```sh
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cd app/ui && pnpm typecheck && pnpm lint && pnpm test
+cd app/ui && pnpm typecheck && pnpm lint && pnpm test && pnpm e2e
 ```
 
-`cargo test` also regenerates the TypeScript bindings in `app/ui/src/bindings.ts`. Commit that file
-when it changes.
+`pnpm tauri build` in `app/` builds installers for your OS into `target/release/bundle/`. See
+[development.md](docs/development.md) for everything else and [architecture.md](docs/architecture.md) for where
+code goes.
+
+## Your data
+
+Frida writes only the YAML files of your workspace and collections. Everything else stays in its app data folder:
+settings, open tabs, history and logs (`~/Library/Application Support/io.github.clon1998.frida/` on macOS,
+`%APPDATA%\io.github.clon1998.frida\` on Windows, `~/.local/share/io.github.clon1998.frida/` on Linux). Secret
+values are only in the OS keychain. Frida only talks to the network for what you ask it to do: your requests, their
+OAuth2 token calls, AWS secrets you configured, and git push/pull/fetch.
+
+## Name
+
+The logo is a Westie, traced from a one-line drawing (`assets/logo/`). The binary is called `frida-http` so it
+doesn't clash with the [frida](https://frida.re) instrumentation toolkit.

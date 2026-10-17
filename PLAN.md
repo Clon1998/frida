@@ -31,7 +31,7 @@ decisions change.
 - Git merge or conflict resolution UI. Conflicts are resolved in the user's normal git tooling.
 - Postman import.
 - Cloud sync, accounts, telemetry.
-- Code signing, notarization and auto-update. These are planned for later.
+- Code signing for Windows and Linux. (macOS signing is done in M13, auto-update is planned as M14.)
 
 ---
 
@@ -765,11 +765,10 @@ Patrick hasn't been able to test the AWS integration (M8) against real accounts 
 **Acceptance:** fake-SDK tests for both new sources and the alias mapping; the manual check above passes.
 
 ### Later (backlog, not scheduled)
-- `frida-cli` headless runner (`frida run <collection> --env dev`).
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
 - SSM Parameter Store, SigV4 auth.
-- Code signing / notarization for Windows, auto-update. (macOS signing: M13.)
+- Code signing for Windows. (macOS signing: M13, auto-update: M14.)
 - Additional codegen targets (HTTPie, fetch, Java HttpClient, Python).
 - Postman import.
 
