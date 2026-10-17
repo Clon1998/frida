@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "frida-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2155,7 +2155,7 @@ dependencies = [
 
 [[package]]
 name = "frida-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "brotli",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "frida-git"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "specta",
@@ -2199,7 +2199,7 @@ dependencies = [
 
 [[package]]
 name = "frida-http"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "frida-core",
@@ -2228,7 +2228,7 @@ dependencies = [
 
 [[package]]
 name = "frida-script"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "hmac",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "frida-secrets"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "aws-config",
@@ -2270,7 +2270,7 @@ dependencies = [
 
 [[package]]
 name = "frida-testserver"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
