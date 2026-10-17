@@ -690,7 +690,8 @@ Developer account). Decided with Patrick on 2026-10-16.
 (profile via `bundle.macOS.files` → `Contents/embedded.provisionprofile`), `app/scripts/build-signed.sh dev|release`.
 A dev-signed build was checked on Patrick's Mac: valid signature, entitlements match the profile, and the app logs
 "secrets: data protection keychain". Release workflow signs + notarizes when the secrets are set (not run yet).
-Open: migration of real secrets in the signed app (Patrick), first notarized release.*
+Migration of real secrets in the signed app checked by Patrick (one last prompt per old secret, none after a
+restart). Open: GitHub signing secrets and the first notarized release.*
 
 ### Later (backlog, not scheduled)
 - `frida-cli` headless runner (`frida run <collection> --env dev`).
