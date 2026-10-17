@@ -27,6 +27,7 @@ use crate::mask::Masker;
 use crate::model::{
     Auth, AuthScheme, BodyMode, Collection, EnvVariable, Environment, Folder, KeyValue, Request,
 };
+use crate::network::ProxySettings;
 use crate::storage;
 use crate::vars::{Resolver, ScopeInput, UsageLocation, VarScope, iso_timestamp};
 
@@ -145,6 +146,8 @@ pub(crate) struct Pipeline<'a> {
     pub cookies: Option<Arc<CookieJar>>,
     pub cancel: CancellationToken,
     pub ctx: &'a ScriptContext<'a>,
+    /// For `fri.sendRequest`, like the request itself.
+    pub proxy: ProxySettings,
 }
 
 impl Pipeline<'_> {
@@ -225,6 +228,7 @@ impl Pipeline<'_> {
             collection_dir: self.collection_dir.to_path_buf(),
             cookies: self.cookies.clone(),
             cancel: self.cancel.clone(),
+            proxy: self.proxy.clone(),
         })
     }
 
@@ -685,6 +689,7 @@ struct CoreHost {
     collection_dir: PathBuf,
     cookies: Option<Arc<CookieJar>>,
     cancel: CancellationToken,
+    proxy: ProxySettings,
 }
 
 impl ScriptHost for CoreHost {
@@ -714,6 +719,7 @@ impl ScriptHost for CoreHost {
                 .iter()
                 .map(|p| self.collection_dir.join(p))
                 .collect(),
+            proxy: self.proxy.clone(),
         };
         let cookies = self.cookies.clone();
         let cancel = self.cancel.clone();

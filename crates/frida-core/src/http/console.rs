@@ -27,6 +27,9 @@ pub struct ConsoleEntry {
     /// `None` when there was no response (see `error`).
     pub response: Option<ConsoleResponse>,
     pub error: Option<String>,
+    /// `via proxy http://proxy:8080` when the request went through a manual proxy (never
+    /// with the proxy's login).
+    pub proxy: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -118,6 +121,7 @@ impl ConsoleEntry {
             request_body,
             response,
             error,
+            proxy: sent.proxy.describe_for(&sent.url),
         }
     }
 
@@ -142,6 +146,7 @@ impl ConsoleEntry {
             request_body: None,
             response: None,
             error: Some(error),
+            proxy: None,
         }
     }
 }
@@ -198,6 +203,7 @@ mod tests {
             timeout: Duration::from_secs(1),
             tls_verify: true,
             ca_cert_paths: vec![],
+            proxy: Default::default(),
         }
     }
 

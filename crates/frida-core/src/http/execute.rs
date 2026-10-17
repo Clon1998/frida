@@ -20,6 +20,7 @@ use crate::codegen::{CurlOptions, curl_request, render_curl};
 use crate::error::{CoreError, Result};
 use crate::model::AuthScheme;
 use crate::model::{Environment, Request};
+use crate::network::ProxySettings;
 use crate::storage;
 use crate::vars::{ResolveReport, ResolvedContext, ScopeInput, resolve_context};
 
@@ -52,6 +53,9 @@ pub struct Session<'a> {
     /// Don't verify TLS certificates for any request of this session, whatever the
     /// collection says (`frida-run --insecure`, like `curl -k`).
     pub skip_tls_verify: bool,
+    /// The proxy for every request of the send: the request, OAuth2 token calls and
+    /// `fri.sendRequest` (PLAN.md M16).
+    pub proxy: &'a ProxySettings,
 }
 
 /// Owns the session state for one collection (the app keeps one per collection; tests and a
@@ -63,6 +67,8 @@ pub struct SessionStore {
     pub global_overrides: EnvOverrides,
     /// See [`Session::skip_tls_verify`].
     pub skip_tls_verify: bool,
+    /// See [`Session::proxy`].
+    pub proxy: ProxySettings,
 }
 
 impl SessionStore {
@@ -85,6 +91,7 @@ impl SessionStore {
             global_overrides: &self.global_overrides,
             workspace_dir,
             skip_tls_verify: self.skip_tls_verify,
+            proxy: &self.proxy,
         }
     }
 }
@@ -152,6 +159,7 @@ pub async fn execute_as(
         cookies: input.cookies.clone(),
         cancel: cancel.clone(),
         ctx: &script_ctx,
+        proxy: session.proxy.clone(),
     };
 
     let pre = pipeline.run_pre().await.map_err(CoreError::Script)?;
@@ -179,6 +187,7 @@ pub async fn execute_as(
         folders: &resolved.folders,
     };
     let mut prepared = prepare(ctx, &resolved.request)?;
+    prepared.proxy = session.proxy.clone();
     let mut sensitive = resolved.report.secret_values.clone();
     if !resolved.auth.is_empty() {
         // The token endpoint is reached with the collection's TLS settings, without cookies.
@@ -228,8 +237,9 @@ pub async fn fetch_tokens(
         collection: &resolved.collection,
         folders: &resolved.folders,
     };
-    // Only for the TLS settings and timeout; nothing is sent to the request's URL.
-    let prepared = prepare(ctx, &resolved.request)?;
+    // Only for the TLS settings, timeout and proxy; nothing is sent to the request's URL.
+    let mut prepared = prepare(ctx, &resolved.request)?;
+    prepared.proxy = input.session.proxy.clone();
     let client = build_client(&prepared, None)
         .await?
         .build()

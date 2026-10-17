@@ -22,6 +22,9 @@ pub struct PreparedRequest {
     pub tls_verify: bool,
     /// Absolute paths of extra CA certificates (PEM).
     pub ca_cert_paths: Vec<PathBuf>,
+    /// The proxy settings it is sent with (PLAN.md M16). [`prepare`] leaves the default
+    /// (system settings); the send pipeline sets the session's.
+    pub proxy: crate::network::ProxySettings,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +88,7 @@ pub fn prepare(ctx: RequestContext<'_>, request: &Request) -> Result<PreparedReq
             .iter()
             .map(|p| ctx.collection_dir.join(p))
             .collect(),
+        proxy: crate::network::ProxySettings::default(),
     })
 }
 

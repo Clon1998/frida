@@ -16,6 +16,7 @@ pub mod jsonpath;
 pub mod local_state;
 pub mod mask;
 pub mod model;
+pub mod network;
 pub mod runner;
 pub mod secrets;
 pub mod storage;

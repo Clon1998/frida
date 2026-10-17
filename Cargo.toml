@@ -47,7 +47,7 @@ tempfile = "3.27.0"
 # Command line arguments of `frida-run` (PLAN.md M15).
 clap = { version = "4.6.7", features = ["derive"] }
 insta = "1.49.0"
-reqwest = { version = "0.13.5", features = ["cookies", "form", "multipart", "gzip", "brotli", "deflate", "zstd"] }
+reqwest = { version = "0.13.5", features = ["cookies", "form", "multipart", "gzip", "brotli", "deflate", "zstd", "socks"] }
 tokio-util = "0.7.20"
 base64 = "0.23.1"
 axum = "0.8.9"
@@ -73,6 +73,8 @@ hmac = "0.13.0"
 # AWS Secrets Manager (frida-secrets, PLAN.md §9).
 aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.120.0"
+# The SDK's HTTP client, built by hand to give it a proxy (PLAN.md M16). Already in the tree.
+aws-smithy-http-client = { version = "1.5.0", features = ["rustls-aws-lc"] }
 # Already a dependency of aws-config; used directly for custom config file locations.
 aws-runtime = "1.10.0"
 

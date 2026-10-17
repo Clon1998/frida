@@ -61,6 +61,14 @@ pub enum SendError {
     #[error("could not read {path}: {message}")]
     File { path: String, message: String },
 
+    /// The request was to go through the proxy, which couldn't be reached.
+    #[error("could not reach the proxy {proxy}: {message}")]
+    Proxy { proxy: String, message: String },
+
+    /// The proxy wants a (different) login: `407 Proxy Authentication Required`.
+    #[error("the proxy {proxy} refused the request: 407 Proxy Authentication Required")]
+    ProxyAuth { proxy: String },
+
     #[error("{0}")]
     Other(String),
 }
@@ -121,13 +129,30 @@ async fn send_inner(
     add_default_headers(request.headers_mut());
     let request_headers = wire_headers(&request, cookies.as_deref());
 
+    // The proxy this request goes through (manual proxies only), to explain proxy errors.
+    let via = prepared
+        .proxy
+        .proxy_for(&prepared.url)
+        .map(|p| p.url.clone());
     let started = Instant::now();
-    let response = client
-        .execute(request)
-        .await
-        .map_err(|e| map_error(e, prepared.timeout))?;
+    let response = client.execute(request).await.map_err(|e| {
+        let error = map_error(e, prepared.timeout);
+        match &via {
+            Some(proxy) => proxy_error(proxy, error),
+            None => error,
+        }
+    })?;
 
     let status = response.status();
+    // Plain-HTTP requests travel inside the proxy's own response, so its 407 arrives as an
+    // ordinary response; HTTPS requests get it as a failed CONNECT (see `proxy_error`).
+    if let Some(proxy) = &via
+        && status == reqwest::StatusCode::PROXY_AUTHENTICATION_REQUIRED
+    {
+        return Err(SendError::ProxyAuth {
+            proxy: proxy.clone(),
+        });
+    }
     let final_url = response.url().to_string();
     // `Version`'s Debug output is already the protocol name, e.g. "HTTP/1.1".
     let http_version = format!("{:?}", response.version());
@@ -253,7 +278,7 @@ pub(crate) async fn build_client(
         // Custom CAs are trusted *in addition to* the OS roots (PLAN.md §7).
         .tls_certs_merge(certs)
         .tls_danger_accept_invalid_certs(!prepared.tls_verify);
-    Ok(builder)
+    Ok(prepared.proxy.apply(builder))
 }
 
 async fn build_multipart(parts: &[PreparedPart]) -> Result<reqwest::multipart::Form, SendError> {
@@ -290,6 +315,30 @@ fn map_error(error: reqwest::Error, timeout: Duration) -> SendError {
         SendError::Connect(message)
     } else {
         SendError::Other(message)
+    }
+}
+
+/// Explains a failed request that went to the proxy: it refused the login (407 on the
+/// `CONNECT` of an HTTPS request), or it couldn't be reached at all.
+fn proxy_error(proxy: &str, error: SendError) -> SendError {
+    let message = error.to_string();
+    let lower = message.to_lowercase();
+    if lower.contains("proxy authorization required")
+        || lower.contains("proxy authentication required")
+        || lower.contains("407")
+    {
+        return SendError::ProxyAuth {
+            proxy: proxy.to_string(),
+        };
+    }
+    match error {
+        // "unsuccessful tunnel": the proxy answered, but couldn't reach the server itself.
+        SendError::Connect(message) if lower.contains("tunnel") => SendError::Connect(message),
+        SendError::Connect(message) => SendError::Proxy {
+            proxy: proxy.to_string(),
+            message,
+        },
+        other => other,
     }
 }
 

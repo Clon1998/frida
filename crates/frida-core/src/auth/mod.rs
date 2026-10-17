@@ -171,6 +171,7 @@ mod tests {
             timeout: std::time::Duration::from_secs(1),
             tls_verify: true,
             ca_cert_paths: vec![],
+            proxy: Default::default(),
         }
     }
 

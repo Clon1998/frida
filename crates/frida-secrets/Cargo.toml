@@ -10,6 +10,7 @@ publish = false
 aws-config = { workspace = true }
 aws-runtime = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
+aws-smithy-http-client = { workspace = true }
 specta = { workspace = true }
 tokio = { workspace = true }
 argon2 = { workspace = true }

@@ -54,6 +54,8 @@ pub struct Preferences {
     pub aws: AwsPreferences,
     /// Look for a new Frida version on start (at most once a day).
     pub check_for_updates: bool,
+    /// The HTTP proxy (PLAN.md M16). Its password is in the keychain, not here.
+    pub proxy: crate::network::ProxyPreferences,
 }
 
 impl Default for Preferences {
@@ -67,6 +69,7 @@ impl Default for Preferences {
             git_path: None,
             aws: AwsPreferences::default(),
             check_for_updates: true,
+            proxy: crate::network::ProxyPreferences::default(),
         }
     }
 }
@@ -104,6 +107,12 @@ impl Preferences {
                 cache_minutes: clamp(self.aws.cache_minutes, &Self::AWS_CACHE_MINUTES),
             },
             check_for_updates: self.check_for_updates,
+            proxy: crate::network::ProxyPreferences {
+                mode: self.proxy.mode,
+                url: self.proxy.url.trim().to_string(),
+                username: self.proxy.username.trim().to_string(),
+                bypass: self.proxy.bypass.trim().to_string(),
+            },
         }
     }
 }
@@ -203,6 +212,9 @@ pub struct CollectionState {
     pub active_environment: Option<String>,
     /// The AWS profile per collection environment (PLAN.md §9.1), for AWS-backed secrets.
     pub aws_profiles: std::collections::BTreeMap<String, String>,
+    /// "Don't use the proxy" for this collection on this computer (PLAN.md M16), e.g. for
+    /// APIs on the local network.
+    pub bypass_proxy: bool,
 }
 
 /// Reads and writes the local state files below one base directory (the app data dir).
@@ -246,6 +258,7 @@ impl LocalStore {
             &CollectionState {
                 active_environment: current.active_environment,
                 aws_profiles: current.aws_profiles,
+                bypass_proxy: current.bypass_proxy,
                 ..view.clone()
             },
         )
@@ -376,6 +389,7 @@ mod tests {
             expanded_folders: vec!["orders".into()],
             active_environment: Some("dev".into()),
             aws_profiles: [("prod".to_string(), "work-sso".to_string())].into(),
+            bypass_proxy: true,
         };
         store.save_collection_state(id, &state).unwrap();
         assert_eq!(store.load_collection_state(id).unwrap(), state);
@@ -438,6 +452,7 @@ mod tests {
                 &CollectionState {
                     active_environment: Some("dev".into()),
                     aws_profiles: [("prod".to_string(), "work".to_string())].into(),
+                    bypass_proxy: true,
                     ..CollectionState::default()
                 },
             )
@@ -454,6 +469,7 @@ mod tests {
             .unwrap();
         let loaded = store.load_collection_state(id).unwrap();
         assert_eq!(loaded.active_environment.as_deref(), Some("dev"));
+        assert!(loaded.bypass_proxy, "the proxy switch survives tab changes");
         assert_eq!(
             loaded.aws_profiles.get("prod").map(String::as_str),
             Some("work")

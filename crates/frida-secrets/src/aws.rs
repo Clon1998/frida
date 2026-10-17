@@ -118,11 +118,50 @@ pub struct AwsSecretRef {
 /// A boxed future that can move between threads (`async fn` can't be used in a `dyn` trait).
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
+/// How AWS calls reach AWS (PLAN.md M16): through the proxy from `HTTPS_PROXY`/`NO_PROXY`
+/// (the default), directly, or through a manual proxy. Built by the app from its network
+/// settings. `Debug` is written by hand so the password never shows.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub enum AwsProxy {
+    #[default]
+    FromEnv,
+    Disabled,
+    Manual {
+        /// `http://host:port` or `https://host:port`, without credentials.
+        url: String,
+        username: Option<String>,
+        password: Option<String>,
+        /// `NO_PROXY` syntax: `localhost,.internal,10.0.0.0/8`.
+        no_proxy: String,
+    },
+}
+
+impl std::fmt::Debug for AwsProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FromEnv => write!(f, "FromEnv"),
+            Self::Disabled => write!(f, "Disabled"),
+            Self::Manual {
+                url,
+                username,
+                no_proxy,
+                ..
+            } => f
+                .debug_struct("Manual")
+                .field("url", url)
+                .field("username", username)
+                .field("no_proxy", no_proxy)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 /// Reads one secret string from AWS. [`SdkFetcher`] is the real one.
 pub trait SecretFetcher: Send + Sync {
     fn fetch(
         &self,
         files: &AwsFiles,
+        proxy: &AwsProxy,
         profile: &str,
         region: Option<&str>,
         secret_id: &str,
@@ -138,6 +177,7 @@ pub struct AwsSecrets {
     /// The settings can change while the app runs, hence the locks (read often, written rarely).
     ttl: RwLock<Duration>,
     files: RwLock<AwsFiles>,
+    proxy: RwLock<AwsProxy>,
     cache: Mutex<HashMap<CacheKey, (Instant, String)>>,
 }
 
@@ -151,6 +191,7 @@ impl AwsSecrets {
             fetcher,
             ttl: RwLock::new(ttl),
             files: RwLock::new(AwsFiles::default()),
+            proxy: RwLock::new(AwsProxy::default()),
             cache: Mutex::new(HashMap::new()),
         }
     }
@@ -164,6 +205,11 @@ impl AwsSecrets {
             *current = files;
             self.clear(None);
         }
+    }
+
+    /// Sets how later AWS calls reach AWS. Cached values stay valid (same credentials).
+    pub fn set_proxy(&self, proxy: AwsProxy) {
+        *self.proxy.write().expect("aws proxy lock poisoned") = proxy;
     }
 
     /// The config files in use (for listing profiles).
@@ -190,10 +236,12 @@ impl AwsSecrets {
             return value;
         }
         let files = self.files();
+        let proxy = self.proxy.read().expect("aws proxy lock poisoned").clone();
         let raw = self
             .fetcher
             .fetch(
                 &files,
+                &proxy,
                 &secret.profile,
                 secret.region.as_deref(),
                 &secret.secret_id,
@@ -252,17 +300,21 @@ impl SecretFetcher for SdkFetcher {
     fn fetch(
         &self,
         files: &AwsFiles,
+        proxy: &AwsProxy,
         profile: &str,
         region: Option<&str>,
         secret_id: &str,
     ) -> BoxFuture<Result<String, AwsError>> {
         let files = files.clone();
+        let http_client = http_client(proxy);
         let profile = profile.to_string();
         let region = region.map(str::to_string);
         let secret_id = secret_id.to_string();
         Box::pin(async move {
             let call = async {
+                // The HTTP client is used for AWS and for the credential providers (SSO too).
                 let mut loader = aws_config::defaults(aws_config::BehaviorVersion::latest())
+                    .http_client(http_client)
                     .profile_name(&profile);
                 if let Some(region) = region {
                     loader = loader.region(aws_config::Region::new(region));
@@ -288,6 +340,52 @@ impl SecretFetcher for SdkFetcher {
             }
         })
     }
+}
+
+/// The SDK's HTTP client with Frida's proxy setting. The SDK's default client ignores proxies,
+/// so it is built here like the default one (rustls with aws-lc), plus the proxy.
+///
+/// `build_with_connector_fn` is the hook the SDK offers for custom connectors; the closure
+/// copies what the SDK's own builder passes on (connector settings, the sleep source), so
+/// timeouts keep working.
+fn http_client(proxy: &AwsProxy) -> aws_sdk_secretsmanager::config::SharedHttpClient {
+    use aws_smithy_http_client::proxy::ProxyConfig;
+    use aws_smithy_http_client::tls::{Provider, rustls_provider::CryptoMode};
+    use aws_smithy_http_client::{Builder, Connector};
+
+    let config = match proxy {
+        AwsProxy::FromEnv => ProxyConfig::from_env(),
+        AwsProxy::Disabled => ProxyConfig::disabled(),
+        AwsProxy::Manual {
+            url,
+            username,
+            password,
+            no_proxy,
+        } => match ProxyConfig::all(url.as_str()) {
+            Ok(mut config) => {
+                if let Some(username) = username {
+                    config = config
+                        .with_basic_auth(username.as_str(), password.as_deref().unwrap_or(""));
+                }
+                config.no_proxy(no_proxy)
+            }
+            // e.g. a SOCKS proxy, which the SDK doesn't support.
+            Err(err) => {
+                tracing::warn!(%err, "AWS calls can't use this proxy; using HTTPS_PROXY instead");
+                ProxyConfig::from_env()
+            }
+        },
+    };
+    Builder::new().build_with_connector_fn(move |settings, components| {
+        let mut builder = Connector::builder().proxy_config(config.clone());
+        builder.set_connector_settings(settings.cloned());
+        if let Some(components) = components {
+            builder.set_sleep_impl(components.sleep_impl());
+        }
+        builder
+            .tls_provider(Provider::Rustls(CryptoMode::AwsLc))
+            .build()
+    })
 }
 
 /// The SDK's view of [`AwsFiles`]: a chosen file replaces the usual one, the other stays.
@@ -437,6 +535,7 @@ mod tests {
         fn fetch(
             &self,
             _: &AwsFiles,
+            _: &AwsProxy,
             _: &str,
             _: Option<&str>,
             id: &str,

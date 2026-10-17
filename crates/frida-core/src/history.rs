@@ -36,6 +36,8 @@ pub struct NewEntry {
     pub request_body: Option<Vec<u8>>,
     pub response: Option<HttpResponse>,
     pub error: Option<String>,
+    /// `via proxy http://proxy:8080` when it went through a manual proxy (PLAN.md M16).
+    pub proxy: Option<String>,
 }
 
 impl NewEntry {
@@ -72,6 +74,7 @@ impl NewEntry {
             url: sent.url.clone(),
             request_headers: sent.headers.clone(),
             request_body,
+            proxy: sent.proxy.describe_for(&sent.url),
             response,
             error,
         }
@@ -137,6 +140,8 @@ pub struct HistoryEntry {
     pub request_body_truncated: bool,
     /// The response in the same shape as a live one. Its `id` is `history-<id>`.
     pub response: Option<ResponseView>,
+    /// `via proxy …` when the request went through a manual proxy.
+    pub proxy: Option<String>,
 }
 
 pub struct HistoryStore {
@@ -184,6 +189,16 @@ impl HistoryStore {
             CREATE INDEX IF NOT EXISTS history_collection ON history (collection_id, id);",
         )
         .map_err(db)?;
+        // Added in M16. Databases from older versions get the column; SQLite has no
+        // "ADD COLUMN IF NOT EXISTS", so look first.
+        let has_proxy = conn
+            .prepare("SELECT 1 FROM pragma_table_info('history') WHERE name = 'proxy'")
+            .and_then(|mut s| s.exists([]))
+            .map_err(db)?;
+        if !has_proxy {
+            conn.execute("ALTER TABLE history ADD COLUMN proxy TEXT", [])
+                .map_err(db)?;
+        }
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -219,8 +234,8 @@ impl HistoryStore {
         conn.execute(
             "INSERT INTO history (timestamp, collection_id, request_path, request_name, method, url,
                 request_headers, request_body, request_body_truncated, status, status_text, error,
-                time_ms, final_url, response_headers, response_body, response_size)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+                time_ms, final_url, response_headers, response_body, response_size, proxy)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 iso_timestamp(now_millis()),
                 entry.collection_id,
@@ -239,6 +254,7 @@ impl HistoryStore {
                 response_headers,
                 response_body,
                 response.map(|r| r.body.len() as i64),
+                entry.proxy,
             ],
         )
         .map_err(db)?;
@@ -284,7 +300,7 @@ impl HistoryStore {
             .query_row(
                 "SELECT id, timestamp, collection_id, request_path, request_name, method, url, status, time_ms, error,
                         request_headers, request_body, request_body_truncated, status_text, final_url,
-                        response_headers, response_body
+                        response_headers, response_body, proxy
                  FROM history WHERE id = ?1",
                 params![id],
                 |row| {
@@ -296,7 +312,8 @@ impl HistoryStore {
                     let final_url: Option<String> = row.get(14)?;
                     let response_headers: Option<String> = row.get(15)?;
                     let response_body: Option<Vec<u8>> = row.get(16)?;
-                    Ok((summary, request_headers, request_body, truncated, status_text, final_url, response_headers, response_body))
+                    let proxy: Option<String> = row.get(17)?;
+                    Ok((summary, request_headers, request_body, truncated, status_text, final_url, response_headers, response_body, proxy))
                 },
             )
             .optional()
@@ -311,6 +328,7 @@ impl HistoryStore {
             final_url,
             response_headers,
             response_body,
+            proxy,
         ) = row;
 
         let pairs = |json: &str| -> Vec<(String, String)> {
@@ -337,6 +355,7 @@ impl HistoryStore {
             request_body: request_body.map(|b| String::from_utf8_lossy(&b).to_string()),
             request_body_truncated: truncated,
             response,
+            proxy,
             summary,
         })
     }
@@ -407,6 +426,7 @@ mod tests {
             timeout: Duration::from_secs(1),
             tls_verify: true,
             ca_cert_paths: vec![],
+            proxy: Default::default(),
         }
     }
 
@@ -449,6 +469,50 @@ mod tests {
         assert!(everything.contains("***"));
         assert_eq!(full.summary.status, Some(200));
         assert_eq!(full.response.unwrap().time_ms, 42);
+    }
+
+    #[test]
+    fn databases_from_before_the_proxy_column_are_upgraded() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.sqlite");
+        {
+            // The table as versions before M16 created it.
+            let old = Connection::open(&path).unwrap();
+            old.execute_batch(
+                "CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
+                 collection_id TEXT NOT NULL, request_path TEXT NOT NULL, request_name TEXT NOT NULL,
+                 method TEXT NOT NULL, url TEXT NOT NULL, request_headers TEXT NOT NULL,
+                 request_body BLOB, request_body_truncated INTEGER NOT NULL DEFAULT 0,
+                 status INTEGER, status_text TEXT, error TEXT, time_ms INTEGER, final_url TEXT,
+                 response_headers TEXT, response_body BLOB, response_size INTEGER);
+                 INSERT INTO history (timestamp, collection_id, request_path, request_name, method,
+                 url, request_headers) VALUES ('t', 'c', 'a.yaml', 'A', 'GET', 'http://old', '[]');",
+            )
+            .unwrap();
+        }
+        let store = HistoryStore::open(&path).unwrap();
+        assert_eq!(
+            store.get(1).unwrap().proxy,
+            None,
+            "old entries have no proxy"
+        );
+
+        let mut entry = NewEntry::from_send(
+            "c",
+            "b.yaml",
+            "B",
+            &sent("http://new", "t", ""),
+            Err("x".into()),
+        );
+        entry.proxy = Some("via proxy http://proxy:8080".into());
+        let id = store.add(&entry, &[], 10).unwrap();
+        assert_eq!(
+            store.get(id).unwrap().proxy.as_deref(),
+            Some("via proxy http://proxy:8080")
+        );
+        // Opening again doesn't try to add the column twice.
+        drop(store);
+        HistoryStore::open(&path).unwrap();
     }
 
     #[test]
