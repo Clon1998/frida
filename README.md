@@ -34,6 +34,8 @@ your operating system's keychain.
   PowerShell) and Frida archives.
 - **Git panel**: status, side-by-side diffs, stage, commit, push, fast-forward pull, branch switch, using your own
   `git` and SSH keys.
+- **Proxy support**: system settings, none, or a manual HTTP/HTTPS/SOCKS5 proxy with login and bypass list, for
+  requests, OAuth2, scripts and AWS; collections for local APIs can opt out.
 - History, a console with the raw exchange, cookie jars, response search and JSONPath filter, image and HTML
   preview, dark and light themes, keyboard-first (Cmd/Ctrl+K quick open).
 - **Updates itself**: a signed update check once a day (can be switched off), installed only when you say so.
@@ -41,7 +43,7 @@ your operating system's keychain.
 - **`frida-run` for CI**: run a collection from the command line with JUnit or JSON output and exit codes;
   secrets from environment variables. [CLI](docs/cli.md)
 
-Not supported (yet): WebSockets, GraphQL, gRPC, SSE, Postman import. HTTP proxy support is planned, see the
+Not supported (yet): WebSockets, GraphQL, gRPC, SSE, Postman import, PAC files. See the
 [roadmap](PLAN.md#15-milestones).
 
 ## Install
@@ -126,7 +128,7 @@ Frida writes only the YAML files of your workspace and collections. Everything e
 settings, open tabs, history and logs (`~/Library/Application Support/io.github.clon1998.frida/` on macOS,
 `%APPDATA%\io.github.clon1998.frida\` on Windows, `~/.local/share/io.github.clon1998.frida/` on Linux). Secret
 values are only in the OS keychain. Frida only talks to the network for what you ask it to do: your requests, their
-OAuth2 token calls, AWS secrets you configured, git push/pull/fetch, and the daily update check against GitHub
+OAuth2 token calls, AWS secrets you configured, git push/pull/fetch (with git's own proxy configuration), and the daily update check against GitHub
 (switch it off in Settings → Updates).
 
 ## Name

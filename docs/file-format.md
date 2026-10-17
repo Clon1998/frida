@@ -109,8 +109,9 @@ Frida keeps machine-specific and sensitive data out of the repo, in its app data
 | Data | Where |
 |---|---|
 | Secret values | OS keychain (or `secrets.enc` when no keychain exists) |
-| Recent and pinned workspaces, active global environment, preferences | `settings.json` |
-| Open tabs, active environment, AWS profile per environment, expanded tree nodes | `state/<collection id>.json` |
+| Recent and pinned workspaces, active global environment, preferences (including the proxy, without its password) | `settings.json` |
+| Open tabs, active environment, AWS profile per environment, expanded tree nodes, "Don't use the proxy" | `state/<collection id>.json` |
+| The proxy password | OS keychain |
 | Request history (secrets masked) | `history.sqlite` |
 | Logs (rotated daily, 7 kept) | `logs/` |
 | Runtime variables, cookies, OAuth2 tokens, fetched AWS secrets | memory only |

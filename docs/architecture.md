@@ -49,6 +49,7 @@ Inside `frida-core`:
 | `import/` | OpenAPI, Bruno (`.bru` parser and YAML), curl |
 | `codegen/` | curl export |
 | `runner.rs` | The collection runner, on top of `http::execute_as` |
+| `network.rs` | Proxy settings: modes, bypass rules, applying them to reqwest, the AWS form |
 | `history.rs`, `archive.rs`, `local_state.rs`, `watch.rs`, `mask.rs` | History (SQLite), Frida archives (zip), per-machine settings, file watcher, secret masking |
 
 ## How a send works
@@ -65,7 +66,8 @@ Inside `frida-core`:
    and the list of secret values, used for masking later.
 5. **Prepare**: merge headers (collection → folder → request), build the URL, body and settings.
 6. **Auth**: apply the effective auth schemes; OAuth2 fetches or refreshes a token if needed.
-7. **Send** with reqwest (cookie jar per collection, custom CAs, timeout, cancellation token).
+7. **Send** with reqwest (cookie jar per collection, custom CAs, timeout, the proxy settings carried on the
+   `PreparedRequest`, cancellation token).
 8. **Post-response scripts and tests**: request → folders → collection.
 9. Back in the app: the console entry and history entry are written **with secrets masked**, the full body goes
    to an in-memory response cache, and a `ResponseView` (a size-limited, displayable version) goes to the UI.

@@ -144,6 +144,22 @@ merge conflicts are resolved in your usual git tool.
 When files change on disk (a `git pull`, another editor), the tree reloads. If a tab with unsaved edits changed
 on disk, Frida asks whether to keep your version or reload.
 
+## Proxy
+
+**Settings → Network** decides how Frida reaches servers:
+
+- **System settings** (default): the operating system's proxy and the `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`
+  variables. Automatic configuration scripts (PAC files) aren't read; enter such a proxy under Manual.
+- **No proxy**: always directly.
+- **Manual**: a proxy URL (`http://`, `https://` or `socks5://`), an optional username and password (the password
+  is stored in the keychain), and hosts that skip the proxy: names (`localhost`), `*.internal` for a domain and
+  its subdomains, IP addresses and ranges like `10.0.0.0/8`.
+
+The proxy applies to requests, OAuth2 token requests, `fri.sendRequest` in scripts and AWS Secrets Manager calls.
+For APIs on your own machine or network, open the collection's settings and tick **Don't use the proxy** (this
+applies on your computer only). When a request went through a manual proxy, the console and history say so. If
+the proxy can't be reached or rejects the login (407), the error says which and where to fix it.
+
 ## History
 
 Every send is stored locally, per collection, in the **History** tab of the sidebar (500 entries by default,

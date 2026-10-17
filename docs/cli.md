@@ -43,6 +43,9 @@ frida-run collections/orders-api --env ci --reporter junit --output frida-report
 | `--bail` | Stop at the first request that fails or can't be sent |
 | `--reporter cli\|junit\|json` | Output format (default `cli`) |
 | `-o, --output <file>` | Write the JUnit/JSON report to a file instead of stdout |
+| `--proxy <url>` | Send everything through this proxy (`http://`, `https://`, `socks5://`). A login can be part of the URL: `http://user:password@proxy:3128` (masked in the output). Default: `HTTP(S)_PROXY`/`NO_PROXY` |
+| `--proxy-bypass <list>` | Hosts that skip `--proxy` (default `localhost,127.0.0.1,::1`; names, `*.domain`, IPs, CIDRs) |
+| `--no-proxy` | No proxy at all, not even from the environment |
 | `-k, --insecure` | Don't verify TLS certificates (like `curl -k`) |
 | `-v, --verbose` | Also print the scripts' `console.log` output (to stderr) |
 

@@ -27,7 +27,7 @@ decisions change.
 
 ### Non-goals (for now)
 - WebSockets, GraphQL, gRPC, MCP, SSE.
-- PAC files (a manual or system HTTP proxy is planned in M16).
+- PAC files (the system proxy is read without PAC; M16 checked this). Enter such a proxy manually.
 - Git merge or conflict resolution UI. Conflicts are resolved in the user's normal git tooling.
 - Postman import.
 - Cloud sync, accounts, telemetry.
@@ -748,18 +748,28 @@ layout. Whether GitHub shows the report is checked with the first release (`docs
 
 ### M16: HTTP proxy
 Company networks often only allow traffic through a proxy (moved out of the non-goals, see the decisions log).
-- [ ] Settings → Network: **System proxy** (default: the OS settings and `HTTP(S)_PROXY`/`NO_PROXY`), **No proxy**,
+- [x] Settings → Network: **System proxy** (default: the OS settings and `HTTP(S)_PROXY`/`NO_PROXY`), **No proxy**,
   or **Manual**: proxy URL (`http://`/`https://`/`socks5://`), optional username + password (password in the
   keychain), and a bypass list (`localhost`, `*.internal`, CIDRs).
-- [ ] Applies to every request Frida makes: sends, OAuth2 token calls, `fri.sendRequest`, and the AWS SDK.
+- [x] Applies to every request Frida makes: sends, OAuth2 token calls, `fri.sendRequest`, and the AWS SDK.
   Per collection: a "Don't use the proxy" switch for local APIs.
-- [ ] Proxy errors are explained (unreachable proxy, 407 authentication required) with a hint to the settings.
-- [ ] The console and history show whether a request went through the proxy (never the proxy password).
-- [ ] PAC files: only if the system proxy needs them and the OS resolves them for us; otherwise still a non-goal.
-- [ ] `frida-testserver` gets a small forward proxy (HTTP + CONNECT, optional Basic auth) for integration tests.
+- [x] Proxy errors are explained (unreachable proxy, 407 authentication required) with a hint to the settings.
+- [x] The console and history show whether a request went through the proxy (never the proxy password).
+- [x] PAC files: only if the system proxy needs them and the OS resolves them for us; otherwise still a non-goal.
+  *Checked: reqwest's system-proxy support reads only the static HTTP/HTTPS proxies of macOS and Windows (and the
+  environment), not PAC; PAC stays a non-goal. With a PAC-only network, enter the proxy under Manual.*
+- [x] `frida-testserver` gets a small forward proxy (HTTP + CONNECT, optional Basic auth) for integration tests.
 
 **Acceptance:** with a manual proxy, sends, OAuth2 and scripts go through the test proxy (with and without
 authentication); the bypass list and the per-collection switch skip it; a wrong proxy password gives the 407 hint.
+*Status 2026-10-17: done (automated): `crates/frida-core/tests/proxy.rs` against `frida_testserver::spawn_proxy`:
+plain HTTP and HTTPS (CONNECT) through the proxy, login right/wrong/missing (407 for HTTP and HTTPS), bypass list
+and "off", OAuth2 token call plus `fri.sendRequest` plus the send itself, an unreachable proxy, the console's
+"via proxy" line. `network.rs` unit tests for bypass rules, URL/credential parsing and the settings.
+`frida-cli/tests/cli.rs` for `--proxy` with a login (masked) and `--proxy-bypass`. Playwright: Settings → Network
+(manual proxy, login, bypass list, refused URL, password never in settings.json) and the collection switch
+surviving tab changes. History migration test for old databases. The per-collection switch itself is three
+lines in `commands/http.rs` (`proxy_for`, not unit-tested). AWS through a proxy is not tested against real AWS.*
 
 ### M17: More AWS secret sources and per-secret AWS accounts
 Patrick hasn't been able to test the AWS integration (M8) against real accounts yet; this milestone ends with that.
@@ -1040,6 +1050,25 @@ Deviations from and clarifications of this plan, newest last.
   also for Ctrl+C, a `setNextRequest` loop or an unknown request name; `--bail` stops after the first failed or
   unsent request. Release archives are named without the version (`frida-run-<target>.tar.gz`) for stable
   `releases/latest/download` URLs. The auth code grant prints the sign-in URL instead of opening a browser.
+
+- **2026-10-17 HTTP proxy (M16).** The proxy settings travel on `PreparedRequest` (`proxy: ProxySettings`, set
+  from `Session::proxy`), so the send, OAuth2 token calls, "Get new token" and `fri.sendRequest` all build their
+  client with it in one place (`build_client`). Manual mode uses `reqwest::Proxy::custom` with Frida's own bypass
+  matcher (`frida_core::network::Bypass`: hosts, `*.domain`/`.domain`, IPs, CIDRs; ports ignored), so Frida
+  knows per URL whether the proxy is used: console entries and history get `proxy: "via proxy <url>"` (new
+  nullable `proxy` column, added to old databases on open). The default bypass list is `localhost, 127.0.0.1,
+  ::1`. New `SendError::Proxy`/`ProxyAuth` (`ErrorCode::Proxy`) with hints; a 407 is detected both as a response
+  (plain HTTP) and as a failed CONNECT (HTTPS); "unsuccessful tunnel" (proxy reached, server not) stays a
+  connect error. **The per-collection switch is local state** (`state/<id>.json` `bypassProxy`, set at once by
+  `set_collection_bypass_proxy`), not `collection.yaml`: the proxy is per machine too, so this needs no
+  on-disk format change. The password lives in the keychain (`app/network/proxyPassword`), is read only for a
+  manual proxy with a username, and the built settings are cached until the settings or the password change.
+  **AWS**: the SDK's default client ignores proxies, so `frida-secrets` builds it with `aws-smithy-http-client`
+  (already in the tree; `Builder::build_with_connector_fn` + `ConnectorBuilder::proxy_config`, a hook the crate
+  marks `doc(hidden)`); System mode means `HTTPS_PROXY`/`NO_PROXY` there (the SDK can't read OS settings),
+  SOCKS proxies fall back to the environment for AWS. SOCKS5 for requests via reqwest's `socks` feature (not
+  covered by an integration test). The per-collection switch doesn't affect AWS calls. CLI: `--proxy URL` (login
+  in the URL, masked), `--proxy-bypass`, `--no-proxy`; default is the environment.
 
 ## 17. Testing strategy
 

@@ -1,5 +1,32 @@
 # Changelog
 
+## M16: HTTP proxy (2026-10-17)
+
+### What was built
+- **Settings → Network**: system settings (default), no proxy, or a manual HTTP/HTTPS/SOCKS5 proxy with an optional
+  login (password in the keychain) and a bypass list (hosts, `*.domain`, IPs, CIDR ranges).
+- **Everything goes through it**: requests, OAuth2 token calls, "Get new token", `fri.sendRequest` and AWS Secrets
+  Manager. A collection can opt out with **Don't use the proxy** (per computer).
+- **Clear errors**: "could not reach the proxy …" and "407 Proxy Authentication Required", with hints to the
+  settings. The console and history show "via proxy …" (never the login).
+- **frida-run**: `--proxy URL` (login in the URL, masked), `--proxy-bypass`, `--no-proxy`.
+- **Test proxy** in `frida-testserver` (plain HTTP and CONNECT, optional Basic auth) that records what passed
+  through, used by the integration tests.
+- PAC files stay unsupported: reqwest's system proxy support doesn't read them (checked).
+
+### Rust things worth understanding in this milestone
+1. **A closure as a strategy** (`frida-core/src/network.rs` `apply`). `reqwest::Proxy::custom` takes a
+   `Fn(&Url) -> Option<proxy>` that reqwest calls for every request. The closure owns an `Arc` of the settings
+   (`move`), so it can live inside the client after `apply` returns: a lambda capturing an immutable object.
+2. **Writing `Debug` by hand to hide a field** (`ManualProxy`, `AwsProxy`). `#[derive(Debug)]` would print the
+   password in every `{:?}`, log line or panic message. Implementing `fmt::Debug` ourselves (with
+   `debug_struct(...).field(...)`) prints `***` instead; a test checks it.
+3. **Bit arithmetic for CIDR ranges** (`in_range`). Both IPv4 and IPv6 addresses become a `u128`, and a range
+   `net/bits` matches when the first `bits` bits are equal: `(ip >> shift) == (net >> shift)`. `u32::from` and
+   `u128::from` are lossless conversions, so there's no casting surprise.
+4. **A small schema migration** (`history.rs` `init`). SQLite has no `ADD COLUMN IF NOT EXISTS`, so the code asks
+   `pragma_table_info` first and only then runs `ALTER TABLE`. A test opens a database in the old layout.
+
 ## M15: CLI runner `frida-run` (2026-10-17)
 
 ### What was built
