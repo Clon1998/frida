@@ -404,3 +404,46 @@ tests: |
             && !stderr.contains("client_credentials-token")
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unmapped_aws_account_alias_says_which_flag_to_pass() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "collection.yaml",
+        "version: 1\nid: c-5\nname: AWS\n",
+    );
+    write(
+        dir.path(),
+        "environments/prod.yaml",
+        "version: 1\nname: prod\nvariables:\n- name: apiKey\n  secret: true\n  source:\n    type: api-gateway-key\n    apiKeyId: a1b2c3\n    account: shared-services\n",
+    );
+    write(
+        dir.path(),
+        "echo.yaml",
+        "version: 1\nname: Echo\nmethod: GET\nurl: http://127.0.0.1:9/echo\n",
+    );
+    let output = frida_run(&[dir.path().to_str().unwrap(), "--env", "prod"], &[]);
+    let stderr = text(&output.stderr);
+    assert_eq!(output.status.code(), Some(2), "{stderr}");
+    assert!(
+        stderr.contains("pass --aws-account shared-services=<profile>"),
+        "{stderr}"
+    );
+    // A value given directly wins over the AWS source, so no AWS call and no alias are needed.
+    let output = frida_run(
+        &[
+            dir.path().to_str().unwrap(),
+            "--env",
+            "prod",
+            "--secret",
+            "apiKey=local",
+        ],
+        &[],
+    );
+    assert!(
+        !text(&output.stderr).contains("--aws-account"),
+        "{}",
+        text(&output.stderr)
+    );
+}
