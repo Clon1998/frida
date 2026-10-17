@@ -344,3 +344,63 @@ async fn proxy_with_login_and_bypass() {
         "{stdout}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn oauth2_client_credentials_with_the_secret_from_the_environment() {
+    let addr = server().await;
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "collection.yaml",
+        &format!(
+            r#"version: 1
+id: c-4
+name: OAuth
+auth:
+  mode: custom
+  schemes:
+  - type: oauth2
+    grant: client_credentials
+    tokenUrl: http://{addr}/oauth/token
+    clientId: frida
+    clientSecret: "{{{{clientSecret}}}}"
+    scope: orders/read
+"#
+        ),
+    );
+    write(
+        dir.path(),
+        "environments/ci.yaml",
+        "version: 1\nname: ci\nvariables:\n- name: clientSecret\n  secret: true\n",
+    );
+    write(
+        dir.path(),
+        "echo.yaml",
+        &format!(
+            r#"version: 1
+name: Echo
+method: GET
+url: http://{addr}/echo
+scripts:
+  post: |
+    console.log("sent", res.body.headers.authorization);
+tests: |
+  test("has a token", () => expect(res.body.headers.authorization).to.match(/^Bearer client_credentials-token-/));
+"#
+        ),
+    );
+    let output = frida_run(
+        &[dir.path().to_str().unwrap(), "--env", "ci", "--verbose"],
+        &[("FRIDA_SECRET_clientSecret", "secret")],
+    );
+    let stdout = text(&output.stdout);
+    let stderr = text(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "{stdout}{stderr}");
+    assert!(stdout.contains("1/1 tests"), "{stdout}");
+    // Neither the client secret nor the access token show up, also not in script output.
+    assert!(stderr.contains("sent Bearer ***"), "{stderr}");
+    assert!(
+        !stdout.contains("client_credentials-token")
+            && !stderr.contains("client_credentials-token")
+    );
+}

@@ -5,8 +5,7 @@
 //! - `POST /oauth/token` supports `client_credentials`, `password`, `authorization_code` (with
 //!   PKCE S256 verification) and `refresh_token`.
 //!
-//! Clients: `frida` / `secret` gets tokens valid for an hour; `short-lived` / `secret` gets
-//! tokens valid for 1 second (to test refreshing). User: `alice` / `wonderland`.
+//! Clients: see [`CLIENTS`] (all with the secret `secret`). User: `alice` / `wonderland`.
 //! Client credentials may be sent as an HTTP Basic header or in the form body.
 
 use std::collections::HashMap;
@@ -40,6 +39,13 @@ pub fn router() -> Router {
         .with_state(Shared::default())
 }
 
+/// The clients the provider knows (all with the secret `secret`):
+/// - `frida`: tokens live an hour;
+/// - `short-lived`: tokens expire after 1 s and come with a refresh token;
+/// - `no-refresh`: short-lived, without a refresh token (the client must fetch a new one);
+/// - `refresh-fails`: short-lived, and its refresh tokens are always rejected.
+const CLIENTS: [&str; 4] = ["frida", "short-lived", "no-refresh", "refresh-fails"];
+
 #[derive(Deserialize)]
 struct AuthorizeQuery {
     client_id: String,
@@ -49,7 +55,7 @@ struct AuthorizeQuery {
 }
 
 async fn authorize(State(state): State<Shared>, Query(q): Query<AuthorizeQuery>) -> Response {
-    if q.client_id != "frida" && q.client_id != "short-lived" {
+    if !CLIENTS.contains(&q.client_id.as_str()) {
         return (StatusCode::BAD_REQUEST, "unknown client").into_response();
     }
     let mut s = state.lock().unwrap();
@@ -102,7 +108,7 @@ fn client(headers: &HeaderMap, form: &TokenForm) -> Option<String> {
             form.client_secret.clone().unwrap_or_default(),
         ),
     };
-    ((id == "frida" || id == "short-lived") && secret == "secret").then_some(id)
+    (CLIENTS.contains(&id.as_str()) && secret == "secret").then_some(id)
 }
 
 async fn token(
@@ -145,7 +151,7 @@ async fn token(
                 .refresh_token
                 .as_ref()
                 .and_then(|r| s.refresh_tokens.remove(r));
-            if known.as_deref() != Some(client_id.as_str()) {
+            if known.as_deref() != Some(client_id.as_str()) || client_id == "refresh-fails" {
                 return error(StatusCode::BAD_REQUEST, "invalid_grant");
             }
         }
@@ -154,15 +160,17 @@ async fn token(
 
     s.issued += 1;
     let n = s.issued;
-    let refresh = format!("refresh-{n}");
-    s.refresh_tokens.insert(refresh.clone(), client_id.clone());
-    let expires_in = if client_id == "short-lived" { 1 } else { 3600 };
-    axum::Json(json!({
+    let expires_in = if client_id == "frida" { 3600 } else { 1 };
+    let mut body = json!({
         "access_token": format!("{}-token-{n}", form.grant_type),
         "token_type": "Bearer",
         "expires_in": expires_in,
-        "refresh_token": refresh,
         "scope": form.scope.unwrap_or_default(),
-    }))
-    .into_response()
+    });
+    if client_id != "no-refresh" {
+        let refresh = format!("refresh-{n}");
+        s.refresh_tokens.insert(refresh.clone(), client_id.clone());
+        body["refresh_token"] = json!(refresh);
+    }
+    axum::Json(body).into_response()
 }
