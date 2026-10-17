@@ -52,6 +52,9 @@ tokio-rustls = "0.26.6"
 time = "0.3.55"
 notify-debouncer-full = "0.7.0"
 keyring = "4.2.0"
+# macOS data protection keychain (frida-secrets, PLAN.md M13). Already in the tree through keyring;
+# `OSX_10_15` enables `kSecUseDataProtectionKeychain`.
+security-framework = { version = "3.7.0", features = ["OSX_10_15"] }
 argon2 = "0.6.0"
 chacha20poly1305 = "0.11.0"
 getrandom = "0.4.3"

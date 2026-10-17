@@ -92,10 +92,48 @@ impl OpenWorkspace {
     }
 }
 
+/// The keychain access group of signed builds: team id + bundle id (`Entitlements.plist`).
+#[cfg(target_os = "macos")]
+const KEYCHAIN_ACCESS_GROUP: &str = "Q4XB68D4T7.io.github.clon1998.frida";
+
+/// The OS keychain store to use (PLAN.md M13).
+///
+/// On macOS, a signed build uses the data protection keychain (no password prompts); an
+/// unsigned dev build keeps all secrets in one legacy keychain item, the "vault" (one prompt
+/// per run). Old per-secret items move over on first use. A signed build also takes over what
+/// a dev build put into the vault, so switching to a release loses nothing. (The other way
+/// round, secrets entered in a signed build stay there: dev builds can't read that keychain.)
+/// Elsewhere: the OS store as is.
+fn os_keychain() -> Box<dyn SecretStore> {
+    #[cfg(target_os = "macos")]
+    {
+        use frida_secrets::{MigratingStore, ProtectedStore, VaultStore};
+        // The vault, which itself takes over old per-secret items.
+        let vault = || -> Box<dyn SecretStore> {
+            Box::new(MigratingStore::new(
+                Box::new(VaultStore::new(Box::new(KeychainStore))),
+                Box::new(KeychainStore),
+            ))
+        };
+        let protected = ProtectedStore::new(KEYCHAIN_ACCESS_GROUP);
+        if protected.available() {
+            tracing::info!("secrets: data protection keychain");
+            Box::new(MigratingStore::new(Box::new(protected), vault()))
+        } else {
+            tracing::info!("secrets: one vault item in the login keychain (unsigned build)");
+            vault()
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Box::new(KeychainStore)
+    }
+}
+
 impl AppState {
     pub fn new(app_data_dir: PathBuf) -> Self {
         let secrets = if frida_secrets::keychain_available() {
-            SecretBackend::Keychain(Arc::new(CachedStore::new(Box::new(KeychainStore))))
+            SecretBackend::Keychain(Arc::new(CachedStore::new(os_keychain())))
         } else {
             tracing::warn!("no OS keychain available, using the encrypted secret file");
             SecretBackend::File(Arc::new(EncryptedFileStore::new(

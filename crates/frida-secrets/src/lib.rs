@@ -6,6 +6,9 @@
 //! - [`EncryptedFileStore`]: an encrypted file in the app data dir, protected by a master
 //!   password. Used when no OS keychain is available (e.g. headless Linux).
 //! - [`MemoryStore`]: for tests.
+//! - On macOS (PLAN.md M13): [`ProtectedStore`], the data protection keychain of a signed app
+//!   (no prompts), or in unsigned dev builds a [`VaultStore`] (all secrets in one legacy item);
+//!   both behind a [`MigratingStore`] that takes over the old per-secret items.
 //! - [`CachedStore`]: an in-memory cache in front of another store; the app wraps the keychain
 //!   in it so each secret is read (and macOS asks for access) at most once per run.
 //!
@@ -18,11 +21,19 @@ mod cached;
 mod encrypted_file;
 mod keychain;
 mod memory;
+mod migrate;
+#[cfg(target_os = "macos")]
+mod protected;
+mod vault;
 
 pub use cached::CachedStore;
 pub use encrypted_file::EncryptedFileStore;
 pub use keychain::{KeychainStore, keychain_available};
 pub use memory::MemoryStore;
+pub use migrate::MigratingStore;
+#[cfg(target_os = "macos")]
+pub use protected::ProtectedStore;
+pub use vault::VaultStore;
 
 /// Identifies one secret: the variable `var` of environment `env` in scope `scope_id`.
 ///
