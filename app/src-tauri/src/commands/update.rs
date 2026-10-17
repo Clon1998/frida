@@ -284,6 +284,9 @@ mod tests {
                 "https://github.com/Clon1998/frida/releases/latest/download/latest.json"
             ])
         );
+        // Without a public key nothing could be verified (`install_blocker` would refuse).
+        let pubkey = updater["pubkey"].as_str().unwrap_or_default();
+        assert!(!pubkey.trim().is_empty(), "plugins.updater.pubkey is empty");
         // Updater artifacts are only built in the release workflow, which has the private key.
         assert_ne!(config["bundle"]["createUpdaterArtifacts"], true);
     }
