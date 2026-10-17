@@ -695,21 +695,31 @@ restart). Open: GitHub signing secrets and the first notarized release.*
 
 ### M14: Auto-update
 Signed releases exist since M13; users should not have to reinstall every version by hand.
-- [ ] `tauri-plugin-updater` with Tauri's own update signature (a key pair from `tauri signer generate`; the public
+- [x] `tauri-plugin-updater` with Tauri's own update signature (a key pair from `tauri signer generate`; the public
   key goes into `tauri.conf.json`, the private key and its password into GitHub secrets
   `TAURI_SIGNING_PRIVATE_KEY`/`..._PASSWORD`). Independent of the Apple signing.
-- [ ] Release workflow: build the updater artifacts (macOS `.app.tar.gz`, Windows NSIS, Linux AppImage, each with
+- [x] Release workflow: build the updater artifacts (macOS `.app.tar.gz`, Windows NSIS, Linux AppImage, each with
   its `.sig`) and a `latest.json` manifest, attached to the release. The app reads
   `https://github.com/Clon1998/frida/releases/latest/download/latest.json`, so only **published** releases are
   offered (drafts stay invisible).
-- [ ] UI: check on start (at most once a day, can be switched off in Settings), then a quiet notice "Frida X is
+- [x] UI: check on start (at most once a day, can be switched off in Settings), then a quiet notice "Frida X is
   available" with the release notes, **Install and restart** and **Later**. Settings → "Check for updates" by hand.
   Unsaved tabs are asked about before restarting (the close dialog). The `.deb` and `.msi` installs show "download
   the new version" instead (the updater can't replace them).
-- [ ] Never during a run or a send; the download can be cancelled.
+- [x] Never during a run or a send; the download can be cancelled.
+- [ ] **Patrick:** generate the update key pair (`cd app && pnpm tauri signer generate -w ~/.frida-signing/frida-updater.key`),
+  put the public key into `plugins.updater.pubkey` in `tauri.conf.json`, and the private key (file content) and its
+  password into the GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Back the key
+  up: without it, installed copies can never be updated again.
 
 **Acceptance:** an installed 0.2.x finds a published 0.3.0, installs it and restarts into it on macOS (signed) and
 Windows; a tampered `latest.json` signature is rejected.
+*Status 2026-10-17: built, waiting for the update key and a first release. Commands `check_for_update`,
+`install_update`, `cancel_update` (`app/src-tauri/src/commands/update.rs`) on the plugin's Rust API; once-a-day rule
+in `frida_core::local_state` (unit-tested); the update dialog and Settings → Updates (`pnpm e2e`: check by hand, save
+unsaved tabs, install; switch off). `release.yml` builds and signs updater artifacts and attaches `latest.json`
+(`app/scripts/update-manifest.sh`) when `TAURI_SIGNING_PRIVATE_KEY` is set. A test pins the strict updater config.
+Note: 0.2.0 has no updater, so 0.2.0 users install 0.3.0 by hand once; the end-to-end check is 0.3.0 → 0.3.1.*
 
 ### M15: CLI runner (`frida-run`) with JUnit output
 Run collections in CI with the same engine as the app's runner (M11).
@@ -997,6 +1007,19 @@ Deviations from and clarifications of this plan, newest last.
   an HTTP proxy (M16, moved out of the non-goals) and more AWS sources with per-secret accounts (M17). Not needed for
   now: declarative assertions, Postman import, OpenAPI re-sync, more codegen targets. AWS profiles are per
   environment today; per-secret accounts use aliases so the YAML stays machine-independent.
+
+- **2026-10-17 Auto-update (M14).** Deviations from the plan: (1) **every** installer updates itself, not only
+  `.app`/NSIS/AppImage: `tauri-plugin-updater` 2.14 looks up `{os}-{arch}-{installer}` keys, so `latest.json` has
+  entries for `.deb`, `.rpm` and `.msi` too (the plan expected a "download it yourself" notice for those). (2) The UI
+  uses Frida's own commands on the plugin's Rust API instead of the plugin's JS package: no npm dependency, types via
+  tauri-specta, and the busy check and cancel live in Rust. (3) `requireSignedVersion` is on from the start (no older
+  updater release exists that would need re-signing): the signature also covers the version, so an altered manifest
+  can't serve an old release as a new one. (4) Updater artifacts are enabled by a release-only config overlay
+  (`tauri.updater.conf.json`), so local and CI builds don't need the private key. (5) The plugin brings rustls'
+  `ring` backend next to reqwest's `aws-lc-rs`; the app installs `aws-lc-rs` as the process default at startup and the
+  test server names its provider, otherwise rustls can't choose and panics. Release notes in `latest.json` are the
+  draft's notes at build time; edits made before publishing don't reach it (rerun the manifest job if needed).
+  Development builds never check on their own and can't install.
 
 ## 17. Testing strategy
 

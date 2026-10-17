@@ -172,4 +172,12 @@ On macOS, Ctrl+E and Ctrl+K keep their usual text-editing meaning.
 ## Settings
 
 The gear in the sidebar footer (or **Mod+,**) opens per-machine settings: theme, accent color, UI and editor size,
-the git program, AWS config files and cache time, and the history size. Changes apply immediately.
+the git program, AWS config files and cache time, the history size and updates. Changes apply immediately.
+
+## Updates
+
+Frida looks for a new version when it starts, at most once a day (switch it off in **Settings → Updates**, where
+**Check for updates** also checks right away). When there is one, a notice shows up; **Details…** shows the release
+notes and **Install and restart**. If tabs have unsaved changes, Frida offers to save them first. The download can be
+cancelled; nothing is installed while a request or a collection run is in progress. Every update is verified with
+Frida's signing key before it is installed. Builds you compiled yourself don't update themselves.

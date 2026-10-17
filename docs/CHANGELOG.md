@@ -1,5 +1,38 @@
 # Changelog
 
+## M14: Auto-update (2026-10-17, waiting for the update key and a first release)
+
+### What was built
+- **Update check** on start, at most once a day and never in development builds (Settings → Updates switches it off;
+  **Check for updates** checks right away). A quiet notice says "Frida X is available"; **Details…** opens the
+  release notes with **Install and restart** and **Later**.
+- **Installing**: unsaved tabs are offered to be saved first; the download shows progress and can be cancelled;
+  nothing is installed while a request or run is in flight. Every installer type updates itself (`.app`, NSIS,
+  MSI, AppImage, `.deb`, `.rpm`).
+- **Safety**: the plugin verifies each download with Frida's update key, and `requireSignedVersion` binds the
+  signature to the version, so an altered `latest.json` can't offer an old release as new. A test pins these settings.
+- **Release workflow**: with `TAURI_SIGNING_PRIVATE_KEY` set, installers are signed for the updater and
+  `latest.json` is attached (`app/scripts/update-manifest.sh`). Only published releases are offered.
+- **Docs**: a rewritten README, plus a user guide, file format, architecture, development and releasing docs.
+- **Fix found on the way**: with the updater, rustls has two crypto backends, so the test server's TLS mode
+  panicked; the app now fixes the TLS backend at startup so sends can't switch backend after the first update check.
+
+### Rust things worth understanding in this milestone
+1. **Cancelling by dropping a future** (`app/src-tauri/src/commands/update.rs` `download`). `tokio::select!` polls the
+   download and a `CancellationToken` together and continues with whichever finishes first. When cancel wins, the
+   download future is dropped, and a dropped future simply stops: Rust futures only make progress while polled.
+   There's no thread to interrupt, unlike `Future.cancel(true)` in Java.
+2. **Cargo feature unification** (the rustls fix, `app/src-tauri/src/lib.rs` `run`). Features are additive across
+   the whole build: the updater turning on rustls' `ring` feature also turns it on for reqwest's rustls, so suddenly
+   two backends exist and "pick the one that's enabled" no longer works. It's like two Maven modules pulling
+   different implementations of one SPI onto the same classpath. Choosing one explicitly (`install_default`) settles it.
+3. **Numbers that cross into TypeScript** (`frida_core::local_state::AppSettings::last_update_check`). specta refuses
+   `u64`, because a JS `number` is a 64-bit float and silently loses precision above 2^53. Unix seconds and download
+   sizes fit easily in `u32`, so the types say so and conversion clamps (`clamp_u32`).
+4. **`cfg!` vs `#[cfg]`** (`install_blocker`). `cfg!(debug_assertions)` is an ordinary `bool` expression, so both
+   branches must compile on every build; `#[cfg(...)]` removes code entirely (as in M13's macOS-only keychain). Use
+   `cfg!` when the code is valid everywhere and only the behaviour differs.
+
 ## M13: macOS data protection keychain and signed releases (2026-10-17)
 
 ### What was built

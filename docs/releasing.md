@@ -28,6 +28,42 @@ If the workflow fails, fix it on `main`, delete the draft release and the tag (`
 | macOS arm64 / x64 | `.dmg` | Developer ID + notarized (when the secrets below are set) |
 | Windows x64 | `.msi`, NSIS `-setup.exe` | No: SmartScreen shows *More info → Run anyway* |
 | Linux x64 | `.AppImage`, `.deb`, `.rpm` | No |
+| All | `.sig` per installer, `Frida_<version>_<arch>.app.tar.gz` (macOS), `latest.json` | Update key (see below) |
+
+## In-app updates
+
+Installed copies update themselves from the newest **published** release (PLAN.md M14). The app reads
+`https://github.com/Clon1998/frida/releases/latest/download/latest.json`, which only resolves to a published release,
+so drafts are never offered.
+
+For that, `release.yml` needs the update signing key (Tauri's own signature, unrelated to Apple's):
+
+| Secret | Content |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | The content of the private key file |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password |
+
+The matching public key is `plugins.updater.pubkey` in `app/src-tauri/tauri.conf.json`. Create the pair once:
+
+```sh
+cd app
+pnpm tauri signer generate -w ~/.frida-signing/frida-updater.key
+```
+
+**Back up the private key.** If it is lost, installed copies can't verify any future update and users have to
+reinstall by hand.
+
+With the secret set, the release workflow:
+
+1. builds with `tauri.updater.conf.json` (`createUpdaterArtifacts`), which signs every installer (`.sig` next to it)
+   and adds `Frida.app.tar.gz` on macOS (renamed per architecture);
+2. after all builds, writes `latest.json` with `app/scripts/update-manifest.sh` (one entry per OS, architecture and
+   installer type, e.g. `linux-x86_64-deb`) and attaches it to the draft.
+
+The notes in `latest.json` are the draft's notes at that moment. If you edit them before publishing and want the
+app to show the edited notes, rerun the **Update manifest** job.
+
+Without the secret the workflow still builds and releases, just without updater files.
 
 ## Signed macOS builds
 
