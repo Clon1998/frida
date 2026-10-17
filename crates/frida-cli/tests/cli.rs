@@ -301,3 +301,46 @@ async fn bail_stops_at_the_first_failure() {
         "{stdout}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn proxy_with_login_and_bypass() {
+    let addr = server().await;
+    let proxy = frida_testserver::spawn_proxy(Some(("ann", "pr0xy-Pass")))
+        .await
+        .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "collection.yaml",
+        "version: 1\nid: c-3\nname: Proxy\n",
+    );
+    write(
+        dir.path(),
+        "echo.yaml",
+        &format!("version: 1\nname: Echo\nmethod: GET\nurl: http://{addr}/echo\n"),
+    );
+    let path = dir.path().to_str().unwrap();
+    let with_login = format!("http://ann:pr0xy-Pass@{}", proxy.addr);
+
+    // 127.0.0.1 is bypassed by default; an empty bypass list sends it through the proxy.
+    let output = frida_run(&[path, "--proxy", &with_login], &[]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(proxy.requests().is_empty(), "{:?}", proxy.requests());
+
+    let output = frida_run(&[path, "--proxy", &with_login, "--proxy-bypass", ""], &[]);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stdout));
+    assert_eq!(proxy.requests(), [format!("GET http://{addr}/echo")]);
+
+    let wrong = format!("http://ann:nope@{}", proxy.addr);
+    let output = frida_run(&[path, "--proxy", &wrong, "--proxy-bypass", ""], &[]);
+    let stdout = text(&output.stdout);
+    assert_eq!(output.status.code(), Some(2), "{stdout}");
+    assert!(
+        stdout.contains("407 Proxy Authentication Required"),
+        "{stdout}"
+    );
+    assert!(
+        !stdout.contains("nope") && !stdout.contains("pr0xy-Pass"),
+        "{stdout}"
+    );
+}

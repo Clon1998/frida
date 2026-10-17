@@ -19,6 +19,7 @@ use frida_core::auth::OAuth2Manager;
 use frida_core::http::{CookieJar, ScriptLog, SessionStore};
 use frida_core::mask::Masker;
 use frida_core::model::{Environment, SecretSource};
+use frida_core::network::{ManualProxy, ProxySettings};
 use frida_core::runner::{self, RunInput, RunOptions, RunOutcome, RunStep, RunStop, RunSummary};
 use frida_core::secrets::{AwsFetch, fill_aws_secrets};
 use frida_core::storage;
@@ -73,11 +74,18 @@ async fn run_collection(args: Args) -> anyhow::Result<u8> {
         ),
         (None, _) => None,
     };
-    fill_secrets(&args, collection_env.as_mut(), global_env.as_mut()).await?;
+    let proxy = proxy_settings(&args)?;
+    fill_secrets(&args, collection_env.as_mut(), global_env.as_mut(), &proxy).await?;
 
     let envs: Vec<&Environment> = collection_env.iter().chain(global_env.iter()).collect();
     let mut known_secrets = secrets::secret_values(&envs);
     known_secrets.extend(args.secrets.iter().map(|(_, value)| value.clone()));
+    // A proxy password from the URL is masked like any secret.
+    if let ProxySettings::Manual(manual) = &proxy
+        && let Some(password) = &manual.password
+    {
+        known_secrets.push(password.clone());
+    }
 
     let folder = args.folder.as_deref().unwrap_or("");
     let items = runner::plan_run(&collection_dir, folder)
@@ -112,6 +120,7 @@ async fn run_collection(args: Args) -> anyhow::Result<u8> {
 
     let session = SessionStore {
         skip_tls_verify: args.insecure,
+        proxy,
         ..SessionStore::with_runtime(
             &args
                 .vars
@@ -282,6 +291,18 @@ fn environment(dir: &Path, name: &str, kind: &str) -> anyhow::Result<Environment
     )
 }
 
+/// `--proxy`/`--no-proxy`, or the environment's proxy (`HTTPS_PROXY` etc.) by default.
+fn proxy_settings(args: &Args) -> anyhow::Result<ProxySettings> {
+    if args.no_proxy {
+        return Ok(ProxySettings::Off);
+    }
+    let Some(url) = &args.proxy else {
+        return Ok(ProxySettings::System);
+    };
+    let proxy = ManualProxy::parse(url, &args.proxy_bypass)?;
+    Ok(ProxySettings::Manual(Arc::new(proxy)))
+}
+
 /// The nearest folder at or above `collection_dir` with a `frida-workspace.yaml`.
 fn find_workspace(collection_dir: &Path) -> Option<PathBuf> {
     let start = collection_dir.canonicalize().ok()?;
@@ -298,6 +319,7 @@ async fn fill_secrets(
     args: &Args,
     collection_env: Option<&mut Environment>,
     global_env: Option<&mut Environment>,
+    proxy: &ProxySettings,
 ) -> anyhow::Result<()> {
     let given: HashMap<String, String> = args.secrets.iter().cloned().collect();
     let lookup = |name: &str| std::env::var(name).ok();
@@ -324,7 +346,11 @@ async fn fill_secrets(
                 && matches!(v.source, Some(SecretSource::AwsSecretsManager { .. }))
         });
         if needs_aws {
-            let aws = aws.get_or_insert_with(frida_secrets::aws::AwsSecrets::with_sdk);
+            let aws = aws.get_or_insert_with(|| {
+                let aws = frida_secrets::aws::AwsSecrets::with_sdk();
+                aws.set_proxy(proxy.for_aws());
+                aws
+            });
             fill_aws_secrets(env, global, Some(&profile), aws, AwsFetch::Fetch)
                 .await
                 .with_context(|| format!("AWS profile {profile:?}"))?;

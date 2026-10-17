@@ -70,6 +70,24 @@ pub struct Args {
     #[arg(long, short = 'o')]
     pub output: Option<PathBuf>,
 
+    /// Send everything through this proxy: http://host:port, https://… or socks5://…. A login
+    /// can be part of the URL (http://user:password@host:port). Default: HTTPS_PROXY etc.
+    #[arg(long, value_name = "URL", conflicts_with = "no_proxy")]
+    pub proxy: Option<String>,
+
+    /// Hosts that skip --proxy: names, *.domain, IP addresses and CIDR ranges, comma-separated.
+    #[arg(
+        long,
+        value_name = "LIST",
+        default_value = "localhost,127.0.0.1,::1",
+        requires = "proxy"
+    )]
+    pub proxy_bypass: String,
+
+    /// Use no proxy at all, not even from HTTPS_PROXY.
+    #[arg(long)]
+    pub no_proxy: bool,
+
     /// Don't verify TLS certificates (like curl -k).
     #[arg(long, short = 'k')]
     pub insecure: bool,
