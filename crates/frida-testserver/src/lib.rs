@@ -16,8 +16,10 @@
 //! [`spawn_tls`] serves the same routes over HTTPS with a throwaway CA.
 
 mod oauth;
+mod proxy;
 mod tls;
 
+pub use proxy::{ProxyServer, spawn_proxy};
 pub use tls::{TlsServer, spawn_tls};
 
 use std::net::SocketAddr;
