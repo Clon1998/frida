@@ -97,10 +97,25 @@ variables:
     secretId: eip/dev/orders-api
     jsonKey: apiKey   # optional: one key of a JSON secret
     region: eu-central-1
+- name: clientSecret2
+  secret: true
+  source:
+    type: cognito-client-secret
+    userPoolId: eu-central-1_AbCdEf   # its prefix is the default region
+    clientId: 4tq1example
+- name: partnerApiKey
+  secret: true
+  source:
+    type: api-gateway-key
+    apiKeyId: a1b2c3d4e5
+    account: shared-services          # optional: another AWS account (alias, see below)
 - name: legacyHost
   value: old.example.com
   enabled: false    # only written when disabled
 ```
+
+An AWS source's `account` is an alias, not a profile name: profile names differ per machine, so each person maps
+the alias to one of their profiles once (stored on their machine, Settings → AWS).
 
 ## What is *not* in these files
 
@@ -109,7 +124,7 @@ Frida keeps machine-specific and sensitive data out of the repo, in its app data
 | Data | Where |
 |---|---|
 | Secret values | OS keychain (or `secrets.enc` when no keychain exists) |
-| Recent and pinned workspaces, active global environment, preferences (including the proxy, without its password) | `settings.json` |
+| Recent and pinned workspaces, active global environment, preferences (including the proxy, without its password), AWS account alias → profile | `settings.json` |
 | Open tabs, active environment, AWS profile per environment, expanded tree nodes, "Don't use the proxy" | `state/<collection id>.json` |
 | The proxy password | OS keychain |
 | Request history (secrets masked) | `history.sqlite` |

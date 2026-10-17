@@ -23,7 +23,7 @@ your operating system's keychain.
   global environment). The **variable inspector** shows every `{{variable}}` a request uses, its value, where it
   comes from and what it shadows.
 - **Secrets stay out of git.** Only `secret: true` is written; values live in the macOS Keychain, Windows
-  Credential Manager or Linux Secret Service, or come from **AWS Secrets Manager**. They are masked in the
+  Credential Manager or Linux Secret Service, or come from **AWS** (Secrets Manager, Cognito app client secrets, API Gateway keys). They are masked in the
   console, history and curl exports.
 - **Auth**: Basic, Bearer, API key, OAuth2 (client credentials, password, authorization code + PKCE, Cognito
   preset), and combinations such as OAuth2 + API key. Tokens are cached and refreshed.

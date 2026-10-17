@@ -89,10 +89,19 @@ masked in the inspector, the console, history and curl exports.
 On Linux systems without a Secret Service, Frida falls back to an encrypted file in its data folder, unlocked with
 a password you choose.
 
-A secret can also come from **AWS Secrets Manager** (optionally one key of a JSON secret). Frida asks which AWS
-profile to use for that environment the first time it needs one; the choice stays on your machine, because profile
-names differ between people. Values are cached in memory for 15 minutes (Settings → AWS). If an SSO session has
-expired, the error shows the `aws sso login --profile …` command to run.
+A secret can also come from **AWS**. Pick the source in the environment editor's Secrets tab:
+
+- **Secrets Manager**: a secret id or ARN, optionally one key of a JSON secret.
+- **Cognito client secret**: a user pool id and app client id; Frida reads the client's secret, e.g. for OAuth2
+  client credentials with the Cognito preset. The region comes from the pool id.
+- **API Gateway key**: an API key id; Frida reads the key's value, e.g. for an `x-api-key` header.
+
+Frida asks which AWS profile to use for an environment the first time it needs one; the choice stays on your
+machine, because profile names differ between people. A secret can instead name an **account alias** (e.g.
+`shared-services`) when it lives in another AWS account than the environment's other secrets. The alias is saved in
+the file for everyone; each person picks the profile for it once (Frida asks, and Settings → AWS → Accounts lists
+them). Values are cached in memory for 15 minutes (Settings → AWS). If an SSO session has expired, the error shows
+the `aws sso login --profile …` command to run; if access is denied, it names the IAM permission that's missing.
 
 ## Auth
 
@@ -155,7 +164,7 @@ on disk, Frida asks whether to keep your version or reload.
   is stored in the keychain), and hosts that skip the proxy: names (`localhost`), `*.internal` for a domain and
   its subdomains, IP addresses and ranges like `10.0.0.0/8`.
 
-The proxy applies to requests, OAuth2 token requests, `fri.sendRequest` in scripts and AWS Secrets Manager calls.
+The proxy applies to requests, OAuth2 token requests, `fri.sendRequest` in scripts and AWS calls.
 For APIs on your own machine or network, open the collection's settings and tick **Don't use the proxy** (this
 applies on your computer only). When a request went through a manual proxy, the console and history say so. If
 the proxy can't be reached or rejects the login (407), the error says which and where to fix it.

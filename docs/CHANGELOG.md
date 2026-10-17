@@ -1,5 +1,35 @@
 # Changelog
 
+## M17: More AWS secret sources and per-secret accounts (2026-10-17, manual AWS check open)
+
+### What was built
+- **Two new AWS sources** next to Secrets Manager: a **Cognito app client secret** (user pool id + client id, for
+  OAuth2 client credentials) and an **API Gateway key** (API key id, for `x-api-key`). Cached and refreshed like
+  Secrets Manager values; "access denied" names the IAM permission the profile needs.
+- **Per-secret AWS accounts**: a secret can name an account alias (`account: shared-services`). Each person maps
+  the alias to a local profile once: Frida asks on first use, Settings → AWS → Accounts lists the mappings.
+- **Environment editor**: the Source column offers Keychain, Secrets Manager, Cognito client secret and API Gateway
+  key, with the fields for each plus region and account.
+- **frida-run**: `--aws-account alias=profile`.
+- **Fixes**: a dialog reopened during its closing animation could be covered by its own overlay (found by CI);
+  double-clicking a profile in the AWS profile dialog did nothing.
+
+### Rust things worth understanding in this milestone
+1. **An enum instead of a string** (`frida-secrets/src/aws.rs` `AwsTarget`). The secret id became an enum with one
+   variant per AWS service, carrying exactly the fields that service needs. Because it derives `Hash` and `Eq`,
+   it works directly as part of the cache key, and every `match` on it must handle all three kinds, so the
+   compiler points at each place a new service has to be supported.
+2. **Erasing different error types early** (`call_aws`). Each SDK operation has its own error type
+   (`SdkError<GetSecretValueError>`, `SdkError<DescribeUserPoolClientError>`, …), so a single `match` can't
+   return them together. Each branch turns its error into a message (`Failure::Sdk(String)`) right away, and one
+   function classifies the message. In Java you'd catch a common supertype; Rust has none here, so it converts.
+3. **`static` data in tests** (`crates/frida-core/tests/aws.rs` `profile`). `AwsProfiles` borrows a map, and a
+   helper returning `AwsProfiles<'static>` needs a map that lives forever: `static NO_ACCOUNTS: BTreeMap<_, _> =
+   BTreeMap::new();` works because `BTreeMap::new` is a `const fn`.
+4. **Boxing a rarely used field** (`app/src-tauri/src/error.rs` `ApiError::aws`). Every command returns
+   `Result<T, ApiError>`, and a `Result` is as big as its largest variant. Moving the optional AWS details behind
+   a `Box` keeps all those results small; serde and specta treat `Box<T>` like `T`, so the JSON doesn't change.
+
 ## After M16: auth tests and a masking fix (2026-10-17)
 
 - **End-to-end tests for every auth method**: Basic, Bearer and API keys (header and query) as the server receives

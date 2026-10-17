@@ -39,6 +39,7 @@ frida-run collections/orders-api --env ci --reporter junit --output frida-report
 | `--var name=value` | Sets a variable above every other layer (repeatable) |
 | `--secret name=value` | The value of a secret variable (repeatable; prefer `FRIDA_SECRET_*`, see below) |
 | `--aws-profile <name>` | AWS profile for Secrets Manager values. Default: `AWS_PROFILE`, else `default` |
+| `--aws-account <alias=profile>` | The profile for secrets with that account alias (repeatable) |
 | `--delay <ms>` | Pause between requests |
 | `--bail` | Stop at the first request that fails or can't be sent |
 | `--reporter cli\|junit\|json` | Output format (default `cli`) |
@@ -88,9 +89,10 @@ There is no keychain on a CI machine, so secret variables get their values from:
 1. `--secret name=value`;
 2. the environment variable `FRIDA_SECRET_<name>`, exactly as the variable is named (`FRIDA_SECRET_clientSecret`)
    or in upper case with other characters as `_` (`FRIDA_SECRET_CLIENTSECRET`, `api-key` → `FRIDA_SECRET_API_KEY`);
-3. AWS Secrets Manager, for variables with an AWS source, using `--aws-profile`, `AWS_PROFILE` or `default`.
-   Credentials from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (or the CI's OIDC role) work too. A value from 1 or
-   2 wins over the AWS source.
+3. AWS (Secrets Manager, Cognito client secrets, API Gateway keys), for variables with an AWS source, using
+   `--aws-profile`, `AWS_PROFILE` or `default`. Credentials from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (or the
+   CI's OIDC role) work too. Secrets with an account alias need `--aws-account alias=profile`. A value from 1 or 2
+   wins over the AWS source.
 
 A secret without a value is a warning, not an error: the request is sent with `{{name}}` unresolved.
 

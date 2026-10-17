@@ -773,22 +773,28 @@ lines in `commands/http.rs` (`proxy_for`, not unit-tested). AWS through a proxy 
 
 ### M17: More AWS secret sources and per-secret AWS accounts
 Patrick hasn't been able to test the AWS integration (M8) against real accounts yet; this milestone ends with that.
-- [ ] New secret sources next to Secrets Manager:
+- [x] New secret sources next to Secrets Manager:
   - **Cognito app client secret**: `userPoolId` + `clientId` → `DescribeUserPoolClient` → `ClientSecret`. For
     OAuth2 client credentials with Cognito (pairs with the Cognito preset, §9.2).
   - **API Gateway API key**: `apiKeyId` → `GetApiKey(includeValue)` → the key value. For `x-api-key` auth.
   - Both cached like Secrets Manager values (§9.1), with the same actionable errors (SSO login, missing permission:
     `cognito-idp:DescribeUserPoolClient`, `apigateway:GET`).
-- [ ] **Per-secret AWS account**: a secret source may name an account alias (`account: shared-services`) instead of
+- [x] **Per-secret AWS account**: a secret source may name an account alias (`account: shared-services`) instead of
   using the environment's profile. Aliases, not profile names, go into the YAML because profile names differ per
   machine; each user maps alias → local profile once (local state, like the environment profile today). The UI asks
   for an unmapped alias on first use.
-- [ ] Environment editor: source picker "Keychain / Secrets Manager / Cognito client secret / API Gateway key",
+- [x] Environment editor: source picker "Keychain / Secrets Manager / Cognito client secret / API Gateway key",
   the fields for each, and the account alias.
 - [ ] Manual check with Patrick's real AWS accounts: Secrets Manager (incl. JSON key), SSO profile expiry and the
   login hint, a Cognito client secret feeding the OAuth2 preset, an API Gateway key, two accounts in one env.
 
 **Acceptance:** fake-SDK tests for both new sources and the alias mapping; the manual check above passes.
+*Status 2026-10-17: built; the manual check with real AWS accounts is open. Fake-SDK tests:
+`crates/frida-secrets/src/aws.rs` (per-target caching, region from the pool id, error messages with the missing IAM
+permission), `crates/frida-core/tests/aws.rs` (all three sources, account alias mapping, unmapped alias,
+alias-only environments, disabled secrets), `format_roundtrip.rs` (YAML of the new sources), the UI
+(`AwsProfileDialog.test.tsx`: an unmapped alias asks and resends; Playwright: Cognito source with alias in the
+editor and the mapping in Settings → AWS), `frida-cli/tests/cli.rs` (`--aws-account` hint).*
 
 ### Later (backlog, not scheduled)
 - Declarative assertions (Bruno `assert` style).
@@ -1079,6 +1085,21 @@ Deviations from and clarifications of this plan, newest last.
   tokens and other auth values printed by a post-response script were not masked in the script log (console,
   `frida-run -v`); the pipeline now masks them too (`Pipeline::sensitive`). The Cognito preset has no Rust logic
   (it only fills URLs in the UI; `cognito.test.ts`).
+
+- **2026-10-17 More AWS sources (M17).** Official SDK crates (`aws-sdk-cognitoidentityprovider`,
+  `aws-sdk-apigateway`, chosen by Patrick over hand-signed requests): same credentials, SSO, proxy and errors as
+  Secrets Manager. `frida-secrets` reads an `AwsTarget` (secret, Cognito client secret, API key) instead of a bare
+  secret id; the cache key and the error messages use it. New source types `cognito-client-secret`
+  (`userPoolId`, `clientId`) and `api-gateway-key` (`apiKeyId`), and an optional `account` on every AWS source
+  (additive format change, approved in the plan; only written when set). The Cognito region defaults to the pool
+  id's prefix. The alias → profile mapping is per machine in `settings.json` (`awsAccounts`), shared by all
+  workspaces (an alias names an AWS account, not a workspace). An unmapped alias fails a send with
+  `aws_account_required`; the profile dialog asks and sends again. Secrets with an alias don't need the
+  environment's profile, so the profile picker only shows when some AWS secret has no alias. CLI:
+  `--aws-account alias=profile`. `ApiError.aws` is boxed (clippy `result_large_err` after adding `account`). The
+  UI's `Complete<T>` now drops keys typed `?: never` (tauri-specta's markers for the other variants of a tagged
+  enum), which `-?` had made impossible to satisfy. Fixed on the way: double-clicking a profile in the dialog did
+  nothing (stale state).
 
 ## 17. Testing strategy
 
