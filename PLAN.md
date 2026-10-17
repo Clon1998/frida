@@ -659,13 +659,14 @@ app's access group and never prompt. That needs a signed app with a provisioning
 Developer account). Decided with Patrick on 2026-10-16.
 
 **Needed from Patrick before starting** (not in the repo; CI parts go into GitHub secrets):
-- [ ] Team ID (10 characters, developer.apple.com → Membership).
-- [ ] An explicit App ID `io.github.clon1998.frida` (Certificates, Identifiers & Profiles → Identifiers).
+- [x] Team ID (10 characters, developer.apple.com → Membership): `Q4XB68D4T7`.
+- [x] An explicit App ID `io.github.clon1998.frida` (Certificates, Identifiers & Profiles → Identifiers), no capabilities.
 - [ ] Certificates in the login keychain: **Apple Development** (local builds) and **Developer ID Application**
   (releases). For CI: the Developer ID certificate exported as `.p12` with a password.
 - [ ] Provisioning profiles for the App ID: **macOS App Development** (with this Mac registered as a device, using its
   Provisioning UDID from System Information) and **Developer ID**.
-- [ ] Notarization: an App Store Connect API key (Issuer ID, Key ID, `.p8` file) for CI.
+- [x] Notarization: an App Store Connect API key (Issuer ID, Key ID, `.p8` file) for CI. Key ID `J6UK53D2C8`;
+  the `.p8` stays outside the repo (CI: GitHub secret).
 
 **Work:**
 - [ ] `frida-secrets`: a `ProtectedStore` on macOS using `keyring`'s Apple store with the `protected` feature
