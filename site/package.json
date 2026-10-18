@@ -1,0 +1,17 @@
+{
+  "name": "frida-site",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "sync-docs": "node scripts/sync-docs.mjs",
+    "dev": "pnpm sync-docs && astro dev",
+    "build": "pnpm sync-docs && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.6",
+    "astro": "7.4.0",
+    "sharp": "0.35.5"
+  }
+}

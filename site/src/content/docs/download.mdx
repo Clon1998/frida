@@ -1,0 +1,27 @@
+---
+title: Download
+description: Installers for macOS, Windows and Linux, and the frida-run command line runner.
+tableOfContents: false
+---
+
+import Downloads from "../../components/Downloads.astro";
+
+<Downloads withCli />
+
+## frida-run
+
+The `frida-run` archives contain the command line runner for CI, without the app. See
+[frida-run](../guides/cli/) for how to use it.
+
+## Build from source
+
+You need Rust (stable), Node.js 24, pnpm and your platform's webview build tools. Then:
+
+```sh
+git clone https://github.com/Clon1998/frida.git && cd frida/app
+pnpm install
+pnpm tauri build    # installers end up in target/release/bundle/
+```
+
+[Development](../contributing/development/) has the details, including the prerequisites for
+each platform.

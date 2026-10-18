@@ -1,0 +1,151 @@
+---
+/**
+ * The installers of the latest release, one card per OS (see src/lib/release.ts). Each card
+ * has an id (`#macos`, …), so the hero's "Download for <OS>" button can jump to it.
+ */
+import { Icon } from "@astrojs/starlight/components";
+import { latestRelease } from "../lib/release";
+
+interface Props {
+  /** Also list the frida-run CLI archives. */
+  withCli?: boolean;
+}
+
+const { withCli = false } = Astro.props;
+const release = await latestRelease();
+const icons = { macos: "apple", windows: "laptop", linux: "linux" } as const;
+const size = (mb: number | null) => (mb ? ` · ${mb} MB` : "");
+const released = release.date
+  ? new Date(release.date).toLocaleDateString("en", { dateStyle: "long" })
+  : null;
+---
+
+<div class="downloads not-content">
+  <div class="platforms">
+    {
+      release.platforms.map((p) => (
+        <section id={p.id} class="platform">
+          <h3>
+            <Icon name={icons[p.id]} size="1.5rem" />
+            {p.name}
+          </h3>
+          <ul>
+            {p.app.map((d, i) => (
+              <li>
+                <a class:list={["file", { primary: i === 0 }]} href={d.url}>
+                  <span class="label">{d.label}</span>
+                  <span class="detail">
+                    {d.detail}
+                    {size(d.sizeMb)}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          {withCli && (
+            <ul class="cli">
+              {p.cli.map((d) => (
+                <li>
+                  <a href={d.url}>
+                    <code>{d.label}</code> CLI · {d.detail}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {p.note && <p class="note">{p.note}</p>}
+        </section>
+      ))
+    }
+  </div>
+  <p class="meta">
+    {
+      release.version ? (
+        <>
+          Version {release.version}
+          {released && <>, released {released}</>}.{" "}
+        </>
+      ) : null
+    }
+    All files, checksums and older versions are on <a href={release.pageUrl}>GitHub Releases</a>.
+    Frida checks for updates once a day and installs them only when you say so.
+  </p>
+</div>
+
+<style>
+  .platforms {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: 1rem;
+  }
+  .platform {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    background: var(--sl-color-bg-nav);
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+  }
+  .platform:target {
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 3px var(--sl-color-accent-low);
+  }
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--sl-text-xl);
+    color: var(--sl-color-white);
+  }
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .file {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .file:hover {
+    border-color: var(--sl-color-accent);
+  }
+  /* Like Starlight's primary LinkButton. */
+  .file.primary {
+    background: var(--sl-color-text-accent);
+    border-color: var(--sl-color-text-accent);
+    color: var(--sl-color-black);
+  }
+  .label {
+    font-weight: 600;
+  }
+  .detail {
+    font-size: var(--sl-text-sm);
+    opacity: 0.8;
+  }
+  .cli {
+    font-size: var(--sl-text-sm);
+  }
+  .note,
+  .meta {
+    margin: 0;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+  .meta {
+    margin-top: 1rem;
+  }
+</style>

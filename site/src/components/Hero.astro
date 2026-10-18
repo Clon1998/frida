@@ -1,0 +1,118 @@
+---
+/**
+ * Replaces Starlight's hero (astro.config.mjs → `components.Hero`); only the landing page has
+ * `hero` in its front matter. Custom, so the links can use the base path and the download
+ * button can name the visitor's OS.
+ */
+import { LinkButton } from "@astrojs/starlight/components";
+import { latestRelease } from "../lib/release";
+import Screenshot from "./Screenshot.astro";
+
+const base = import.meta.env.BASE_URL;
+const release = await latestRelease();
+---
+
+<div class="hero not-content">
+  <div class="copy">
+    <a class="badge" href={`${base}changelog/`}>
+      {release.version ? `v${release.version}` : "Latest release"}
+      <span>Free & open source · macOS · Windows · Linux</span>
+    </a>
+    <h1 id="_top" data-page-title>
+      Your API requests,<br /><span class="accent">as files in your repo.</span>
+    </h1>
+    <p class="tagline">
+      Frida is a fast, local-first desktop HTTP client. Requests are plain YAML next to your code,
+      secrets stay in your OS keychain, and there is no account, no cloud and no telemetry.
+    </p>
+    <div class="actions">
+      <LinkButton href={`${base}download/`} icon="download" iconPlacement="start" data-download>
+        Download
+      </LinkButton>
+      <LinkButton href={`${base}quick-start/`} variant="secondary" icon="right-arrow">
+        Quick start
+      </LinkButton>
+      <LinkButton href="https://github.com/Clon1998/frida" variant="minimal" icon="github" iconPlacement="start">
+        GitHub
+      </LinkButton>
+    </div>
+  </div>
+  <Screenshot
+    name="request"
+    alt="Frida sending a POST request with a JSON body; the response is shown on the right."
+    eager
+  />
+</div>
+
+<script>
+  // Names the visitor's OS on the download button and jumps to its section.
+  const ua = navigator.userAgent;
+  const os = /Mac/.test(ua) ? "macOS" : /Win/.test(ua) ? "Windows" : /Linux|X11/.test(ua) ? "Linux" : null;
+  const button = document.querySelector<HTMLAnchorElement>("[data-download]");
+  if (os && button && !/Android|iPhone|iPad/.test(ua)) {
+    button.href += `#${os.toLowerCase()}`;
+    button.lastChild!.textContent = ` Download for ${os}`;
+  }
+</script>
+
+<style>
+  .hero {
+    display: grid;
+    gap: 3rem;
+    padding-block: 2rem 1rem;
+  }
+  .copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.25rem;
+    max-width: 46rem;
+    margin-inline: auto;
+  }
+  .badge {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.9rem;
+    border: 1px solid var(--sl-color-accent);
+    border-radius: 999px;
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .badge span {
+    font-weight: 400;
+    color: var(--sl-color-gray-2);
+  }
+  @media (max-width: 30rem) {
+    .badge span {
+      display: none;
+    }
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(2.25rem, 6vw, 3.75rem);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    color: var(--sl-color-white);
+  }
+  .accent {
+    color: var(--sl-color-accent-high);
+  }
+  .tagline {
+    margin: 0;
+    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+    color: var(--sl-color-gray-2);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem 1rem;
+  }
+</style>

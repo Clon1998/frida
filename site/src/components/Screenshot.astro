@@ -1,0 +1,71 @@
+---
+/**
+ * An app screenshot in a window frame, light or dark to match the site's theme. The pictures
+ * come from `pnpm screenshots` in app/ui (src/assets/screenshots/<name>-<light|dark>.png).
+ */
+import { Image } from "astro:assets";
+
+interface Props {
+  name: string;
+  alt: string;
+  /** Loaded right away (the first screenshot on the page) instead of lazily. */
+  eager?: boolean;
+}
+
+const { name, alt, eager = false } = Astro.props;
+const shots = import.meta.glob<{ default: ImageMetadata }>("../assets/screenshots/*.png");
+const load = async (scheme: string) => {
+  const key = `../assets/screenshots/${name}-${scheme}.png`;
+  if (!shots[key]) throw new Error(`missing screenshot ${key} (run pnpm screenshots in app/ui)`);
+  return (await shots[key]()).default;
+};
+const [light, dark] = await Promise.all([load("light"), load("dark")]);
+const attrs = {
+  alt,
+  widths: [640, 1280, 1920],
+  sizes: "(min-width: 72rem) 64rem, 100vw",
+  loading: eager ? ("eager" as const) : ("lazy" as const),
+};
+---
+
+<figure class="window not-content">
+  <div class="titlebar" aria-hidden="true"><span></span><span></span><span></span></div>
+  <Image src={light} {...attrs} class="light" />
+  <Image src={dark} {...attrs} class="dark" />
+</figure>
+
+<style>
+  .window {
+    margin: 0;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: var(--sl-color-bg);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.08),
+      0 24px 64px -16px rgb(30 27 75 / 0.35);
+  }
+  .titlebar {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    background: var(--sl-color-bg-nav);
+  }
+  .titlebar span {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    background: var(--sl-color-gray-5);
+  }
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  /* Starlight sets data-theme on <html> before the page renders, so this never flickers. */
+  :global([data-theme="light"]) .dark,
+  :global([data-theme="dark"]) .light {
+    display: none;
+  }
+</style>

@@ -1,0 +1,91 @@
+/* Starlight theme: the indigo of the app icon (assets/app-icon.svg) as the accent color.
+   Dark mode is Starlight's default (`:root`), light mode overrides it. */
+:root {
+  --sl-color-accent-low: #1e1b4b;
+  --sl-color-accent: #6366f1;
+  --sl-color-accent-high: #c7d2fe;
+}
+:root[data-theme="light"] {
+  --sl-color-accent-low: #e0e7ff;
+  --sl-color-accent: #4f46e5;
+  --sl-color-accent-high: #312e81;
+}
+
+/* --- Landing page (src/content/docs/index.mdx) --- */
+
+/* A soft glow behind the hero, in the accent color. */
+[data-has-hero] .main-frame {
+  background: radial-gradient(
+      ellipse 80rem 32rem at 50% -8rem,
+      color-mix(in srgb, var(--sl-color-accent) 22%, transparent),
+      transparent 70%
+    )
+    no-repeat;
+}
+
+/* The landing page uses the whole width, not the docs' reading width. */
+[data-has-hero] {
+  --sl-content-width: 72rem;
+}
+
+.landing-heading {
+  margin: 4rem auto 1.5rem;
+  max-width: 40rem;
+  text-align: center;
+}
+.landing-heading h2 {
+  margin: 0;
+  font-size: var(--sl-text-3xl);
+  letter-spacing: -0.02em;
+  color: var(--sl-color-white);
+}
+.landing-heading p {
+  margin: 0.75rem 0 0;
+  color: var(--sl-color-gray-2);
+}
+
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1.5rem 2rem;
+  margin-top: 4rem;
+  padding: 1.5rem 0;
+  border-block: 1px solid var(--sl-color-hairline);
+}
+.pillars strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--sl-color-white);
+}
+.pillars p {
+  margin: 0;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+}
+
+.closing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin: 5rem 0 2rem;
+  padding: 3rem 1.5rem;
+  border-radius: 1rem;
+  text-align: center;
+  background: var(--sl-color-accent-low);
+}
+.closing h2 {
+  margin: 0;
+  font-size: var(--sl-text-3xl);
+  color: var(--sl-color-white);
+}
+.closing p {
+  margin: 0;
+  color: var(--sl-color-gray-2);
+}
+.closing .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+}

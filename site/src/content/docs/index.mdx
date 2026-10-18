@@ -1,0 +1,133 @@
+---
+title: Frida, the local-first HTTP client
+description: A fast desktop HTTP client for macOS, Windows and Linux. Requests are plain YAML files in your git repo, secrets stay in your OS keychain. No account, no cloud, no telemetry.
+template: splash
+# Rendered by src/components/Hero.astro (the Starlight Hero override).
+hero: {}
+editUrl: false
+lastUpdated: false
+pagefind: false
+---
+
+import { Code, LinkButton } from "@astrojs/starlight/components";
+import Downloads from "../../components/Downloads.astro";
+import Features from "../../components/Features.astro";
+import Screenshot from "../../components/Screenshot.astro";
+import Showcase from "../../components/Showcase.astro";
+
+export const requestYaml = `version: 1
+name: "Get order"
+seq: 2
+method: GET
+url: "{{baseUrl}}/orders/:orderId?expand=items"
+headers:
+- name: X-Correlation-Id
+  value: "{{$uuid}}"
+  enabled: true
+auth:
+  mode: inherit
+scripts:
+  post: |
+    fri.setVar("lastOrderId", res.body.id);
+tests: |
+  test("status is 200", () => expect(res.status).to.equal(200));`;
+
+export const runOutput = `$ frida-run collections/orders-api --env ci
+Frida · Orders API · ci (3 requests)
+  ✓ POST    Login          200  41 ms  1/1 tests
+  ✓ GET     List orders    200  12 ms  2/2 tests
+  ✓ DELETE  Delete order   204   9 ms  1/1 tests
+
+3 requests: 3 passed (62 ms)`;
+
+<div class="pillars not-content">
+  <div>
+    <strong>Local-first</strong>
+    <p>No account, no cloud sync, no telemetry. Frida only goes online for what you ask it to do, plus an update check you can switch off.</p>
+  </div>
+  <div>
+    <strong>Git-native</strong>
+    <p>Collections are folders of YAML files. Commit them next to the API they test and review changes in pull requests.</p>
+  </div>
+  <div>
+    <strong>Fast and small</strong>
+    <p>Built with Rust and Tauri: a native app that starts quickly and uses your system's webview, not a bundled browser.</p>
+  </div>
+</div>
+
+<Showcase eyebrow="Plain files" title="Your collection is just a folder">
+  <p>
+    Every request is one readable YAML file. Rename a request and its file follows; reorder and only
+    one line changes. Your team gets the same requests with a <code>git pull</code>.
+  </p>
+  <ul>
+    <li>Collections can live inside your API's repository.</li>
+    <li>Secret values are never written, only <code>secret: true</code>.</li>
+    <li>Atomic writes, versioned files, clean diffs.</li>
+  </ul>
+  <div slot="media">
+    <Code code={requestYaml} lang="yaml" title="collections/orders-api/orders/get-order.yaml" />
+  </div>
+</Showcase>
+
+<Showcase eyebrow="Git panel" title="Review API changes like code" flip>
+  <p>
+    See what changed in a side-by-side diff, stage it and commit, push or pull, and switch
+    branches, all without leaving the app. Frida uses your own <code>git</code> and SSH keys.
+  </p>
+  <div slot="media">
+    <Screenshot name="git" alt="Frida's git panel with a side-by-side diff of a changed request file." />
+  </div>
+</Showcase>
+
+<Showcase eyebrow="Environments" title="Variables, without the guesswork">
+  <p>
+    Collection and global environments, folder and request variables, and values set by scripts:
+    six layers, one clear order. The variables inspector shows where each value comes from.
+  </p>
+  <p>
+    Secrets go to the macOS Keychain, Windows Credential Manager or Linux Secret Service, or come
+    straight from AWS Secrets Manager, Cognito or API Gateway. They are masked in the console,
+    history and curl exports.
+  </p>
+  <div slot="media">
+    <Screenshot name="environments" alt="Frida's environment editor with three variables in the local environment." />
+  </div>
+</Showcase>
+
+<Showcase eyebrow="Runner and CI" title="From your desk to the pipeline" flip>
+  <p>
+    Run a folder or a whole collection with its scripts and tests. Then run exactly the same thing
+    on CI with <code>frida-run</code>: JUnit or JSON output, exit codes, secrets from environment
+    variables.
+  </p>
+  <div slot="media">
+    <Screenshot name="runner" alt="Frida's collection runner after running two requests, both passed." />
+    <Code code={runOutput} lang="sh" frame="terminal" title="CI" />
+  </div>
+</Showcase>
+
+<div class="landing-heading not-content">
+  <h2>Everything else you'd expect</h2>
+  <p>And a few things you might not. Keyboard-first, with Cmd/Ctrl+K quick open, light and dark themes.</p>
+</div>
+
+<Features />
+
+<div class="landing-heading not-content" id="download">
+  <h2>Download Frida</h2>
+  <p>Free and open source, for macOS, Windows and Linux.</p>
+</div>
+
+<Downloads />
+
+<div class="closing not-content">
+  <h2>Ready to send your first request?</h2>
+  <p>The quick start walks you through it, with a sample collection and a local echo server.</p>
+  <div class="buttons">
+    <LinkButton href={`${import.meta.env.BASE_URL}quick-start/`} icon="right-arrow">Quick start</LinkButton>
+    <LinkButton href={`${import.meta.env.BASE_URL}guides/user-guide/`} variant="secondary" icon="open-book" iconPlacement="start">
+      Read the user guide
+    </LinkButton>
+  </div>
+</div>

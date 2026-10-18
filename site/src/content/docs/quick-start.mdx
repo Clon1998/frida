@@ -1,0 +1,108 @@
+---
+title: Quick start
+description: Install Frida, create a workspace and a collection, send your first request and share it through git.
+---
+
+import { Aside, FileTree, LinkButton, Steps, Tabs, TabItem } from "@astrojs/starlight/components";
+
+From zero to a request your whole team can use. You need Frida installed and, for the last step,
+a git repository.
+
+## Install
+
+<LinkButton href={`${import.meta.env.BASE_URL}download/`} icon="download" iconPlacement="start">
+  Download Frida
+</LinkButton>
+
+<Tabs syncKey="os">
+  <TabItem label="macOS" icon="apple">
+    Open the `.dmg` (Apple silicon or Intel) and drag Frida into *Applications*. The app is
+    signed and notarized, so it opens without warnings.
+  </TabItem>
+  <TabItem label="Windows" icon="laptop">
+    Run the `-setup.exe` (or the `.msi`). The installer isn't code-signed yet, so SmartScreen asks
+    once: choose **More info → Run anyway**.
+  </TabItem>
+  <TabItem label="Linux" icon="linux">
+    Install the `.deb` or `.rpm`, or make the AppImage executable and start it:
+
+    ```sh
+    chmod +x Frida_*_amd64.AppImage
+    ./Frida_*_amd64.AppImage
+    ```
+  </TabItem>
+</Tabs>
+
+## Your first request
+
+<Steps>
+
+1. **Create a workspace.** Start Frida and choose **New workspace…**. A workspace is a folder
+   that groups collections and holds global environments.
+
+2. **Add a collection.** **New collection…** creates one inside the workspace.
+   **Add existing collection…** picks a folder anywhere, for example in your API's repository.
+   You can also import one from OpenAPI, Bruno or a Frida archive.
+
+3. **Add a request.** Use the **+** in the sidebar, type a URL such as
+   `https://httpbin.org/get` and press <kbd>Cmd/Ctrl</kbd>+<kbd>Enter</kbd> to send it.
+
+4. **Create an environment.** Open the environment menu in the top right (or press
+   <kbd>Cmd/Ctrl</kbd>+<kbd>E</kbd>), add an environment called `dev` with a variable
+   `baseUrl`, and use it in your URLs: `{{baseUrl}}/orders`. Hover a variable to see its value.
+
+5. **Commit it.** Your collection is a folder of YAML files. Commit it, from the **Git** tab in
+   the sidebar or your usual tools. Colleagues who pull it get the same requests.
+
+   <FileTree>
+   - collections/orders-api/
+     - collection.yaml
+     - environments/
+       - dev.yaml
+     - get-health.yaml
+     - orders/
+       - folder.yaml
+       - get-order.yaml
+   </FileTree>
+
+</Steps>
+
+<Aside type="tip" title="Secrets">
+  Mark a variable as **secret** and its value goes into your OS keychain instead of the
+  environment file; git only sees `secret: true`. Each colleague enters the value once on their
+  machine, or reads it from AWS Secrets Manager.
+</Aside>
+
+## Try the sample workspace
+
+The repository has a sample workspace with requests for every body type, variables and scripts,
+and a small echo server to send them to. With [Rust](https://rustup.rs) installed:
+
+```sh
+git clone https://github.com/Clon1998/frida.git && cd frida
+cargo run -p frida-testserver      # an echo server on http://localhost:8787
+```
+
+Then open `testdata/sample-workspace` in Frida with **Open workspace…** and send the requests
+under *Methods*, *Body types*, *Variables* and *Scripting*.
+
+## Run it on CI
+
+`frida-run` runs a collection with its scripts and tests from the command line, for example in
+GitHub Actions:
+
+```yaml title=".github/workflows/api-tests.yml"
+- name: API tests
+  run: |
+    curl -sSL https://github.com/Clon1998/frida/releases/latest/download/frida-run-x86_64-unknown-linux-gnu.tar.gz | tar xz
+    ./frida-run collections/orders-api --env ci --reporter junit --output frida-report.xml
+  env:
+    FRIDA_SECRET_clientSecret: ${{ secrets.ORDERS_CLIENT_SECRET }}
+```
+
+## Next steps
+
+- [User guide](../guides/user-guide/): variables, secrets, auth, the runner, import and export, git and shortcuts.
+- [Scripting & tests](../guides/scripting/): the `fri`, `req`, `res` and `expect` API.
+- [frida-run](../guides/cli/): every option, secrets on CI, JUnit output and exit codes.
+- [File format](../guides/file-format/): what the YAML files contain and what stays on your machine.

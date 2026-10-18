@@ -1,0 +1,81 @@
+---
+/**
+ * A landing page section: text on one side, a picture or code (the `media` slot) on the other.
+ * Stacks on narrow screens; `flip` puts the media first on wide ones.
+ */
+interface Props {
+  eyebrow: string;
+  title: string;
+  flip?: boolean;
+}
+
+const { eyebrow, title, flip = false } = Astro.props;
+---
+
+<section class:list={["showcase not-content", { flip }]}>
+  <div class="text">
+    <p class="eyebrow">{eyebrow}</p>
+    <h2>{title}</h2>
+    <slot />
+  </div>
+  <div class="media"><slot name="media" /></div>
+</section>
+
+<style>
+  .showcase {
+    display: grid;
+    /* minmax(0, …): wide code blocks scroll instead of widening the page. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    align-items: center;
+    padding-block: 3rem;
+  }
+  @media (min-width: 64rem) {
+    .showcase {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      gap: 3rem;
+    }
+    .flip {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+    .flip .text {
+      order: 2;
+    }
+  }
+  .eyebrow {
+    margin: 0 0 0.5rem;
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sl-color-text-accent);
+  }
+  h2 {
+    margin: 0 0 1rem;
+    font-size: var(--sl-text-3xl);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--sl-color-white);
+  }
+  .text :global(p) {
+    margin: 0 0 1rem;
+    color: var(--sl-color-gray-2);
+  }
+  .text :global(ul) {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+    color: var(--sl-color-gray-2);
+  }
+  .text :global(li + li) {
+    margin-top: 0.4rem;
+  }
+  .text :global(code) {
+    font-size: 0.9em;
+  }
+  .media > :global(div) {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+</style>
