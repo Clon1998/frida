@@ -11,7 +11,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "screenshots": "SCREENSHOTS=1 playwright test e2e/site-screenshots.e2e.ts --project chromium"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
