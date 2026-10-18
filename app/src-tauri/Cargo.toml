@@ -4,6 +4,7 @@ description = "Frida desktop app: thin Tauri command layer over the frida-* crat
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+license.workspace = true
 publish = false
 
 # The Rust library holds all app code so it can be unit-tested; main.rs only calls `run()`.

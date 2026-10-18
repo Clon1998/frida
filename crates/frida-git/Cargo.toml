@@ -4,6 +4,7 @@ description = "Thin wrapper around the system git CLI, used by the Frida git pan
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

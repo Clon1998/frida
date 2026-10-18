@@ -4,6 +4,7 @@ description = "Local echo server for Frida's HTTP tests and manual testing. Not 
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

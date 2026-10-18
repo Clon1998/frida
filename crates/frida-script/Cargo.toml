@@ -4,6 +4,7 @@ description = "Sandboxed QuickJS runtime for Frida pre/post request scripts and 
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

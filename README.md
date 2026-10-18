@@ -143,3 +143,7 @@ OAuth2 token calls, AWS secrets you configured, git push/pull/fetch (with git's 
 
 The logo is a Westie, traced from a one-line drawing (`assets/logo/`). The binary is called `frida-http` so it
 doesn't clash with the [frida](https://frida.re) instrumentation toolkit.
+
+## License
+
+[MIT](LICENSE). Use it, fork it, ship it inside your company; no warranty.

@@ -4,6 +4,7 @@ description = "frida-run: runs Frida collections from the command line, e.g. in 
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+license.workspace = true
 publish = false
 
 # Not `frida`: that name belongs to the frida instrumentation toolkit (CLAUDE.md, Naming).
