@@ -1,0 +1,16 @@
+name: Feature request
+description: Something Frida should do, or do differently.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task or workflow, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How it could work. Mention it if Postman, Bruno or another tool does it well.

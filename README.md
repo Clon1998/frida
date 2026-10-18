@@ -98,6 +98,10 @@ The same documents are on the [website](https://clon1998.github.io/frida/), with
 | Document | For |
 |---|---|
 | [User guide](docs/user-guide.md) | Concepts, variables, secrets, auth, runner, import/export, git, shortcuts |
+| [Using Frida in a team](docs/teams.md) | Where collections live, sharing environments and secrets, reviews, CI |
+| [Coming from Postman or Bruno](docs/migrating.md) | What carries over and how the concepts and script APIs map |
+| [Security & privacy](docs/security.md) | What is stored where, what goes over the network, secrets, sandbox, updates |
+| [FAQ](docs/faq.md) | License, system requirements, limitations, stability, support |
 | [Scripting & tests](docs/scripting.md) | The `fri`/`req`/`res`/`expect` API and what differs from Bruno |
 | [frida-run](docs/cli.md) | Running collections in CI: options, secrets, JUnit, exit codes |
 | [File format](docs/file-format.md) | What the YAML files look like and what stays on your machine |

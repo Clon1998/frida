@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Clon1998/frida/security/advisories/new
+    about: Please report security problems privately, not as an issue.
+  - name: Documentation and FAQ
+    url: https://clon1998.github.io/frida/
+    about: Quick start, user guide, scripting reference and FAQ.
