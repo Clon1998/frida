@@ -5,5 +5,8 @@ dist/
 src/content/docs/guides/
 src/content/docs/contributing/
 src/content/docs/changelog.md
+src/content/docs/migrating.md
+src/content/docs/security.md
+src/content/docs/faq.md
 src/assets/logo.svg
 public/favicon.svg

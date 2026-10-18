@@ -10,12 +10,16 @@ export const REPO = "https://github.com/Clon1998/frida";
  * scripts/sync-docs.mjs, so `docs/` stays the single source (it also renders on GitHub).
  */
 export const DOCS = [
+  { file: "migrating.md", slug: "migrating", label: "Coming from Postman or Bruno" },
   { file: "user-guide.md", slug: "guides/user-guide", label: "User guide" },
+  { file: "teams.md", slug: "guides/teams", label: "Using Frida in a team" },
   { file: "scripting.md", slug: "guides/scripting", label: "Scripting & tests" },
   { file: "cli.md", slug: "guides/cli", label: "frida-run (CLI)" },
   { file: "file-format.md", slug: "guides/file-format", label: "File format" },
   { file: "architecture.md", slug: "contributing/architecture", label: "Architecture" },
   { file: "development.md", slug: "contributing/development", label: "Development" },
   { file: "releasing.md", slug: "contributing/releasing", label: "Releasing" },
+  { file: "security.md", slug: "security", label: "Security & privacy" },
+  { file: "faq.md", slug: "faq", label: "FAQ" },
   { file: "CHANGELOG.md", slug: "changelog", label: "Changelog" },
 ];

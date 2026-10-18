@@ -21,6 +21,12 @@ export default defineConfig({
         "A local-first desktop HTTP client. Your requests are plain YAML files in your git repo. No account, no cloud, no telemetry.",
       logo: { src: "./src/assets/logo.svg", alt: "Frida logo" },
       favicon: "/favicon.svg",
+      // The preview picture for links shared in Slack, LinkedIn, X… (app/ui: pnpm screenshots).
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: `${SITE}${BASE}/og.png` } },
+        { tag: "meta", attrs: { name: "twitter:image", content: `${SITE}${BASE}/og.png` } },
+        { tag: "meta", attrs: { property: "og:image:alt", content: "Frida: your API requests, as files in your repo." } },
+      ],
       social: [{ icon: "github", label: "GitHub", href: REPO }],
       editLink: { baseUrl: `${REPO}/edit/main/site/` },
       lastUpdated: true,
@@ -33,12 +39,14 @@ export default defineConfig({
           items: [
             { label: "Quick start", slug: "quick-start" },
             { label: "Download", slug: "download" },
+            doc("migrating"),
           ],
         },
         {
           label: "Guides",
           items: [
             doc("guides/user-guide"),
+            doc("guides/teams"),
             doc("guides/scripting"),
             doc("guides/cli"),
             doc("guides/file-format"),
@@ -53,7 +61,10 @@ export default defineConfig({
             doc("contributing/releasing"),
           ],
         },
-        doc("changelog"),
+        {
+          label: "About",
+          items: [doc("security"), doc("faq"), doc("changelog")],
+        },
       ],
     }),
   ],

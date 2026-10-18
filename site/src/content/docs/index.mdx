@@ -2,6 +2,10 @@
 title: Frida, the local-first HTTP client
 description: A fast desktop HTTP client for macOS, Windows and Linux. Requests are plain YAML files in your git repo, secrets stay in your OS keychain. No account, no cloud, no telemetry.
 template: splash
+head:
+  # Instead of Starlight's "<title> | Frida".
+  - tag: title
+    content: Frida · Local-first HTTP client for macOS, Windows and Linux
 # Rendered by src/components/Hero.astro (the Starlight Hero override).
 hero: {}
 editUrl: false
@@ -9,7 +13,7 @@ lastUpdated: false
 pagefind: false
 ---
 
-import { Code, LinkButton } from "@astrojs/starlight/components";
+import { CardGrid, Code, LinkButton, LinkCard } from "@astrojs/starlight/components";
 import Downloads from "../../components/Downloads.astro";
 import Features from "../../components/Features.astro";
 import Screenshot from "../../components/Screenshot.astro";
@@ -114,9 +118,37 @@ Frida · Orders API · ci (3 requests)
 
 <Features />
 
+<div class="landing-heading not-content">
+  <h2>Evaluating Frida for your team?</h2>
+  <p>What a team lead or security review usually wants to know, in one place.</p>
+</div>
+
+<CardGrid>
+  <LinkCard
+    title="Using Frida in a team"
+    description="Where collections live, sharing environments and secrets, reviews and CI."
+    href={`${import.meta.env.BASE_URL}guides/teams/`}
+  />
+  <LinkCard
+    title="Security & privacy"
+    description="What is stored where, what goes over the network, how secrets and scripts are protected."
+    href={`${import.meta.env.BASE_URL}security/`}
+  />
+  <LinkCard
+    title="Coming from Postman or Bruno"
+    description="What carries over, how the concepts and script APIs map."
+    href={`${import.meta.env.BASE_URL}migrating/`}
+  />
+  <LinkCard
+    title="FAQ"
+    description="License, system requirements, limitations, stability and support."
+    href={`${import.meta.env.BASE_URL}faq/`}
+  />
+</CardGrid>
+
 <div class="landing-heading not-content" id="download">
   <h2>Download Frida</h2>
-  <p>Free and open source, for macOS, Windows and Linux.</p>
+  <p>Free and open source (MIT), for macOS, Windows and Linux.</p>
 </div>
 
 <Downloads />
