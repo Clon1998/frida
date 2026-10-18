@@ -1,0 +1,65 @@
+name: Site
+
+# Builds the website (site/: landing page + the docs/ folder) and deploys it to GitHub Pages.
+# Runs when the site or the docs change, and when a release is published, so the download
+# buttons point at the new version's files.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "docs/**", "assets/app-icon.svg", ".github/workflows/site.yml"]
+  pull_request:
+    paths: ["site/**", "docs/**", "assets/app-icon.svg", ".github/workflows/site.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# One deployment at a time; a newer one replaces a queued one, a running one finishes.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # For Starlight's "Last updated" dates, which come from git.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: site/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - name: Install
+        working-directory: site
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: site
+        run: pnpm build
+        env:
+          # Lifts the GitHub API rate limit for the latest-release lookup (src/lib/release.ts).
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
