@@ -9,6 +9,12 @@
   A local-first desktop HTTP client. Your requests are plain YAML files in your git repo.
 </p>
 
+<p align="center">
+  <a href="https://clon1998.github.io/frida/"><strong>Website</strong></a> ·
+  <a href="https://clon1998.github.io/frida/quick-start/">Quick start</a> ·
+  <a href="https://clon1998.github.io/frida/download/">Download</a>
+</p>
+
 ---
 
 Frida is an alternative to Postman and Bruno, built with Rust, Tauri 2 and React. There is no account, no cloud and
@@ -86,6 +92,8 @@ Then open `testdata/sample-workspace` in Frida and send the requests under *Meth
 and *Scripting*.
 
 ## Documentation
+
+The same documents are on the [website](https://clon1998.github.io/frida/), with search.
 
 | Document | For |
 |---|---|

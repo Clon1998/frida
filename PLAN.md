@@ -82,8 +82,9 @@ frida/
 ├── app/
 │   ├── src-tauri/             # Tauri commands only: thin glue that calls the crates
 │   └── ui/                    # React/TS frontend
+├── site/                      # website: landing page + docs/ (Astro Starlight, GitHub Pages)
 ├── testdata/                  # sample collections, openapi specs, .bru files, curl commands
-└── .github/workflows/         # CI (lint, test, build for 3 OSes) + release
+└── .github/workflows/         # CI (lint, test, build for 3 OSes) + release + site
 ```
 
 **Rules:**
@@ -1100,6 +1101,16 @@ Deviations from and clarifications of this plan, newest last.
   UI's `Complete<T>` now drops keys typed `?: never` (tauri-specta's markers for the other variants of a tagged
   enum), which `-?` had made impossible to satisfy. Fixed on the way: double-clicking a profile in the dialog did
   nothing (stale state).
+
+- **2026-10-18 Website (asked by Patrick).** A landing page with quick start, downloads and the docs, at
+  <https://clon1998.github.io/frida/>, in `site/` in this repository (docs and code change in the same PR).
+  **Astro + Starlight** on **GitHub Pages**, chosen over a hand-written React app on own hosting: static HTML (fast,
+  indexable), docs sidebar, search (Pagefind) and dark mode built in, free hosting. A separate pnpm project, so
+  the app's dependencies are unaffected. `docs/` stays the single source: `scripts/sync-docs.mjs` turns it into
+  pages at build time (title from the `# heading`, links rewritten). Download buttons read the latest release from
+  the GitHub API at build time; `site.yml` rebuilds on `release: published`. Screenshots come from the real UI
+  against the e2e fake backend (`app/ui/e2e/site-screenshots.e2e.ts`, skipped in the normal e2e run), in light
+  and dark, with the fake's placeholder names replaced in the DOM before each shot.
 
 ## 17. Testing strategy
 

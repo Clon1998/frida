@@ -126,6 +126,30 @@ pnpm tauri build --no-bundle       # only the executable: target/release/frida-h
 On macOS, unsigned builds keep all secrets in one login-keychain item, so the keychain asks once per run. Signed
 builds avoid that, see [releasing.md](releasing.md#signed-macos-builds).
 
+## Website
+
+`site/` is the website at <https://clon1998.github.io/frida/>: a landing page, a quick start and download page,
+and the Markdown files of this `docs/` folder. It is built with [Astro](https://astro.build) and
+[Starlight](https://starlight.astro.build), a separate small pnpm project (not part of `app/`'s workspace).
+
+```sh
+cd site
+pnpm install
+pnpm dev                           # http://localhost:4321/frida/, reloads on changes
+pnpm build                         # the static site in site/dist/
+```
+
+- **Docs pages are generated.** `scripts/sync-docs.mjs` (run by `dev` and `build`) copies `docs/*.md` into
+  `src/content/docs/` (git-ignored): the `# Title` becomes the page title, links to other docs become site links,
+  links to other repo files point to GitHub. Edit the files in `docs/`, never the copies. Which docs appear, and
+  under which label, is the `DOCS` list in `site/site.config.mjs`.
+- **Hand-written pages** are `src/content/docs/index.mdx` (landing page), `quick-start.mdx` and `download.mdx`. The
+  landing page's components are in `src/components/`; `Hero.astro` replaces Starlight's hero.
+- **Download buttons** come from the latest GitHub release at build time (`src/lib/release.ts`). If GitHub can't be
+  reached, they link to the releases page.
+- **Screenshots** are taken from the real UI against the e2e fake backend. After visible UI changes:
+  `cd app/ui && pnpm screenshots` (writes `site/src/assets/screenshots/`), then commit the PNGs.
+
 ## CI
 
 `.github/workflows/ci.yml`:
@@ -135,6 +159,9 @@ builds avoid that, see [releasing.md](releasing.md#signed-macos-builds).
 - **UI flows (Playwright)**: `pnpm e2e`; traces of failed tests are uploaded as an artifact.
 - **Build** (pull requests and **Actions → CI → Run workflow**): installers for macOS arm64 and x64, Windows x64
   and Linux x64, uploaded as `frida-http-<platform>` artifacts.
+
+`.github/workflows/site.yml` builds the website when `site/`, `docs/` or the app icon change (pull requests only
+build) and when a release is published, and deploys `main` to GitHub Pages. `ci.yml` skips site-only changes.
 
 ## Conventions
 

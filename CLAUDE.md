@@ -34,6 +34,8 @@ cargo run -p frida-testserver  # local echo server on :8787 for manual testing (
 cargo run -p frida-cli -- testdata/scripting --env dev --var baseUrl=http://localhost:8787   # frida-run, the CLI runner
 cd app && pnpm tauri build     # bundle
 cd app && scripts/build-signed.sh dev   # macOS: signed bundle (data protection keychain), see README
+cd site && pnpm install && pnpm dev     # website (landing page + docs/), see docs/development.md#website
+cd app/ui && pnpm screenshots           # refresh the website's app screenshots after visible UI changes
 ```
 A milestone is only done when all of these pass.
 
