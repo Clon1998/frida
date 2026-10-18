@@ -1111,6 +1111,10 @@ Deviations from and clarifications of this plan, newest last.
   the GitHub API at build time; `site.yml` rebuilds on `release: published`. Screenshots come from the real UI
   against the e2e fake backend (`app/ui/e2e/site-screenshots.e2e.ts`, skipped in the normal e2e run), in light
   and dark, with the fake's placeholder names replaced in the DOM before each shot.
+  Same day: **MIT license** (Patrick's choice; `LICENSE`, `license` in the workspace `Cargo.toml`, which Tauri also
+  uses for the bundles), and pages for people evaluating Frida: `docs/security.md`, `teams.md`, `migrating.md`
+  (Postman/Bruno), `faq.md` (requirements: macOS 11+, the binary's minimum; limitations), `SECURITY.md` (private
+  vulnerability reports) and issue templates. A link preview card (`og.png`) is generated with the screenshots.
 
 ## 17. Testing strategy
 

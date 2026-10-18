@@ -148,7 +148,8 @@ pnpm build                         # the static site in site/dist/
 - **Download buttons** come from the latest GitHub release at build time (`src/lib/release.ts`). If GitHub can't be
   reached, they link to the releases page.
 - **Screenshots** are taken from the real UI against the e2e fake backend. After visible UI changes:
-  `cd app/ui && pnpm screenshots` (writes `site/src/assets/screenshots/`), then commit the PNGs.
+  `cd app/ui && pnpm screenshots` (writes `site/src/assets/screenshots/` and the link preview card
+  `site/public/og.png`), then commit the PNGs.
 
 ## CI
 
