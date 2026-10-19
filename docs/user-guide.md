@@ -73,6 +73,12 @@ Values can refer to other variables (`{{baseUrl}}/v2`). Frida follows such chain
 a cycle instead of looping. A variable that can't be resolved stays as `{{name}}` in the request and shows a warning;
 the request can still be sent.
 
+A variable can build on a lower layer's value of the same name: with `baseUrl: https://api.example.com` in the
+global environment and `baseUrl: {{baseUrl}}/v1` in the collection environment, `{{baseUrl}}` is
+`https://api.example.com/v1`. Inside its own value, a variable's name always means the next lower definition (like
+`PATH=$PATH:/opt/bin` in a shell), so a folder can add `{{baseUrl}}/admin` on top. If no lower layer defines it,
+that's reported as a cycle.
+
 ### Environments
 
 Each workspace has **global** environments and each collection has its own. Choose the active ones with the

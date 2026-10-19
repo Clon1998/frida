@@ -295,6 +295,10 @@ Separate namespaces:
 ### 5.2 Syntax and rules
 - `{{name}}` with optional whitespace (`{{ name }}`).
 - Values may reference other variables. Resolution is **recursive up to depth 10**, with **cycle detection** (an error that names the cycle).
+- Inside its own value, a variable's name means the **next lower definition** (`baseUrl: {{baseUrl}}/v1` in the
+  collection environment extends the global environment's `baseUrl`), like `PATH=$PATH:/x` in a shell. Only when no
+  lower layer defines it is it a cycle. The report keeps one entry per name: the winning definition with the
+  combined value, the lower ones as shadowed. (Added in M18, see the decisions log.)
 - Unresolved variables are **left as-is** in the output and reported as warnings. The request is still sendable.
 - Interpolation happens in the URL, path and query params, headers, all body modes (including form fields and multipart text values), auth fields and settings where applicable.
 - Disabled rows are ignored.
@@ -797,6 +801,21 @@ alias-only environments, disabled secrets), `format_roundtrip.rs` (YAML of the n
 (`AwsProfileDialog.test.tsx`: an unmapped alias asks and resends; Playwright: Cognito source with alias in the
 editor and the mapping in Settings → AWS), `frida-cli/tests/cli.rs` (`--aws-account` hint).*
 
+### M18: Feedback round 3
+- [x] Deleting the active environment (collection or global) left its name in the picker. Delete clears the
+  selection, rename keeps it under the new name, and a selected environment whose file is gone counts as none.
+- [x] Composite environments: `baseUrl: {{baseUrl}}/v1` in the collection environment extends the global
+  `baseUrl` (§5.2) instead of being a cycle.
+- [x] No scrollbar in the tab bar (Windows drew one).
+- [x] Middle-click closes tabs (also on Windows, where autoscroll swallowed the click).
+- [x] The response pane counts the elapsed time while waiting for a response.
+- [x] The JSONPath filter (and Pretty/Raw) stays when the same request is sent again.
+- [x] Syntax colors after Bruno's palettes, readable in dark mode (JSON, XML/HTML, JS).
+
+**Acceptance:** resolver tests for the new rule (`crates/frida-core/tests/vars.rs`); Playwright for deleting the
+active environment, middle-click and the elapsed time; Vitest for the JSONPath filter across sends.
+*Status 2026-10-19: done.*
+
 ### Later (backlog, not scheduled)
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
@@ -1115,6 +1134,16 @@ Deviations from and clarifications of this plan, newest last.
   uses for the bundles), and pages for people evaluating Frida: `docs/security.md`, `teams.md`, `migrating.md`
   (Postman/Bruno), `faq.md` (requirements: macOS 11+, the binary's minimum; limitations), `SECURITY.md` (private
   vulnerability reports) and issue templates. A link preview card (`og.png`) is generated with the screenshots.
+
+- **2026-10-19 (M18, decided with Patrick) A variable's own name inside its value means the next lower
+  definition.** Wanted: `baseUrl: {{baseUrl}}/v1` in the collection environment on top of the global environment's
+  `baseUrl`; before, that was a cycle. Chosen over explicit scopes (`{{global.baseUrl}}`): no new syntax, works for
+  every layer (folders too) and with Bruno imports. Scoped names could still be added later. The resolver keeps the
+  layer index of each variable being expanded and starts the lookup for the same name one layer below it; a lower
+  definition used this way isn't reported separately (it appears as shadowed). A lower secret without a value is an
+  error, not a fallback further down. Syntax colors: Bruno's current palettes (`themes/{light,dark}` in its repo)
+  as `--syntax-*` theme variables; `@codemirror/language` and `@lezer/highlight` became direct dependencies at the
+  versions already in the lockfile (two copies of `@codemirror/language` would break highlighting).
 
 ## 17. Testing strategy
 

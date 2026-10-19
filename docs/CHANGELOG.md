@@ -1,5 +1,29 @@
 # Changelog
 
+## M18: Feedback round 3 (2026-10-19)
+
+### What was built
+- **Composite environments**: a variable can extend a lower layer's value of the same name, e.g.
+  `baseUrl: {{baseUrl}}/v1` in the collection environment on top of the global `baseUrl`.
+- **Environments**: deleting the active environment selects none (the picker kept showing it); renaming keeps it
+  selected.
+- **Tabs**: no scrollbar in the tab bar; middle-click closes a tab on Windows too.
+- **Response**: elapsed time while waiting; the JSONPath filter and Pretty/Raw stay when sending again.
+- **Syntax colors** after Bruno's palettes, readable in dark mode.
+
+### Rust things worth understanding in this milestone
+1. **Tuples instead of a small struct** (`crates/frida-core/src/vars/resolver.rs`, `type Stack = Vec<(String,
+   usize)>`). The stack of variables being expanded now also remembers which layer each came from. A type alias
+   names the tuple once; `stack[pos].1` reads the second field. For a private helper that's lighter than a struct,
+   like a Java `record` you never have to declare.
+2. **Iterator adapters keep the index** (`crates/frida-core/src/vars/scope.rs`, `definitions`).
+   `.iter().enumerate().skip(first_layer).flat_map(...)` walks the layers lazily, numbers them and starts below a
+   given one, like a Java `Stream` with `skip` and `flatMap`. The `move` closures take `name` by value (a `&str`,
+   so a cheap copy), because the returned iterator outlives the function call.
+3. **`rposition` finds the innermost match** (`resolver.rs`, `placeholder`). The same name can be on the stack
+   twice while a chain like folder → collection env → global env is expanded; searching from the end picks the
+   definition currently being expanded, so the lookup continues below *that* layer.
+
 ## M17: More AWS secret sources and per-secret accounts (2026-10-17, manual AWS check open)
 
 ### What was built
