@@ -46,6 +46,8 @@ test("response: JSONPath filter, headers, save suggestion and cancelling a slow 
   await expect(cancel).toBeVisible();
   await expect(cancel.locator("svg")).toHaveCount(1);
   await expect(cancel.locator("svg")).toHaveClass(/animate-spin/);
+  // The response pane counts the time while waiting.
+  await expect(app.getByLabel("Elapsed time")).toHaveText(/^[1-9]\d* ms$|s$/);
   await cancel.click();
   await expect(app.getByText("The request was cancelled.")).toBeVisible();
 });

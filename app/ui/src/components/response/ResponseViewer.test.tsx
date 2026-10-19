@@ -57,4 +57,28 @@ describe("JSONPath filter", () => {
     fireEvent.change(screen.getByLabelText("JSONPath filter"), { target: { value: "" } });
     await waitFor(() => expect(editorText()).toContain('"items"'));
   });
+
+  it("keeps the filter for the next response of the same view", async () => {
+    const calls: { responseId: string; path: string }[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd !== "filter_response") return null;
+      calls.push(args as { responseId: string; path: string });
+      return "[\n  1,\n  2\n]";
+    });
+    const first = render(<ResponsePanel response={response} viewKey="resend" />);
+    fireEvent.click(screen.getByLabelText("Filter with JSONPath"));
+    fireEvent.change(screen.getByLabelText("JSONPath filter"), {
+      target: { value: "$.items[*].id" },
+    });
+    await waitFor(() => expect(editorText()).toBe("[  1,  2]"));
+    // Sending again unmounts the panel while waiting, then shows the new response.
+    first.unmount();
+
+    render(<ResponsePanel response={{ ...response, id: "r2" }} viewKey="resend" />);
+    expect((screen.getByLabelText("JSONPath filter") as HTMLInputElement).value).toBe(
+      "$.items[*].id",
+    );
+    await waitFor(() => expect(editorText()).toBe("[  1,  2]"));
+    expect(calls.at(-1)).toMatchObject({ responseId: "r2", path: "$.items[*].id" });
+  });
 });

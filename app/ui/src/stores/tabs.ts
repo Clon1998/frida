@@ -25,6 +25,8 @@ export interface RequestTab extends DocTab<"request", RequestModel> {
   error: ApiError | null;
   /** Set while a send is in flight; used to cancel it. */
   requestId: string | null;
+  /** When the send in flight started (`Date.now()`), for the elapsed time while waiting. */
+  sentAt?: number;
   /** The user closed the response pane. The next send opens it again. */
   responseHidden?: boolean;
 }
@@ -431,7 +433,13 @@ export const useTabs = create<TabsState>((set, get) => {
       if (tab?.kind !== "request" || tab.requestId) return;
       const requestId = crypto.randomUUID();
       // Sending always shows the response pane, also after it was closed.
-      updateRequestTab(dir, path, (t) => ({ ...t, requestId, error: null, responseHidden: false }));
+      updateRequestTab(dir, path, (t) => ({
+        ...t,
+        requestId,
+        sentAt: Date.now(),
+        error: null,
+        responseHidden: false,
+      }));
       try {
         const response = await unwrap(commands.sendRequest(requestId, dir, path, tab.draft));
         updateRequestTab(dir, path, (t) => ({ ...t, response, error: null, requestId: null }));

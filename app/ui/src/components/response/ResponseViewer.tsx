@@ -10,7 +10,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { commands, type ResponseView, type ScriptOutcome } from "@/bindings";
 import { CodeEditor } from "@/components/editor/CodeEditor";
@@ -43,6 +43,7 @@ export function ResponseViewer({ tab, dir }: { tab: RequestTab; dir: string }) {
       {tab.requestId ? (
         <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Waiting for response…
+          {tab.sentAt !== undefined && <Elapsed since={tab.sentAt} />}
         </div>
       ) : (
         tab.error && (
@@ -55,6 +56,20 @@ export function ResponseViewer({ tab, dir }: { tab: RequestTab; dir: string }) {
         )
       )}
     </div>
+  );
+}
+
+/** The time since `since`, ticking. The start comes from the tab, so it survives tab switches. */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span className="tabular-nums" aria-label="Elapsed time">
+      {formatDuration(Math.max(0, now - since))}
+    </span>
   );
 }
 
@@ -80,19 +95,31 @@ const FILTER_DEBOUNCE_MS = 250;
  * The JSONPath filter of a JSON body (filtered in Rust, `filter_json`). `result` is the
  * filtered JSON while a valid filter is set, else `null` (show the whole body). While a new
  * filter is being checked, the last result stays, so the body doesn't flicker.
+ *
+ * The path is kept per `viewKey` in the sub-tab store, so it survives the panel unmounting
+ * while the next send is running: the new response is filtered with the same path.
  */
-function useJsonFilter(response: ResponseView, enabled: boolean, uncached: boolean) {
-  const [path, setPath] = useState("");
+function useJsonFilter(
+  response: ResponseView,
+  enabled: boolean,
+  uncached: boolean,
+  viewKey: string,
+) {
+  const [path, setPath] = useSubTab(`jsonpath:${viewKey}`, "");
   const [outcome, setOutcome] = useState<{
     path: string;
     result: string | null;
     error: string | null;
   } | null>(null);
   const active = enabled && path.trim() !== "";
+  // The first filtering of a (new) response runs at once; only typing is debounced.
+  const filteredOnce = useRef(false);
 
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
+    const delay = filteredOnce.current ? FILTER_DEBOUNCE_MS : 0;
+    filteredOnce.current = true;
     const timer = setTimeout(() => {
       unwrap(commands.filterResponse(response.id, uncached ? response.bodyText : null, path)).then(
         (result) => !cancelled && setOutcome({ path, result, error: null }),
@@ -104,7 +131,7 @@ function useJsonFilter(response: ResponseView, enabled: boolean, uncached: boole
             error: e.message ?? String(e),
           })),
       );
-    }, FILTER_DEBOUNCE_MS);
+    }, delay);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -134,10 +161,13 @@ export function ResponsePanel({
   /** The body isn't in Rust's response cache (history): the filter sends the text along. */
   uncached?: boolean;
 }) {
-  const [pretty, setPretty] = useState(true);
+  // Like the JSONPath filter, kept per view so the next send shows the same format.
+  const [format, setFormat] = useSubTab(`format:${viewKey}`, "pretty");
+  const pretty = format === "pretty";
+  const setPretty = (on: boolean) => setFormat(on ? "pretty" : "raw");
   const kind = bodyKind(response.contentType, response.bodyText);
   const text = response.bodyText ?? "";
-  const jsonFilter = useJsonFilter(response, kind === "json", uncached);
+  const jsonFilter = useJsonFilter(response, kind === "json", uncached, viewKey);
   // The JSONPath field only shows after clicking "Filter", and stays while a filter is set.
   const [filterOpen, setFilterOpen] = useState(false);
   const shown = jsonFilter.result ?? (pretty && kind === "json" ? prettyJson(text) : text);
