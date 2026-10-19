@@ -108,6 +108,15 @@ test("closing an unsaved tab offers Save, Don't save and Cancel", async ({ app }
   await expect(app.locator(".cm-content").first()).toHaveText("{{baseUrl}}/health?full=true");
 });
 
+test("middle-click closes a tab", async ({ app }) => {
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+  const tab = app.locator("[data-tab-path='health.yaml']");
+  await expect(tab).toBeVisible();
+  await tab.click({ button: "middle" });
+  await expect(tab).toHaveCount(0);
+});
+
 test("a dialog reopened while it is closing can still be used", async ({ app, browserName }) => {
   // CI found this: Radix gave the overlay and the content their own portals, so reopening
   // during the closing animation could put the overlay on top of the content. It only shows

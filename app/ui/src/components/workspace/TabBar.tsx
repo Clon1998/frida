@@ -59,7 +59,9 @@ export function TabBar({ dir }: { dir: string }) {
           // A normal mouse wheel scrolls vertically; turn that into sideways scrolling here.
           if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY;
         }}
-        className="flex h-9 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b bg-muted/30 [scrollbar-width:thin]"
+        // No visible scrollbar (Windows draws a thick one): the wheel scrolls sideways and the
+        // active tab is scrolled into view.
+        className="flex h-9 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b bg-muted/30 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab, index) => (
           <ContextMenu key={tab.path}>
@@ -69,7 +71,13 @@ export function TabBar({ dir }: { dir: string }) {
                 data-tab-path={tab.path}
                 onClick={() => setActive(dir, tab.path)}
                 onDoubleClick={() => pin(dir, tab.path)}
-                onAuxClick={(e) => {
+                // Middle-click closes. Not `onAuxClick`: on Windows a middle press on a
+                // scrollable strip starts autoscroll and the click never arrives, and WebKit
+                // fires it unreliably. Preventing the press stops autoscroll; the release closes.
+                onMouseDown={(e) => {
+                  if (e.button === 1) e.preventDefault();
+                }}
+                onMouseUp={(e) => {
                   if (e.button === 1) requestClose([tab.path]);
                 }}
                 className={cn(
