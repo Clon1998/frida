@@ -599,6 +599,9 @@ const handlers: Record<string, (args: any) => unknown> = {
       ),
     };
     if (index >= 0) list[index] = saved;
+    // Like the real backend: a renamed active environment stays selected.
+    const key = scope.kind === "global" ? "global" : "collection";
+    if (state.active[key] === originalName) state.active[key] = environment.name;
     return null;
   },
   delete_environment: ({ scope, name }) => {
@@ -607,6 +610,8 @@ const handlers: Record<string, (args: any) => unknown> = {
       list.findIndex((e) => e.name === name),
       1,
     );
+    const key = scope.kind === "global" ? "global" : "collection";
+    if (state.active[key] === name) state.active[key] = null;
     return null;
   },
   reorder_environments: () => null,

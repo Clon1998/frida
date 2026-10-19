@@ -72,6 +72,10 @@ pub async fn save_environment(
     let (dir, scope_id) = state.env_location(&scope)?;
     storage::save_environment(&dir, &original_name, &environment)?;
     if environment.name != original_name {
+        // A renamed active environment stays selected under its new name.
+        if active_name(&state, &scope)?.as_deref() == Some(original_name.as_str()) {
+            set_active(&state, scope.clone(), Some(environment.name.clone()))?;
+        }
         let store = state.secrets.store();
         blocking(move || {
             Ok(secrets::rename_env_secrets(
@@ -176,25 +180,8 @@ pub async fn transfer_environment(
         )?)
     })
     .await?;
-    if mode == secrets::TransferMode::Move {
-        let active = match &from {
-            EnvScope::Global => {
-                let ws = state.workspace_dir()?.to_string_lossy().to_string();
-                state
-                    .local
-                    .load_settings()
-                    .active_global_environments
-                    .get(&ws)
-                    .cloned()
-            }
-            EnvScope::Collection { dir } => {
-                let id = storage::load_collection(&state.collection_dir(dir)?)?.id;
-                state.local.load_collection_state(&id)?.active_environment
-            }
-        };
-        if active.as_deref() == Some(moved_name.as_str()) {
-            set_active(&state, from, None)?;
-        }
+    if mode == secrets::TransferMode::Move && active_name(&state, &from)? == Some(moved_name) {
+        set_active(&state, from, None)?;
     }
     Ok(added.name)
 }
@@ -215,6 +202,9 @@ pub async fn delete_environment(
         )
     })?;
     storage::delete_environment(&dir, &name)?;
+    if active_name(&state, &scope)? == Some(name) {
+        set_active(&state, scope, None)?;
+    }
     let store = state.secrets.store();
     blocking(move || {
         Ok(secrets::delete_env_secrets(
@@ -287,7 +277,19 @@ pub fn get_active_environments(
     dir: String,
 ) -> ApiResult<ActiveEnvironments> {
     let collection_dir = state.collection_dir(&dir)?;
-    active_environments(&state, &collection_dir)
+    let active = active_environments(&state, &collection_dir)?;
+    // The file may be gone (deleted, or removed by a git pull): then nothing is selected,
+    // instead of the picker showing a name that no longer exists.
+    let existing = |dir: &Path, name: Option<String>| -> ApiResult<Option<String>> {
+        Ok(match name {
+            Some(name) if storage::find_environment(dir, &name)?.is_some() => Some(name),
+            _ => None,
+        })
+    };
+    Ok(ActiveEnvironments {
+        global: existing(&state.workspace_dir()?, active.global)?,
+        collection: existing(&collection_dir, active.collection)?,
+    })
 }
 
 /// Selects an environment (`None` = no environment).
@@ -299,6 +301,25 @@ pub fn set_active_environment(
     name: Option<String>,
 ) -> ApiResult<()> {
     set_active(&state, scope, name)
+}
+
+/// The stored active environment of `scope`, as saved (it may no longer exist on disk).
+fn active_name(state: &AppState, scope: &EnvScope) -> ApiResult<Option<String>> {
+    match scope {
+        EnvScope::Global => {
+            let ws = state.workspace_dir()?.to_string_lossy().to_string();
+            Ok(state
+                .local
+                .load_settings()
+                .active_global_environments
+                .get(&ws)
+                .cloned())
+        }
+        EnvScope::Collection { dir } => {
+            let id = storage::load_collection(&state.collection_dir(dir)?)?.id;
+            Ok(state.local.load_collection_state(&id)?.active_environment)
+        }
+    }
 }
 
 fn set_active(state: &AppState, scope: EnvScope, name: Option<String>) -> ApiResult<()> {

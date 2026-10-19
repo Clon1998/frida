@@ -65,3 +65,18 @@ test("move an environment to global and copy one to another collection", async (
   expect(state.globalEnvironments.map((e: { name: string }) => e.name)).toEqual(["prod"]);
   expect(state.environments.map((e: { name: string }) => e.name)).toEqual(["local"]);
 });
+
+test("deleting the active environment selects no environment", async ({ app }) => {
+  await openWorkspace(app);
+  await app.getByTitle("Environments", { exact: true }).click();
+  await app.getByRole("menuitem", { name: "local", exact: true }).click();
+  await expect(app.getByTitle("Environments", { exact: true })).toHaveText(/local/);
+  await expect(app.getByRole("menu")).toHaveCount(0);
+
+  await openEnvironments(app);
+  await entry(app, "local").click();
+  await app.getByRole("button", { name: "Delete environment" }).click();
+  await app.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(entry(app, "local")).toHaveCount(0);
+  await expect(app.getByTitle("Environments", { exact: true })).toHaveText(/No environment/);
+});
