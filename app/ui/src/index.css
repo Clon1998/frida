@@ -31,6 +31,13 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* Code editor syntax colors (components/editor/theme.ts), Bruno's light palette. */
+  --syntax-property: hsl(214 55% 45%);
+  --syntax-string: hsl(28 55% 38%);
+  --syntax-number: hsl(328 50% 48%);
+  --syntax-keyword: hsl(352 45% 50%);
+  --syntax-punctuation: var(--muted-foreground);
+  --syntax-comment: var(--muted-foreground);
 }
 
 .dark {
@@ -55,6 +62,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  /* Bruno's dark palette. */
+  --syntax-property: hsl(210 90% 76%);
+  --syntax-string: hsl(35 65% 72%);
+  --syntax-number: hsl(305 59% 74%);
+  --syntax-keyword: hsl(7 84% 70%);
 }
 
 /* Accent colors (Settings → Appearance), set as `data-accent` on <html> by src/lib/theme.ts.
