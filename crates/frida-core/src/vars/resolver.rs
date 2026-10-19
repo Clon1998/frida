@@ -20,6 +20,10 @@ pub struct Resolver<'a> {
     index: HashMap<String, usize>,
 }
 
+/// The variables being expanded, outermost first, each with the index of the layer its
+/// definition came from (see [`VarScope::definitions`]).
+type Stack = Vec<(String, usize)>;
+
 /// The result of resolving one placeholder or one piece of text.
 struct Resolved {
     text: String,
@@ -39,7 +43,7 @@ impl<'a> Resolver<'a> {
     /// Replaces every `{{name}}` in `text`. Unresolved placeholders stay as written
     /// (PLAN.md §5.2), so the request can still be sent and the user sees what's missing.
     pub fn resolve(&mut self, text: &str, location: UsageLocation) -> String {
-        let mut stack = Vec::new();
+        let mut stack = Stack::new();
         self.interpolate(text, &location, &mut stack).text
     }
 
@@ -48,12 +52,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// `stack` holds the variables currently being expanded, to detect cycles.
-    fn interpolate(
-        &mut self,
-        text: &str,
-        location: &UsageLocation,
-        stack: &mut Vec<String>,
-    ) -> Resolved {
+    fn interpolate(&mut self, text: &str, location: &UsageLocation, stack: &mut Stack) -> Resolved {
         let mut out = String::with_capacity(text.len());
         let mut secret = false;
         let mut rest = text;
@@ -84,7 +83,7 @@ impl<'a> Resolver<'a> {
         &mut self,
         name: &str,
         location: &UsageLocation,
-        stack: &mut Vec<String>,
+        stack: &mut Stack,
     ) -> Option<Resolved> {
         if name.is_empty() {
             return None;
@@ -122,16 +121,26 @@ impl<'a> Resolver<'a> {
             });
         }
 
+        // A variable that uses its own name, like `baseUrl: {{baseUrl}}/v1` in the collection
+        // environment, means the next lower definition (e.g. the global environment's), like
+        // `PATH=$PATH:/opt/bin` in a shell: the lookup starts below the layer of the definition
+        // being expanded. Only when no lower layer defines it is it a cycle.
+        let outer = stack.iter().rposition(|(n, _)| n == name);
+        let first_layer = outer.map_or(0, |pos| stack[pos].1 + 1);
+
         // The highest layer that defines the name wins; the others are "shadowed".
-        let mut definitions = self.scope.definitions(name);
-        let Some((source, winner)) = definitions.next() else {
-            self.record(name, None, None, false, Vec::new(), location);
+        let mut definitions = self.scope.definitions(name, first_layer);
+        let Some((layer, source, winner)) = definitions.next() else {
+            match outer {
+                Some(pos) => self.cycle(stack, pos, name),
+                None => self.record(name, None, None, false, Vec::new(), location),
+            }
             return None;
         };
         let source = source.clone();
         let winner = winner.clone();
         let shadowed: Vec<ShadowedVar> = definitions
-            .map(|(source, def)| ShadowedVar {
+            .map(|(_, source, def)| ShadowedVar {
                 source: source.clone(),
                 value: def.value.clone(),
                 is_secret: def.is_secret,
@@ -140,23 +149,23 @@ impl<'a> Resolver<'a> {
 
         let Some(raw_value) = winner.value else {
             // A secret without a value: flagged as unresolved, never falls back to a lower layer.
-            self.record(
-                name,
-                None,
-                Some(source),
-                winner.is_secret,
-                shadowed,
-                location,
-            );
+            if outer.is_some() {
+                self.error(format!(
+                    "variable {name:?} uses its own name, but the next definition is a secret \
+                     without a value"
+                ));
+            } else {
+                self.record(
+                    name,
+                    None,
+                    Some(source),
+                    winner.is_secret,
+                    shadowed,
+                    location,
+                );
+            }
             return None;
         };
-
-        if let Some(pos) = stack.iter().position(|n| n == name) {
-            let mut cycle: Vec<&str> = stack[pos..].iter().map(String::as_str).collect();
-            cycle.push(name);
-            self.error(format!("variable cycle: {}", cycle.join(" → ")));
-            return None;
-        }
         // `stack` holds the variables being expanded above this one, so its length is this
         // variable's nesting level (0 for a variable used directly in the request).
         if stack.len() > MAX_DEPTH {
@@ -167,9 +176,9 @@ impl<'a> Resolver<'a> {
         }
 
         // Resolve variables inside the value. Their usage is recorded as "inside `name`".
-        stack.push(name.to_string());
+        stack.push((name.to_string(), layer));
         let inner_location = UsageLocation::Variable {
-            name: stack[0].clone(),
+            name: stack[0].0.clone(),
         };
         let inner = self.interpolate(&raw_value, &inner_location, stack);
         stack.pop();
@@ -177,6 +186,15 @@ impl<'a> Resolver<'a> {
         let secret = winner.is_secret || inner.secret;
         if secret && !inner.text.is_empty() && !self.report.secret_values.contains(&inner.text) {
             self.report.secret_values.push(inner.text.clone());
+        }
+        // A lower definition used through the variable's own name isn't reported on its own:
+        // the report has one entry per name, for the definition that wins (its value is the
+        // combined one), with the lower one among its shadowed values.
+        if outer.is_some() {
+            return Some(Resolved {
+                text: inner.text,
+                secret,
+            });
         }
         self.record(
             name,
@@ -227,6 +245,19 @@ impl<'a> Resolver<'a> {
                 });
             }
         }
+    }
+
+    /// Reports the cycle from `stack[pos]` back to `name`.
+    fn cycle(&mut self, stack: &Stack, pos: usize, name: &str) {
+        let mut names: Vec<&str> = stack[pos..].iter().map(|(n, _)| n.as_str()).collect();
+        names.push(name);
+        let hint = if pos == stack.len() - 1 {
+            " (a variable can only use its own name when a lower layer, such as the global \
+             environment, defines it too)"
+        } else {
+            ""
+        };
+        self.error(format!("variable cycle: {}{hint}", names.join(" → ")));
     }
 
     fn error(&mut self, message: String) {

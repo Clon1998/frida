@@ -105,18 +105,24 @@ impl VarScope {
         Self { layers }
     }
 
-    /// Every definition of `name`, highest priority first.
+    /// Every definition of `name` in the layers from index `first_layer` down, highest
+    /// priority first, with the index of its layer.
     pub fn definitions<'s>(
         &'s self,
         name: &'s str,
-    ) -> impl Iterator<Item = (&'s VarSource, &'s VarDef)> {
-        self.layers.iter().flat_map(move |layer| {
-            layer
-                .vars
-                .iter()
-                .filter(move |def| def.name == name)
-                .map(move |def| (&layer.source, def))
-        })
+        first_layer: usize,
+    ) -> impl Iterator<Item = (usize, &'s VarSource, &'s VarDef)> {
+        self.layers
+            .iter()
+            .enumerate()
+            .skip(first_layer)
+            .flat_map(move |(index, layer)| {
+                layer
+                    .vars
+                    .iter()
+                    .filter(move |def| def.name == name)
+                    .map(move |def| (index, &layer.source, def))
+            })
     }
 }
 

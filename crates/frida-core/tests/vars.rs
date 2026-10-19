@@ -189,13 +189,83 @@ fn cycles_are_detected_and_named() {
 }
 
 #[test]
-fn self_reference_is_a_cycle() {
+fn self_reference_without_a_lower_definition_is_a_cycle() {
     let layers = Layers {
-        collection: vec![kv("a", "{{a}}")],
+        collection: vec![kv("a", "{{a}}/v1")],
         ..Default::default()
     };
-    let (_, _, errors) = layers.resolve("{{a}}");
-    assert_eq!(errors, ["variable cycle: a → a"]);
+    let (out, _, errors) = layers.resolve("{{a}}");
+    assert_eq!(out, "{{a}}/v1");
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].starts_with("variable cycle: a → a (a variable can only use its own name"));
+}
+
+#[test]
+fn own_name_uses_the_next_lower_definition() {
+    let layers = Layers {
+        collection_env: Some(env("dev", &[("baseUrl", Some("{{baseUrl}}/v1"), false)])),
+        global_env: Some(env(
+            "shared",
+            &[("baseUrl", Some("https://api.example.com"), false)],
+        )),
+        ..Default::default()
+    };
+    let (out, vars, errors) = layers.resolve("{{baseUrl}}/orders");
+    assert_eq!(out, "https://api.example.com/v1/orders");
+    assert!(errors.is_empty(), "{errors:?}");
+    // One entry: the winning definition with the combined value, the global one shadowed.
+    assert_eq!(vars.len(), 1);
+    let base = var(&vars, "baseUrl");
+    assert_eq!(base.value.as_deref(), Some("https://api.example.com/v1"));
+    assert_eq!(
+        base.source,
+        Some(VarSource::CollectionEnv { name: "dev".into() })
+    );
+    assert_eq!(base.used_in, [UsageLocation::Url]);
+    assert_eq!(base.shadowed.len(), 1);
+    assert_eq!(
+        base.shadowed[0].source,
+        VarSource::GlobalEnv {
+            name: "shared".into()
+        }
+    );
+}
+
+#[test]
+fn own_name_chains_through_several_layers() {
+    let layers = Layers {
+        folders: vec![folder("admin", vec![kv("baseUrl", "{{baseUrl}}/admin")])],
+        collection_env: Some(env("dev", &[("baseUrl", Some("{{baseUrl}}/v1"), false)])),
+        global_env: Some(env("shared", &[("baseUrl", Some("https://api"), false)])),
+        ..Default::default()
+    };
+    let (out, _, errors) = layers.resolve("{{baseUrl}}");
+    assert_eq!(out, "https://api/v1/admin");
+    assert!(errors.is_empty(), "{errors:?}");
+}
+
+#[test]
+fn own_name_keeps_a_lower_secret_secret() {
+    let layers = Layers {
+        collection: vec![kv("token", "Bearer {{token}}")],
+        global_env: Some(env("shared", &[("token", Some("s3cret"), true)])),
+        ..Default::default()
+    };
+    let (out, vars, errors) = layers.resolve("{{token}}");
+    assert_eq!(out, "Bearer s3cret");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(var(&vars, "token").is_secret);
+
+    // A lower secret without a value can't be used: the placeholder stays, with an error.
+    let layers = Layers {
+        collection: vec![kv("token", "Bearer {{token}}")],
+        global_env: Some(env("shared", &[("token", None, true)])),
+        ..Default::default()
+    };
+    let (out, _, errors) = layers.resolve("{{token}}");
+    assert_eq!(out, "Bearer {{token}}");
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].contains("secret without a value"), "{errors:?}");
 }
 
 #[test]
