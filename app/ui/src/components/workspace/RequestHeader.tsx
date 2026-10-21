@@ -20,6 +20,7 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
   const collection = useActiveCollection();
   const tree = useWorkspace((s) => s.trees[dir]);
   const save = useTabs((s) => s.save);
+  const updateDraft = useTabs((s) => s.updateDraft);
   const trail =
     tab && (tab.kind === "request" || tab.kind === "folder") && tree
       ? folderTrail(tree, tab.path)
@@ -59,9 +60,12 @@ export function RequestHeader({ dir, tab }: { dir: string; tab: Tab | null }) {
           ) : (
             <EditableCrumb
               className="font-medium"
-              title={`${tab.path} · click to rename`}
+              title={`${tab.path} · click to rename (saved with the tab)`}
               value={tab.draft.name}
-              onRename={(name) => void actions.renameItem(dir, tab.path, name)}
+              // An edit like any other: saving writes it and renames the file to match.
+              onRename={(name) =>
+                updateDraft(dir, tab.path, (doc) => ({ ...doc, name: name.trim() }))
+              }
             />
           )}
           {tab.kind === "folder" && <span className="text-muted-foreground">settings</span>}

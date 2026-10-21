@@ -418,9 +418,17 @@ export const useTabs = create<TabsState>((set, get) => {
       if (!tab || !isDocument(tab)) return;
       try {
         await writeDoc(dir, tab);
+        // A renamed request or folder (renamed in its tab, saved with it) also gets a matching
+        // file name; open tabs follow the new path.
+        let savedPath = path;
+        if (tab.kind !== "collection" && tab.draft.name !== tab.original.name) {
+          savedPath = await unwrap(commands.renameItem(dir, path, tab.draft.name));
+          get().renamePaths(dir, path, savedPath);
+          await useWorkspace.getState().reloadTree(dir);
+        }
         // Read back what was written (e.g. the method is normalized to upper case).
-        const saved = await readDoc(dir, tab.kind, path);
-        updateTab(dir, path, (t) => withDoc(t, saved));
+        const saved = await readDoc(dir, tab.kind, savedPath);
+        updateTab(dir, savedPath, (t) => withDoc(t, saved));
         // The collection name is shown in the sidebar, which reads it from the workspace overview.
         if (tab.kind === "collection") await useWorkspace.getState().reloadWorkspace();
       } catch (e) {
