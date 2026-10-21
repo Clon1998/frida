@@ -816,6 +816,20 @@ editor and the mapping in Settings → AWS), `frida-cli/tests/cli.rs` (`--aws-ac
 active environment, middle-click and the elapsed time; Vitest for the JSONPath filter across sends.
 *Status 2026-10-19: done.*
 
+### M19: Feedback round 4 (auth)
+- [x] "Get new token" uses the auth as edited, also in folder and collection tabs (it used the saved values, e.g.
+  with the Cognito preset).
+- [x] Every request the app sends is in the console: OAuth2 token requests (fetch and refresh, failed ones with the
+  provider's answer) and `fri.sendRequest`, masked like the request itself.
+- [x] Token viewer: the tokens of the current request/folder/collection first (others folded away), with the
+  environment they were fetched in, token URL and expiry; explicit Copy and Decode buttons.
+- [x] Renaming a request or folder in its tab is an unsaved change until the tab is saved.
+
+**Acceptance:** `crates/frida-core/tests/auth.rs` (token requests in the console, masked, also when rejected; the
+token list marks current tokens with their environment), `tests/console.rs` (`fri.sendRequest` in the console),
+Playwright `e2e/auth.e2e.ts` (unsaved auth reaches "Get new token", token list, copy, decode, rename in the tab).
+*Status 2026-10-21: done.*
+
 ### Later (backlog, not scheduled)
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
@@ -1144,6 +1158,18 @@ Deviations from and clarifications of this plan, newest last.
   error, not a fallback further down. Syntax colors: Bruno's current palettes (`themes/{light,dark}` in its repo)
   as `--syntax-*` theme variables; `@codemirror/language` and `@lezer/highlight` became direct dependencies at the
   versions already in the lockfile (two copies of `@codemirror/language` would break highlighting).
+
+- **2026-10-21 (M19) Everything the app sends goes to the console; token viewer context.** The send functions take
+  one callback, `on_console: &(dyn Fn(ConsoleEvent) + Send + Sync)`, for script logs and HTTP exchanges besides the
+  request itself (OAuth2 token requests, `fri.sendRequest`); the request itself is still logged by the caller from
+  the result. Token requests are built before sending so the console shows what went out; the client secret,
+  password, Basic header and returned tokens are masked. `fri.sendRequest` entries are collected by the script
+  host and passed on after the script, like its logs (the callback can't move to the script's thread). AWS SDK
+  calls are not in the console (they aren't requests the user wrote). Tokens remember the active environments when
+  fetched (`dev · shared`); `list_oauth2_tokens` takes the item's context (like `inspect_request`) and marks the
+  tokens it would use. "Get new token" and the token list take the auth as edited (`auth`), which replaces the saved
+  auth of the request, folder or collection. Renaming in a tab is a draft change; saving writes the document and
+  then renames the file (`rename_item`), so the sidebar's Rename stays a direct file operation.
 
 ## 17. Testing strategy
 

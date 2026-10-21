@@ -1,5 +1,33 @@
 # Changelog
 
+## M19: Feedback round 4, auth (2026-10-21)
+
+### What was built
+- **Console**: OAuth2 token requests (also failed ones, with the provider's answer) and `fri.sendRequest` calls show
+  up next to the request they were made for, with secrets masked.
+- **Get new token** uses unsaved changes in folder and collection tabs too (e.g. the Cognito preset's fields).
+- **Token viewer**: tokens for the current request, folder or collection first, others folded away; each shows its
+  environment, token URL and expiry, with Copy and Decode buttons.
+- **Renaming in a tab** waits for Save (the sidebar's Rename still renames at once).
+
+### Rust things worth understanding in this milestone
+1. **`dyn Fn` in a type alias means `'static`** (`crates/frida-core/src/http/console.rs`, `ConsoleEvent`). A first
+   version had `type ConsoleSink = dyn Fn(ConsoleEvent) + Send + Sync;`. In a type alias, a trait object without a
+   lifetime gets `'static`, so closures that borrow something (the app handle, a `Mutex` in a test) were rejected.
+   Written inline in a parameter, `&(dyn Fn(...) + Send + Sync)`, the trait object borrows for as long as the
+   reference does. The code spells it out for that reason.
+2. **Returning a closure** (`crates/frida-core/src/http/execute.rs`, `label_exchanges`). `-> impl Fn(ConsoleEntry)
+   + Send + Sync + 'a` returns a closure without naming its type (every closure has its own, unnamable type). The
+   closure owns copies of the request's name and path (`move`) and borrows the console callback for `'a`.
+3. **Futures that must own their data** (`crates/frida-core/src/http/scripting.rs`, `CoreHost::send_request`). The
+   script host returns a `BoxFuture`, which is `'static`: the future may outlive `&self`. So it clones what it needs
+   (labels, secrets) and shares the list of exchanges through an `Arc<Mutex<Vec<_>>>`, like handing a Java
+   `CompletableFuture` its own references instead of `this`.
+4. **Boxing a large enum variant** (`ConsoleEvent::Exchange(Box<ConsoleEntry>)`). An enum is as large as its largest
+   variant; clippy flagged that every log line would carry the space of a full console entry. A `Box` keeps the enum
+   small and puts the entry on the heap.
+
+
 ## M18: Feedback round 3 (2026-10-19)
 
 ### What was built

@@ -39,8 +39,13 @@ The response viewer shows status, time and size, and has tabs for the body (pret
 JSONPath filter), headers, cookies and test results. Images are previewed. HTML is previewed in a sandboxed frame
 with scripts disabled. **Save** writes the body to a file.
 
-The **console** (Cmd/Ctrl+J) logs every send of the session as it went over the wire: the resolved request, all
-headers, the response and any script `console.log` output. Secret values are shown as `***`.
+The **console** (Cmd/Ctrl+J) logs every request Frida sends, as it went over the wire: the resolved request, all
+headers, the response and any script `console.log` output. Besides the request itself that includes OAuth2 token
+requests (also failed ones, with the provider's answer) and `fri.sendRequest` calls from scripts, named after the
+request they were made for (`Get order › OAuth2 token (client_credentials)`). Secret values are shown as `***`.
+
+Renaming a request or folder by clicking its name in the tab header is an edit like any other: it is saved (and the
+file renamed to match) with Cmd/Ctrl+S. **Rename** in the sidebar renames the file right away.
 
 ## Environments and variables
 
@@ -120,8 +125,11 @@ the collection.
   URLs from the user pool domain and region.
 - Schemes can be combined, for example OAuth2 plus an API key header.
 
-Tokens are cached in memory and refreshed before they expire. The token viewer shows the decoded JWT claims and
-the expiry, and has **Get new token** and **Clear**.
+Tokens are cached in memory and refreshed before they expire. **Get new token** uses the auth as you see it,
+including changes you haven't saved. **Show tokens** lists the cached tokens: first the ones the request (or folder,
+collection) uses with the active environments, then the others, folded away. Each token shows the environment it was
+fetched in, the token URL and when it expires, with **Copy** (the raw token), **Decode** (the full token and its JWT
+claims) and **Clear**.
 
 ## Scripts and tests
 
