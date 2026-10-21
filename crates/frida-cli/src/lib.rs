@@ -17,7 +17,7 @@ use std::sync::Arc;
 use anyhow::{Context, bail};
 use frida_core::CoreError;
 use frida_core::auth::OAuth2Manager;
-use frida_core::http::{CookieJar, ScriptLog, SessionStore};
+use frida_core::http::{ConsoleEvent, CookieJar, SessionStore};
 use frida_core::mask::Masker;
 use frida_core::model::Environment;
 use frida_core::network::{ManualProxy, ProxySettings};
@@ -148,8 +148,11 @@ async fn run_collection(args: Args) -> anyhow::Result<u8> {
 
     let log_masker = Masker::new(&known_secrets);
     let verbose = args.verbose;
-    let on_log = move |log: ScriptLog| {
-        if verbose {
+    // Only script output; the CLI reports requests itself (the summary and JUnit).
+    let on_log = move |event: ConsoleEvent| {
+        if let ConsoleEvent::Log(log) = event
+            && verbose
+        {
             eprintln!(
                 "    [{}] {}",
                 log.request_name,

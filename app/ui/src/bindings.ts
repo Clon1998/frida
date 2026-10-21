@@ -273,8 +273,10 @@ export const commands = {
 } | null) => typedError<ResolveReport, ApiError>(__TAURI_INVOKE("inspect_request", { dir, path, request })),
 	/**
 	 *  Fetches new OAuth2 tokens for the item at `path` ("Get new token"). `path` may be a request,
-	 *  a folder or `""` (the collection); `request` is the editor's state for request tabs. For the
-	 *  authorization code flow this opens the browser; cancel it with `request_id`.
+	 *  a folder or `""` (the collection); `request` is the editor's state for request tabs, and
+	 *  `auth` the auth as currently edited (unsaved values included), which replaces the saved
+	 *  auth of that request, folder or collection. For the authorization code flow this opens the
+	 *  browser; cancel it with `request_id`. The token requests show up in the console.
 	 */
 	fetchOauth2Tokens: (requestId: string, dir: string, path: string, request: {
 	version: number,
@@ -293,9 +295,38 @@ export const commands = {
 	tests?: string,
 	settings?: Settings,
 	docs?: string,
-} | null) => typedError<TokenInfo[], ApiError>(__TAURI_INVOKE("fetch_oauth2_tokens", { requestId, dir, path, request })),
-	/**  All cached OAuth2 tokens, for the token viewer. Shown only when the user opens the viewer. */
-	listOauth2Tokens: () => __TAURI_INVOKE<TokenInfo[]>("list_oauth2_tokens"),
+} | null, auth: 
+/**  Use the nearest parent's auth. On a collection this behaves like `None`. */
+{ mode: "inherit" } | { mode: "none" } | 
+/**  One or more schemes, applied in order (e.g. OAuth2 + API key). */
+{ mode: "custom"; schemes: AuthScheme[] } | null) => typedError<TokenInfo[], ApiError>(__TAURI_INVOKE("fetch_oauth2_tokens", { requestId, dir, path, request, auth })),
+	/**
+	 *  All cached OAuth2 tokens, for the token viewer. Shown only when the user opens the viewer.
+	 *  The ones the item at `path` would use (with the active environments) are marked current;
+	 *  `path`, `request` and `auth` are as in [`fetch_oauth2_tokens`].
+	 */
+	listOauth2Tokens: (dir: string, path: string, request: {
+	version: number,
+	name: string,
+	/**  Sort order inside its folder. Lower comes first. */
+	seq?: number,
+	/**  Any HTTP method, including custom ones such as `PROPFIND`. Stored upper-case. */
+	method: string,
+	url?: string,
+	params?: Params_Deserialize,
+	headers?: KeyValue_Deserialize[],
+	body?: Body_Deserialize,
+	auth?: Auth,
+	vars?: KeyValue_Deserialize[],
+	scripts?: Scripts,
+	tests?: string,
+	settings?: Settings,
+	docs?: string,
+} | null, auth: 
+/**  Use the nearest parent's auth. On a collection this behaves like `None`. */
+{ mode: "inherit" } | { mode: "none" } | 
+/**  One or more schemes, applied in order (e.g. OAuth2 + API key). */
+{ mode: "custom"; schemes: AuthScheme[] } | null) => typedError<TokenInfo[], ApiError>(__TAURI_INVOKE("list_oauth2_tokens", { dir, path, request, auth })),
 	/**  Forgets one cached token, or all of them when `token` is `None`. */
 	clearOauth2Tokens: (token: {
 	tokenUrl: string,
@@ -311,6 +342,15 @@ export const commands = {
 	expired: boolean,
 	/**  Pretty-printed JWT claims, when the access token is a JWT. */
 	claims: string | null,
+	/**  The active environments when it was fetched (`dev · shared`), if any. */
+	environment: string | null,
+	/**  ISO timestamp. */
+	fetchedAt: string,
+	/**
+	 *  Used by the request (or folder, collection) the viewer was opened for, with the active
+	 *  environments. The viewer shows these first.
+	 */
+	current: boolean,
 } | null) => __TAURI_INVOKE<void>("clear_oauth2_tokens", { token }),
 	/**  Cancels an in-flight request. Unknown ids (already finished) are ignored. */
 	cancelRequest: (requestId: string) => __TAURI_INVOKE<void>("cancel_request", { requestId }),
@@ -1539,6 +1579,15 @@ export type TokenInfo = {
 	expired: boolean,
 	/**  Pretty-printed JWT claims, when the access token is a JWT. */
 	claims: string | null,
+	/**  The active environments when it was fetched (`dev · shared`), if any. */
+	environment: string | null,
+	/**  ISO timestamp. */
+	fetchedAt: string,
+	/**
+	 *  Used by the request (or folder, collection) the viewer was opened for, with the active
+	 *  environments. The viewer shows these first.
+	 */
+	current: boolean,
 };
 
 /**  Where the OAuth2 access token is put on the outgoing request. */

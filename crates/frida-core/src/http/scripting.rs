@@ -20,6 +20,7 @@ use serde_json::{Map, Value};
 use specta::Type;
 use tokio_util::sync::CancellationToken;
 
+use super::console::{ConsoleEntry, ConsoleEvent};
 use super::cookies::CookieJar;
 use super::prepare::{PreparedBody, PreparedRequest, RequestContext, merge_headers};
 use super::send::{HttpResponse, send};
@@ -108,7 +109,7 @@ pub struct ScriptContext<'a> {
     /// Where global environments live, for `setGlobalEnvVar(..., { persist: true })`.
     pub workspace_dir: Option<&'a Path>,
     /// Receives every `console.log` (already masked).
-    pub on_log: &'a (dyn Fn(ScriptLog) + Send + Sync),
+    pub on_console: &'a (dyn Fn(ConsoleEvent) + Send + Sync),
     pub limits: ScriptLimits,
     /// A single send or part of a run (`req.getExecutionMode()`).
     pub mode: ExecutionMode,
@@ -137,6 +138,8 @@ impl RunnerFlow {
 /// and the active environments with session overrides applied.
 pub(crate) struct Pipeline<'a> {
     pub collection_dir: &'a Path,
+    /// The request's path in the collection, to label `fri.sendRequest` in the console.
+    pub request_rel: &'a str,
     pub collection: Collection,
     /// `(path, folder)`, outermost first.
     pub folders: Vec<(String, Folder)>,
@@ -225,6 +228,10 @@ impl Pipeline<'_> {
 
     fn host(&self) -> Arc<CoreHost> {
         Arc::new(CoreHost {
+            label: format!("{} › fri.sendRequest", self.request.name),
+            request_rel: self.request_rel.to_string(),
+            sensitive: self.secrets(),
+            exchanges: Arc::default(),
             collection: self.collection.clone(),
             folders: self.folders.clone(),
             request: self.request.clone(),
@@ -250,16 +257,23 @@ impl Pipeline<'_> {
         let mut errors = Vec::new();
         for script in scripts {
             let location = format!("{}, {}", script.owner, state.phase.label());
+            let host = self.host();
+            // The script gets one handle to the host (as `Arc<dyn ScriptHost>`), we keep one to
+            // read what it collected afterwards.
             let (mut out, error) =
-                run_script(script, state.clone(), self.host(), self.ctx.limits).await;
+                run_script(script, state.clone(), host.clone(), self.ctx.limits).await;
+            let exchanges = std::mem::take(&mut *host.exchanges.lock().expect("exchanges lock"));
+            for entry in exchanges {
+                (self.ctx.on_console)(ConsoleEvent::Exchange(Box::new(entry)));
+            }
             for log in out.logs.drain(..) {
-                (self.ctx.on_log)(ScriptLog {
+                (self.ctx.on_console)(ConsoleEvent::Log(ScriptLog {
                     timestamp: now_iso(),
                     level: log.level,
                     message: masker.text(&log.message),
                     location: location.clone(),
                     request_name: self.request.name.clone(),
-                });
+                }));
             }
             tests.append(&mut out.tests);
             *self.ctx.runtime.lock().expect("runtime lock poisoned") = out.vars.runtime.clone();
@@ -316,7 +330,7 @@ impl Pipeline<'_> {
             }
         };
         if let Err(message) = result {
-            (self.ctx.on_log)(ScriptLog {
+            (self.ctx.on_console)(ConsoleEvent::Log(ScriptLog {
                 timestamp: now_iso(),
                 level: LogLevel::Warn,
                 message: masker.text(&format!(
@@ -325,7 +339,7 @@ impl Pipeline<'_> {
                 )),
                 location: "environment".into(),
                 request_name: self.request.name.clone(),
-            });
+            }));
         }
     }
 
@@ -686,6 +700,15 @@ fn now_iso() -> String {
 /// for `fri.interpolate`. Holds owned copies (`'static`), because it is shared with the
 /// script's thread.
 struct CoreHost {
+    /// How `fri.sendRequest` calls are named in the console, and the request's path.
+    label: String,
+    request_rel: String,
+    /// Secret values to mask in those console entries.
+    sensitive: Vec<String>,
+    /// Console entries of the `fri.sendRequest` calls, passed on after the script ends (the
+    /// console callback borrows from the caller, so it can't move to the script's thread).
+    /// An `Arc` because each call's future must own what it uses (`'static`, see `BoxFuture`).
+    exchanges: Arc<Mutex<Vec<ConsoleEntry>>>,
     collection: Collection,
     folders: Vec<(String, Folder)>,
     request: Request,
@@ -728,10 +751,23 @@ impl ScriptHost for CoreHost {
         };
         let cookies = self.cookies.clone();
         let cancel = self.cancel.clone();
+        let exchanges = Arc::clone(&self.exchanges);
+        let (label, request_rel) = (self.label.clone(), self.request_rel.clone());
+        let sensitive = self.sensitive.clone();
         Box::pin(async move {
-            let response = send(&prepared, cookies, cancel)
-                .await
-                .map_err(|e| e.to_string())?;
+            let result = send(&prepared, cookies, cancel).await;
+            exchanges
+                .lock()
+                .expect("exchanges lock")
+                .push(ConsoleEntry::from_send(
+                    uuid::Uuid::new_v4().to_string(),
+                    &label,
+                    &request_rel,
+                    &prepared,
+                    result.as_ref().map_err(|e| e.to_string()),
+                    &sensitive,
+                ));
+            let response = result.map_err(|e| e.to_string())?;
             Ok(HttpReply {
                 status: response.status,
                 status_text: response.status_text,

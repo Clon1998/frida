@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 use super::jwt::decode_claims;
 use super::loopback::Loopback;
 use super::pkce;
+use crate::http::{ConsoleEntry, HttpResponse, PreparedBody, PreparedRequest, header_pairs};
 use crate::model::{OAuth2ClientAuth, OAuth2Config, OAuth2Grant};
 use crate::vars::iso_timestamp;
 
@@ -22,6 +23,20 @@ const BROWSER_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// Opens a URL in the system browser. Provided by the app (Tauri's opener) or by tests.
 pub type BrowserOpener = Arc<dyn Fn(&str) -> Result<(), String> + Send + Sync>;
+
+/// What fetching a token needs besides its config. Grouped in a struct because every step of
+/// the flow (fetch, refresh, the token request) passes it on unchanged.
+pub struct TokenCall<'a> {
+    /// Carries the collection's TLS and proxy settings.
+    pub client: &'a reqwest::Client,
+    pub cancel: &'a CancellationToken,
+    /// Receives a console entry for every token request (masked), successful or not, so failed
+    /// sign-ins can be debugged in the console like any other request.
+    pub on_exchange: &'a (dyn Fn(ConsoleEntry) + Send + Sync),
+    /// The active environments (`dev · shared`: collection · global), remembered with the
+    /// token so the token viewer can show where it came from.
+    pub environment: Option<String>,
+}
 
 /// Tokens are shared between requests with the same token URL, client, scope, grant and user.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -52,6 +67,9 @@ pub struct Token {
     pub refresh_token: Option<String>,
     pub expires_at: Option<SystemTime>,
     pub scope: Option<String>,
+    /// See [`TokenCall::environment`].
+    pub environment: Option<String>,
+    pub fetched_at: SystemTime,
 }
 
 impl Token {
@@ -79,6 +97,13 @@ pub struct TokenInfo {
     pub expired: bool,
     /// Pretty-printed JWT claims, when the access token is a JWT.
     pub claims: Option<String>,
+    /// The active environments when it was fetched (`dev · shared`), if any.
+    pub environment: Option<String>,
+    /// ISO timestamp.
+    pub fetched_at: String,
+    /// Used by the request (or folder, collection) the viewer was opened for, with the active
+    /// environments. The viewer shows these first.
+    pub current: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -134,8 +159,7 @@ impl OAuth2Manager {
     pub async fn token(
         &self,
         config: &OAuth2Config,
-        client: &reqwest::Client,
-        cancel: &CancellationToken,
+        call: &TokenCall<'_>,
     ) -> Result<Token, OAuth2Error> {
         let key = TokenKey::of(config);
         if let Some(token) = self.cached_valid(&key) {
@@ -161,14 +185,14 @@ impl OAuth2Manager {
                 return Ok(token);
             }
             if let Some(refresh) = &token.refresh_token {
-                match self.refresh(config, refresh, client).await {
+                match self.refresh(config, refresh, call).await {
                     Ok(fresh) => return Ok(self.store(key, fresh)),
                     // A rejected refresh token falls through to a full fetch.
                     Err(err) => tracing::info!(%err, "token refresh failed, fetching a new token"),
                 }
             }
         }
-        let fresh = self.fetch(config, client, cancel).await?;
+        let fresh = self.fetch(config, call).await?;
         Ok(self.store(key, fresh))
     }
 
@@ -186,10 +210,9 @@ impl OAuth2Manager {
     pub async fn fetch_new(
         &self,
         config: &OAuth2Config,
-        client: &reqwest::Client,
-        cancel: &CancellationToken,
+        call: &TokenCall<'_>,
     ) -> Result<Token, OAuth2Error> {
-        let fresh = self.fetch(config, client, cancel).await?;
+        let fresh = self.fetch(config, call).await?;
         Ok(self.store(TokenKey::of(config), fresh))
     }
 
@@ -202,8 +225,10 @@ impl OAuth2Manager {
             .cloned()
     }
 
-    /// All cached tokens, for the token viewer.
-    pub fn list(&self) -> Vec<TokenInfo> {
+    /// All cached tokens, for the token viewer. Those for one of `current` (the configs of the
+    /// item the viewer is open for) are marked [`TokenInfo::current`] and come first.
+    pub fn list(&self, current: &[&OAuth2Config]) -> Vec<TokenInfo> {
+        let current: Vec<TokenKey> = current.iter().map(|config| TokenKey::of(config)).collect();
         let tokens = self.tokens.lock().expect("token cache lock");
         let mut infos: Vec<TokenInfo> = tokens
             .iter()
@@ -216,18 +241,17 @@ impl OAuth2Manager {
                 access_token: token.access_token.clone(),
                 token_type: token.token_type.clone(),
                 has_refresh_token: token.refresh_token.is_some(),
-                expires_at: token.expires_at.map(|at| {
-                    let millis = at
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis();
-                    iso_timestamp(millis)
-                }),
+                expires_at: token.expires_at.map(iso),
                 expired: token.expires_at.is_some_and(|at| at <= SystemTime::now()),
                 claims: decode_claims(&token.access_token),
+                environment: token.environment.clone(),
+                fetched_at: iso(token.fetched_at),
+                current: current.contains(key),
             })
             .collect();
-        infos.sort_by(|a, b| (&a.token_url, &a.client_id).cmp(&(&b.token_url, &b.client_id)));
+        // Current ones first (`!current` is `false` for them, and `false` sorts first), then
+        // newest first (`b` before `a`), like a chained Java `Comparator`.
+        infos.sort_by(|a, b| (!a.current, &b.fetched_at).cmp(&(!b.current, &a.fetched_at)));
         infos
     }
 
@@ -257,8 +281,7 @@ impl OAuth2Manager {
     async fn fetch(
         &self,
         config: &OAuth2Config,
-        client: &reqwest::Client,
-        cancel: &CancellationToken,
+        call: &TokenCall<'_>,
     ) -> Result<Token, OAuth2Error> {
         if config.token_url.trim().is_empty() {
             return Err(OAuth2Error::Missing("a token URL"));
@@ -274,7 +297,7 @@ impl OAuth2Manager {
                 form.push(("password", config.password.clone()));
             }
             OAuth2Grant::AuthorizationCode => {
-                let (code, redirect_uri, verifier) = self.authorize(config, cancel).await?;
+                let (code, redirect_uri, verifier) = self.authorize(config, call.cancel).await?;
                 form.push(("grant_type", "authorization_code".to_string()));
                 form.push(("code", code));
                 form.push(("redirect_uri", redirect_uri));
@@ -286,20 +309,20 @@ impl OAuth2Manager {
         if !config.scope.trim().is_empty() {
             form.push(("scope", config.scope.clone()));
         }
-        self.token_request(config, form, client).await
+        self.token_request(config, form, call).await
     }
 
     async fn refresh(
         &self,
         config: &OAuth2Config,
         refresh_token: &str,
-        client: &reqwest::Client,
+        call: &TokenCall<'_>,
     ) -> Result<Token, OAuth2Error> {
         let form = vec![
             ("grant_type", "refresh_token".to_string()),
             ("refresh_token", refresh_token.to_string()),
         ];
-        let mut token = self.token_request(config, form, client).await?;
+        let mut token = self.token_request(config, form, call).await?;
         // Providers may omit a new refresh token; keep using the old one then.
         if token.refresh_token.is_none() {
             token.refresh_token = Some(refresh_token.to_string());
@@ -373,8 +396,14 @@ impl OAuth2Manager {
         &self,
         config: &OAuth2Config,
         mut form: Vec<(&'static str, String)>,
-        client: &reqwest::Client,
+        call: &TokenCall<'_>,
     ) -> Result<Token, OAuth2Error> {
+        let (client, on_exchange) = (call.client, call.on_exchange);
+        let grant_type = form
+            .iter()
+            .find(|(name, _)| *name == "grant_type")
+            .map(|(_, value)| value.clone())
+            .unwrap_or_default();
         let mut request = client
             .post(&config.token_url)
             .header("Accept", "application/json");
@@ -396,16 +425,43 @@ impl OAuth2Manager {
             form.push(("client_id", config.client_id.clone()));
         }
 
-        let response = request
+        // Built first (instead of `send()`), so the console can show what went out.
+        let request = request
             .form(&form)
-            .send()
-            .await
+            .build()
             .map_err(|e| OAuth2Error::Request(e.to_string()))?;
+        let mut log = TokenExchange::new(&request, config, &grant_type);
+        let started = Instant::now();
+        let response = match client.execute(request).await {
+            Ok(response) => response,
+            Err(e) => {
+                on_exchange(log.entry(Err(e.to_string())));
+                return Err(OAuth2Error::Request(e.to_string()));
+            }
+        };
         let status = response.status();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| OAuth2Error::Request(e.to_string()))?;
+        let final_url = response.url().to_string();
+        // `Version`'s Debug output is already the protocol name, e.g. "HTTP/1.1".
+        let http_version = format!("{:?}", response.version());
+        let headers = header_pairs(response.headers());
+        let body = match response.text().await {
+            Ok(body) => body,
+            Err(e) => {
+                on_exchange(log.entry(Err(e.to_string())));
+                return Err(OAuth2Error::Request(e.to_string()));
+            }
+        };
+        log.mask_tokens_in(&body);
+        on_exchange(log.entry(Ok(&HttpResponse {
+            status: status.as_u16(),
+            status_text: status.canonical_reason().unwrap_or("").to_string(),
+            headers,
+            body: body.clone().into_bytes(),
+            elapsed: started.elapsed(),
+            final_url,
+            http_version,
+            request_headers: Vec::new(),
+        })));
         if !status.is_success() {
             // The error body (e.g. `{"error":"invalid_client"}`) never contains our secrets.
             return Err(OAuth2Error::Rejected {
@@ -426,7 +482,82 @@ impl OAuth2Manager {
                 .expires_in
                 .map(|secs| SystemTime::now() + Duration::from_secs(secs)),
             scope: parsed.scope,
+            environment: call.environment.clone(),
+            fetched_at: SystemTime::now(),
         })
+    }
+}
+
+fn iso(time: SystemTime) -> String {
+    let millis = time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    iso_timestamp(millis)
+}
+
+/// A token request as the console shows it: what went out, and the values to mask (the
+/// client secret, password and Basic credentials, and the tokens in the response).
+struct TokenExchange {
+    sent: PreparedRequest,
+    name: String,
+    sensitive: Vec<String>,
+}
+
+impl TokenExchange {
+    fn new(request: &reqwest::Request, config: &OAuth2Config, grant_type: &str) -> Self {
+        let headers = header_pairs(request.headers());
+        let mut sensitive = vec![config.client_secret.clone(), config.password.clone()];
+        // The whole `Basic …` value: the encoded client id and secret.
+        sensitive.extend(
+            headers
+                .iter()
+                .filter(|(name, _)| name.eq_ignore_ascii_case("authorization"))
+                .map(|(_, value)| value.clone()),
+        );
+        let body = request
+            .body()
+            .and_then(|body| body.as_bytes())
+            .map(<[u8]>::to_vec)
+            .unwrap_or_default();
+        Self {
+            sent: PreparedRequest {
+                method: request.method().to_string(),
+                url: request.url().to_string(),
+                headers,
+                body: PreparedBody::Bytes(body),
+                // Not used by the console; the client that sends it has the real settings.
+                timeout: Duration::ZERO,
+                tls_verify: true,
+                ca_cert_paths: Vec::new(),
+                proxy: Default::default(),
+            },
+            name: format!("OAuth2 token ({grant_type})"),
+            sensitive,
+        }
+    }
+
+    /// Adds the tokens in a token response to the values to mask.
+    fn mask_tokens_in(&mut self, body: &str) {
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(body) else {
+            return;
+        };
+        for field in ["access_token", "refresh_token", "id_token"] {
+            if let Some(token) = json.get(field).and_then(|v| v.as_str()) {
+                self.sensitive.push(token.to_string());
+            }
+        }
+    }
+
+    fn entry(&self, outcome: Result<&HttpResponse, String>) -> ConsoleEntry {
+        ConsoleEntry::from_send(
+            uuid::Uuid::new_v4().to_string(),
+            &self.name,
+            "",
+            &self.sent,
+            outcome,
+            &self.sensitive,
+        )
     }
 }
 

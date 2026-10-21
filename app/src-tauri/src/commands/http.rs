@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use frida_core::auth::TokenInfo;
 use frida_core::history::NewEntry;
-use frida_core::http::{self, ConsoleEntry, ExecuteInput, ResponseView};
+use frida_core::http::{self, ConsoleEntry, ConsoleEvent, ExecuteInput, ResponseView};
 use tauri_specta::Event;
 
 use crate::{ConsoleLogged, ScriptLogged};
-use frida_core::model::{Environment, Request};
+use frida_core::model::{Auth, Environment, Request};
 use frida_core::secrets;
 use frida_core::storage;
 use frida_core::vars::ResolveReport;
@@ -165,13 +165,7 @@ pub async fn send_request(
         cookies: Some(state.cookie_jar(&root)),
         oauth: &state.oauth,
     };
-    // Script output goes to the console as it happens (already masked).
-    let on_log = |log: http::ScriptLog| {
-        if let Err(err) = (ScriptLogged { log }).emit(&app) {
-            tracing::warn!(%err, "could not emit script log");
-        }
-    };
-    let result = http::execute(input, cancel, &on_log).await;
+    let result = http::execute(input, cancel, &console_events(&app)).await;
     state
         .in_flight
         .lock()
@@ -196,6 +190,21 @@ pub async fn send_request(
         "response received"
     );
     Ok(view)
+}
+
+/// Passes what a send reports while it runs to the console panel, as it happens (already
+/// masked): script output, and the other requests made on the way (OAuth2 tokens,
+/// `fri.sendRequest`).
+pub(crate) fn console_events(app: &tauri::AppHandle) -> impl Fn(ConsoleEvent) + Send + Sync + '_ {
+    move |event| {
+        let emitted = match event {
+            ConsoleEvent::Log(log) => (ScriptLogged { log }).emit(app),
+            ConsoleEvent::Exchange(entry) => (ConsoleLogged { entry: *entry }).emit(app),
+        };
+        if let Err(err) = emitted {
+            tracing::warn!(%err, "could not emit console event");
+        }
+    }
 }
 
 /// Sends the raw request and response (or the error) to the console panel.
@@ -331,29 +340,50 @@ fn request_or_stand_in(request: Option<Request>, path: String) -> (Request, Stri
             } else {
                 format!("{path}/_.yaml")
             };
-            (Request::new("stand-in"), rel)
+            // Named for the console ("Orders › OAuth2 token (…)").
+            let name = if path.is_empty() { "Collection" } else { &path };
+            (Request::new(name), rel)
         }
     }
 }
 
+/// [`request_or_stand_in`] carrying `auth` (as edited) instead of the saved auth. For a folder
+/// or the collection that acts like their own auth: what it doesn't define (`inherit`) still
+/// comes from above.
+fn stand_in_with_auth(
+    request: Option<Request>,
+    path: String,
+    auth: Option<Auth>,
+) -> (Request, String) {
+    let (mut request, request_rel) = request_or_stand_in(request, path);
+    if let Some(auth) = auth {
+        request.auth = auth;
+    }
+    (request, request_rel)
+}
+
 /// Fetches new OAuth2 tokens for the item at `path` ("Get new token"). `path` may be a request,
-/// a folder or `""` (the collection); `request` is the editor's state for request tabs. For the
-/// authorization code flow this opens the browser; cancel it with `request_id`.
+/// a folder or `""` (the collection); `request` is the editor's state for request tabs, and
+/// `auth` the auth as currently edited (unsaved values included), which replaces the saved
+/// auth of that request, folder or collection. For the authorization code flow this opens the
+/// browser; cancel it with `request_id`. The token requests show up in the console.
 #[tauri::command]
 #[specta::specta]
 pub async fn fetch_oauth2_tokens(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     request_id: String,
     dir: String,
     path: String,
     request: Option<Request>,
+    auth: Option<Auth>,
 ) -> ApiResult<Vec<TokenInfo>> {
     let root = state.collection_dir(&dir)?;
     let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::Fetch).await?;
     let store = state.session_store(&root);
     let proxy = proxy_for(&state, &root).await?;
     let workspace_dir = state.workspace_dir().ok();
-    let (request, request_rel) = request_or_stand_in(request, path);
+    let (request, request_rel) = stand_in_with_auth(request, path, auth);
     let cancel = CancellationToken::new();
     state
         .in_flight
@@ -372,6 +402,7 @@ pub async fn fetch_oauth2_tokens(
             oauth: &state.oauth,
         },
         cancel,
+        &console_events(&app),
     )
     .await;
     state
@@ -383,10 +414,33 @@ pub async fn fetch_oauth2_tokens(
 }
 
 /// All cached OAuth2 tokens, for the token viewer. Shown only when the user opens the viewer.
+/// The ones the item at `path` would use (with the active environments) are marked current;
+/// `path`, `request` and `auth` are as in [`fetch_oauth2_tokens`].
 #[tauri::command]
 #[specta::specta]
-pub fn list_oauth2_tokens(state: State<'_, AppState>) -> Vec<TokenInfo> {
-    state.oauth.list()
+pub async fn list_oauth2_tokens(
+    state: State<'_, AppState>,
+    dir: String,
+    path: String,
+    request: Option<Request>,
+    auth: Option<Auth>,
+) -> ApiResult<Vec<TokenInfo>> {
+    let root = state.collection_dir(&dir)?;
+    let (global_env, collection_env) = load_active_envs(&state, &root, AwsFetch::CacheOnly).await?;
+    let store = state.session_store(&root);
+    let proxy = proxy_for(&state, &root).await?;
+    let workspace_dir = state.workspace_dir().ok();
+    let (request, request_rel) = stand_in_with_auth(request, path, auth);
+    Ok(http::list_tokens(&ExecuteInput {
+        collection_dir: &root,
+        request_rel: &request_rel,
+        request: &request,
+        collection_env: collection_env.as_ref(),
+        global_env: global_env.as_ref(),
+        session: state.session(&store, workspace_dir.as_deref(), &proxy),
+        cookies: None,
+        oauth: &state.oauth,
+    })?)
 }
 
 /// Forgets one cached token, or all of them when `token` is `None`.

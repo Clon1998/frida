@@ -8,11 +8,12 @@ mod pkce;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use tokio_util::sync::CancellationToken;
 
 pub use jwt::decode_claims;
 pub use loopback::{Callback, DEFAULT_REDIRECT_URI, Loopback};
-pub use oauth2::{BrowserOpener, OAuth2Error, OAuth2Manager, REFRESH_SKEW, Token, TokenInfo};
+pub use oauth2::{
+    BrowserOpener, OAuth2Error, OAuth2Manager, REFRESH_SKEW, Token, TokenCall, TokenInfo,
+};
 pub use pkce::{code_challenge, code_verifier};
 
 use crate::http::PreparedRequest;
@@ -42,16 +43,15 @@ pub fn effective_auth(
 
 /// Adds the auth headers / query parameters of `schemes` to `prepared`, in order. Auth
 /// replaces a header of the same name set elsewhere (e.g. an old `Authorization` header).
-/// OAuth2 tokens come from `oauth` (cached, refreshed or fetched); `client` is used for the
-/// token endpoint so the collection's TLS settings apply there too.
+/// OAuth2 tokens come from `oauth` (cached, refreshed or fetched) with `call`, whose client
+/// carries the collection's TLS settings for the token endpoint.
 ///
 /// Returns the sensitive values it added (tokens, keys, credentials) for masking.
 pub async fn apply_auth(
     prepared: &mut PreparedRequest,
     schemes: &[AuthScheme],
     oauth: &OAuth2Manager,
-    client: &reqwest::Client,
-    cancel: &CancellationToken,
+    call: &TokenCall<'_>,
 ) -> Result<Vec<String>, OAuth2Error> {
     // Values that must be masked in history and logs.
     let mut sensitive = Vec::new();
@@ -79,7 +79,7 @@ pub async fn apply_auth(
                 }
             }
             AuthScheme::OAuth2(config) => {
-                let token = oauth.token(config, client, cancel).await?;
+                let token = oauth.token(config, call).await?;
                 sensitive.push(token.access_token.clone());
                 let placement = &config.token_placement;
                 match placement.location {
@@ -121,6 +121,7 @@ fn add_query(prepared: &mut PreparedRequest, name: &str, value: &str) {
 mod tests {
     use super::*;
     use crate::model::Folder;
+    use tokio_util::sync::CancellationToken;
 
     fn custom(schemes: Vec<AuthScheme>) -> Auth {
         Auth::Custom { schemes }
@@ -200,8 +201,12 @@ mod tests {
             &mut req,
             &schemes,
             &oauth,
-            &client,
-            &CancellationToken::new(),
+            &TokenCall {
+                client: &client,
+                cancel: &CancellationToken::new(),
+                on_exchange: &|_| {},
+                environment: None,
+            },
         )
         .await
         .unwrap();
@@ -219,8 +224,12 @@ mod tests {
             &mut req,
             &[bearer("t")],
             &oauth,
-            &client,
-            &CancellationToken::new(),
+            &TokenCall {
+                client: &client,
+                cancel: &CancellationToken::new(),
+                on_exchange: &|_| {},
+                environment: None,
+            },
         )
         .await
         .unwrap();

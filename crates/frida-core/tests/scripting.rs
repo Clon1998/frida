@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use frida_core::http::{self, ExecuteInput, ScriptLog, SessionStore};
+use frida_core::http::{self, ConsoleEvent, ExecuteInput, ScriptLog, SessionStore};
 use frida_core::{CoreError, storage};
 use tokio_util::sync::CancellationToken;
 
@@ -28,7 +28,11 @@ async fn send(
 ) -> frida_core::Result<http::Executed> {
     let dir = collection();
     let env = storage::find_environment(&dir, "dev").unwrap().unwrap();
-    let on_log = |log: ScriptLog| logs.lock().unwrap().push(log);
+    let on_log = |event: ConsoleEvent| {
+        if let ConsoleEvent::Log(log) = event {
+            logs.lock().unwrap().push(log);
+        }
+    };
     http::execute(
         ExecuteInput {
             collection_dir: &dir,

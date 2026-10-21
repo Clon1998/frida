@@ -6,7 +6,7 @@
 use std::net::SocketAddr;
 use std::sync::Mutex;
 
-use frida_core::http::{self, ExecuteInput, ExecutionMode, ScriptLog, SessionStore};
+use frida_core::http::{self, ConsoleEvent, ExecuteInput, ExecutionMode, ScriptLog, SessionStore};
 use frida_core::model::{Body, BodyMode, EnvVariable, Environment, Request, Scripts};
 use frida_core::{CoreError, storage};
 use frida_script::LogLevel;
@@ -102,7 +102,11 @@ async fn send(addr: SocketAddr, snippet: &Snippet, path: &str, mode: ExecutionMo
     let session = SessionStore::default();
     let logs = Mutex::new(Vec::new());
     let request = request_with(snippet, path);
-    let on_log = |log: ScriptLog| logs.lock().unwrap().push(log);
+    let on_log = |event: ConsoleEvent| {
+        if let ConsoleEvent::Log(log) = event {
+            logs.lock().unwrap().push(log);
+        }
+    };
     let result = http::execute_as(
         ExecuteInput {
             collection_dir: dir.path(),

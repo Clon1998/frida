@@ -1,4 +1,13 @@
-import { KeyRound, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  KeyRound,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { type CognitoDomain, cognitoUrls, parseCognito } from "@/lib/cognito";
 import { useContext, useId, useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +21,7 @@ import {
   type OAuth2Grant,
   type TokenInfo,
 } from "@/bindings";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VariableInput } from "@/components/editor/VariableInput";
 import { VariablesContext } from "@/components/editor/variables";
@@ -26,6 +36,8 @@ import {
 } from "@/components/ui/select";
 import { showError, unwrap } from "@/lib/api";
 import type { RequestModel } from "@/lib/model";
+import { expiryLabel, timeAgo } from "@/lib/time";
+import { cn } from "cn";
 
 type SchemeType = AuthScheme["type"];
 type Mode = "inherit" | "none" | SchemeType;
@@ -37,6 +49,11 @@ export interface AuthContext {
   path: string;
   /** The editor's current request, for request tabs. */
   request: RequestModel | null;
+  /**
+   * The auth as edited, unsaved values included: "Get new token" uses it instead of the saved
+   * auth (folders and the collection have no `request`). Set by the AuthEditor itself.
+   */
+  auth?: Auth;
 }
 
 interface AuthEditorProps {
@@ -150,7 +167,7 @@ export function AuthEditor({ auth, onChange, canInherit, context }: AuthEditorPr
           <SchemeFields
             scheme={scheme}
             onChange={(s) => updateScheme(index, s)}
-            context={context}
+            context={{ ...context, auth }}
           />
         </section>
       ))}
@@ -417,27 +434,38 @@ function OAuth2Fields({
 function TokenPanel({ context }: { context: AuthContext }) {
   const [tokens, setTokens] = useState<TokenInfo[] | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
-  const [shown, setShown] = useState<string | null>(null);
+  const [othersOpen, setOthersOpen] = useState(false);
+  const { dir, path, request } = context;
+  const auth = context.auth ?? null;
+  const item = request ? "this request" : path === "" ? "the collection" : "this folder";
 
   const fetchNew = async () => {
     const id = crypto.randomUUID();
     setRequestId(id);
     try {
-      setTokens(
-        await unwrap(commands.fetchOauth2Tokens(id, context.dir, context.path, context.request)),
-      );
+      setTokens(await unwrap(commands.fetchOauth2Tokens(id, dir, path, request, auth)));
       toast.success("New token received");
     } catch (e) {
+      // The token request itself, with the provider's answer, is in the console.
       showError(e);
     } finally {
       setRequestId(null);
     }
   };
-  const refreshList = async () => setTokens(await commands.listOauth2Tokens());
+  const refreshList = async () => {
+    try {
+      setTokens(await unwrap(commands.listOauth2Tokens(dir, path, request, auth)));
+    } catch (e) {
+      showError(e);
+    }
+  };
   const clear = async (token: TokenInfo | null) => {
     await commands.clearOauth2Tokens(token);
     await refreshList();
   };
+
+  const current = tokens?.filter((t) => t.current) ?? [];
+  const others = tokens?.filter((t) => !t.current) ?? [];
 
   return (
     <div className="flex flex-col gap-2 border-t pt-3">
@@ -464,39 +492,114 @@ function TokenPanel({ context }: { context: AuthContext }) {
           </Button>
         )}
       </div>
-      {tokens?.length === 0 && <p className="text-xs text-muted-foreground">No tokens yet.</p>}
-      {tokens?.map((t) => {
-        const id = `${t.tokenUrl}|${t.clientId}|${t.scope}|${t.grant}|${t.username}`;
-        return (
-          <div key={id} className="rounded-md border p-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{t.clientId}</span>
-              <span className="text-muted-foreground">{t.grant.replace("_", " ")}</span>
-              {t.scope && <span className="text-muted-foreground">scope: {t.scope}</span>}
-              <div className="flex-1" />
-              <span className={t.expired ? "text-destructive" : "text-muted-foreground"}>
-                {t.expiresAt ? `${t.expired ? "expired" : "expires"} ${t.expiresAt}` : "no expiry"}
-              </span>
-              <Button variant="ghost" size="sm" className="h-6" onClick={() => void clear(t)}>
-                Clear
+      {tokens !== null && (
+        <>
+          <p className="text-xs font-medium text-muted-foreground">
+            For {item}, with the active environments
+          </p>
+          {current.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No token yet. &quot;Get new token&quot; fetches one, and so does sending.
+            </p>
+          )}
+          {current.map((t) => (
+            <TokenCard key={tokenId(t)} token={t} onClear={() => void clear(t)} />
+          ))}
+          {others.length > 0 && (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="self-start px-1 text-muted-foreground"
+                aria-expanded={othersOpen}
+                onClick={() => setOthersOpen(!othersOpen)}
+              >
+                {othersOpen ? <ChevronDown /> : <ChevronRight />} Other tokens ({others.length})
               </Button>
-            </div>
-            <button
-              type="button"
-              className="mt-1 block w-full truncate text-left font-mono text-muted-foreground hover:text-foreground"
-              title="Click to show or hide the token"
-              onClick={() => setShown(shown === id ? null : id)}
+              {othersOpen &&
+                others.map((t) => (
+                  <TokenCard key={tokenId(t)} token={t} onClear={() => void clear(t)} />
+                ))}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const tokenId = (t: TokenInfo) => `${t.tokenUrl}|${t.clientId}|${t.scope}|${t.grant}|${t.username}`;
+
+/**
+ * One cached token: where it came from (environment, token URL), its expiry, and the token
+ * itself, with explicit Copy and Details (full token and decoded JWT claims) buttons.
+ */
+function TokenCard({ token: t, onClear }: { token: TokenInfo; onClear: () => void }) {
+  const [details, setDetails] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(t.accessToken);
+    toast.success("Token copied");
+  };
+  return (
+    <div className="rounded-md border p-2 text-xs" data-testid="oauth-token">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Badge variant="outline" title="The active environments when the token was fetched">
+          {t.environment ?? "no environment"}
+        </Badge>
+        <span className="font-medium">{t.clientId}</span>
+        <span className="text-muted-foreground">{t.grant.replaceAll("_", " ")}</span>
+        {t.scope && <span className="text-muted-foreground">scope: {t.scope}</span>}
+        <span
+          className={cn("ml-auto", t.expired ? "text-destructive" : "text-muted-foreground")}
+          title={t.expiresAt ?? undefined}
+        >
+          {expiryLabel(t.expiresAt)}
+        </span>
+      </div>
+      <p className="mt-1 truncate text-muted-foreground" title={t.tokenUrl}>
+        {t.tokenUrl}
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <code className="min-w-0 flex-1 truncate font-mono text-muted-foreground">
+          {t.accessToken}
+        </code>
+        <Button variant="ghost" size="sm" className="h-6" onClick={() => void copy()}>
+          <Copy /> Copy
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6"
+          aria-expanded={details}
+          onClick={() => setDetails(!details)}
+        >
+          {details ? <ChevronDown /> : <ChevronRight />} {t.claims ? "Decode" : "Details"}
+        </Button>
+        <Button variant="ghost" size="sm" className="h-6" onClick={onClear}>
+          Clear
+        </Button>
+      </div>
+      {details && (
+        <div className="mt-1 flex flex-col gap-1">
+          <p className="text-muted-foreground">
+            Fetched {timeAgo(t.fetchedAt)} · {t.tokenType}
+            {t.hasRefreshToken && " · has a refresh token"}
+          </p>
+          <pre className="max-h-24 overflow-auto rounded bg-muted p-2 font-mono break-all whitespace-pre-wrap">
+            {t.accessToken}
+          </pre>
+          {t.claims ? (
+            <pre
+              aria-label="JWT claims"
+              className="max-h-64 overflow-auto rounded bg-muted p-2 font-mono"
             >
-              {shown === id ? t.accessToken : `${t.accessToken.slice(0, 12)}…`}
-            </button>
-            {shown === id && t.claims && (
-              <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 font-mono">
-                {t.claims}
-              </pre>
-            )}
-          </div>
-        );
-      })}
+              {t.claims}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground">Not a JWT, so there are no claims to decode.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

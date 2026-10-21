@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Mutex;
 
-use frida_core::http::{self, ConsoleEntry, ExecuteInput, ScriptLog, SessionStore};
+use frida_core::http::{self, ConsoleEntry, ConsoleEvent, ExecuteInput, ScriptLog, SessionStore};
 use frida_core::model::{
     ApiKeyLocation, Auth, AuthScheme, EnvVariable, Environment, Request, Scripts,
 };
@@ -79,10 +79,28 @@ async fn send(
     addr: SocketAddr,
     request: &Request,
 ) -> (frida_core::Result<http::Executed>, Vec<ScriptLog>) {
+    let (result, logs, _) = send_with_exchanges(dir, addr, request).await;
+    (result, logs)
+}
+
+/// Like [`send`], plus the other HTTP exchanges reported on the way (`fri.sendRequest`).
+async fn send_with_exchanges(
+    dir: &Path,
+    addr: SocketAddr,
+    request: &Request,
+) -> (
+    frida_core::Result<http::Executed>,
+    Vec<ScriptLog>,
+    Vec<ConsoleEntry>,
+) {
     let env = env(addr);
     let session = SessionStore::default();
     let logs = Mutex::new(Vec::new());
-    let on_log = |log: ScriptLog| logs.lock().unwrap().push(log);
+    let exchanges = Mutex::new(Vec::new());
+    let on_log = |event: ConsoleEvent| match event {
+        ConsoleEvent::Log(log) => logs.lock().unwrap().push(log),
+        ConsoleEvent::Exchange(entry) => exchanges.lock().unwrap().push(*entry),
+    };
     let result = http::execute(
         ExecuteInput {
             collection_dir: dir,
@@ -98,7 +116,11 @@ async fn send(
         &on_log,
     )
     .await;
-    (result, logs.into_inner().unwrap())
+    (
+        result,
+        logs.into_inner().unwrap(),
+        exchanges.into_inner().unwrap(),
+    )
 }
 
 async fn server() -> SocketAddr {
@@ -246,4 +268,29 @@ async fn a_failing_pre_request_script_logs_up_to_the_error_and_sends_nothing() {
     assert_eq!(entry.url, "{{baseUrl}}/echo");
     assert!(entry.response.is_none());
     assert!(entry.error.unwrap().contains("boom"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn script_requests_show_up_in_the_console_masked() {
+    let addr = server().await;
+    let dir = tempfile::tempdir().unwrap();
+    collection(dir.path());
+    let request = request(
+        &format!(
+            r#"await fri.sendRequest({{ url: "http://{addr}/echo?from=script", headers: {{ "X-Key": fri.getEnvVar("apiKey") }} }});"#
+        ),
+        "",
+    );
+    let (result, _, exchanges) = send_with_exchanges(dir.path(), addr, &request).await;
+    result.unwrap();
+
+    assert_eq!(exchanges.len(), 1);
+    let entry = &exchanges[0];
+    assert_eq!(entry.request_name, "Create order › fri.sendRequest");
+    assert_eq!(entry.request_path, "orders/create-order.yaml");
+    assert_eq!(entry.url, format!("http://{addr}/echo?from=script"));
+    assert_eq!(entry.response.as_ref().unwrap().status, 200);
+    let json = serde_json::to_string(entry).unwrap();
+    assert!(!json.contains(SECRET), "{json}");
+    assert!(json.contains("***"), "{json}");
 }

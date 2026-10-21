@@ -1,6 +1,6 @@
 //! The collection runner (PLAN.md M11): thin glue around `frida_core::runner`.
 
-use frida_core::http::{self, ResponseView};
+use frida_core::http::ResponseView;
 use frida_core::runner::{self, RunInput, RunItem, RunOptions, RunResult, RunSummary};
 use frida_core::secrets::AwsFetch;
 use serde::{Deserialize, Serialize};
@@ -8,8 +8,7 @@ use tauri::State;
 use tauri_specta::Event;
 use tokio_util::sync::CancellationToken;
 
-use super::http::{load_active_envs, log_to_console, proxy_for};
-use crate::ScriptLogged;
+use super::http::{console_events, load_active_envs, log_to_console, proxy_for};
 use crate::error::ApiResult;
 use crate::state::AppState;
 
@@ -62,11 +61,7 @@ pub async fn run_collection(
         .expect("in-flight lock poisoned")
         .insert(run_id.clone(), cancel.clone());
 
-    let on_log = |log: http::ScriptLog| {
-        if let Err(err) = (ScriptLogged { log }).emit(&app) {
-            tracing::warn!(%err, "could not emit script log");
-        }
-    };
+    let on_console = console_events(&app);
     // Called after each request: console entry, response cache, progress event. Runs don't go
     // into the history (a run of 50 requests would push everything else out).
     let mut on_step = |step: runner::RunStep| {
@@ -113,7 +108,7 @@ pub async fn run_collection(
         &items,
         &options,
         cancel,
-        &on_log,
+        &on_console,
         &mut on_step,
     )
     .await;

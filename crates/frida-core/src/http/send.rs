@@ -233,7 +233,7 @@ fn wire_headers(request: &reqwest::Request, cookies: Option<&CookieJar>) -> Vec<
     headers
 }
 
-fn header_pairs(headers: &HeaderMap) -> Vec<(String, String)> {
+pub(crate) fn header_pairs(headers: &HeaderMap) -> Vec<(String, String)> {
     headers
         .iter()
         .map(|(name, value)| {

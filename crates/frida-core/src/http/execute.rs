@@ -8,17 +8,17 @@ use std::sync::{Arc, Mutex};
 use frida_script::ExecutionMode;
 use tokio_util::sync::CancellationToken;
 
+use super::console::{ConsoleEntry, ConsoleEvent};
 use super::cookies::CookieJar;
 use super::prepare::{PreparedRequest, RequestContext, prepare};
 use super::scripting::{
-    EnvOverrides, Pipeline, RunnerFlow, RuntimeVars, ScriptContext, ScriptLog, ScriptOutcome,
-    runtime_strings,
+    EnvOverrides, Pipeline, RunnerFlow, RuntimeVars, ScriptContext, ScriptOutcome, runtime_strings,
 };
 use super::send::{HttpResponse, SendError, build_client, send};
-use crate::auth::{OAuth2Manager, TokenInfo, apply_auth, effective_auth};
+use crate::auth::{OAuth2Manager, TokenCall, TokenInfo, apply_auth, effective_auth};
 use crate::codegen::{CurlOptions, curl_request, render_curl};
 use crate::error::{CoreError, Result};
-use crate::model::AuthScheme;
+use crate::model::{AuthScheme, OAuth2Config};
 use crate::model::{Environment, Request};
 use crate::network::ProxySettings;
 use crate::storage;
@@ -115,14 +115,15 @@ pub fn inspect(input: &ExecuteInput<'_>) -> Result<ResolveReport> {
     Ok(load_and_resolve(input)?.report)
 }
 
-/// Sends the request. Script `console.log` output goes to `on_log` as it happens, so it is
+/// Sends the request. Script `console.log` output and other HTTP exchanges (OAuth2 token requests,
+/// `fri.sendRequest`) go to `on_console` as they happen, so it is
 /// shown even when the send fails later.
 pub async fn execute(
     input: ExecuteInput<'_>,
     cancel: CancellationToken,
-    on_log: &(dyn Fn(ScriptLog) + Send + Sync),
+    on_console: &(dyn Fn(ConsoleEvent) + Send + Sync),
 ) -> Result<Executed> {
-    execute_as(input, ExecutionMode::Standalone, cancel, on_log).await
+    execute_as(input, ExecutionMode::Standalone, cancel, on_console).await
 }
 
 /// Like [`execute`], with the execution mode scripts see (`req.getExecutionMode()`); the
@@ -131,7 +132,7 @@ pub async fn execute_as(
     input: ExecuteInput<'_>,
     mode: ExecutionMode,
     cancel: CancellationToken,
-    on_log: &(dyn Fn(ScriptLog) + Send + Sync),
+    on_console: &(dyn Fn(ConsoleEvent) + Send + Sync),
 ) -> Result<Executed> {
     let session = input.session;
     let script_ctx = ScriptContext {
@@ -139,7 +140,7 @@ pub async fn execute_as(
         env_overrides: session.env_overrides,
         global_overrides: session.global_overrides,
         workspace_dir: session.workspace_dir,
-        on_log,
+        on_console,
         limits: frida_script::ScriptLimits::default(),
         mode,
     };
@@ -151,6 +152,7 @@ pub async fn execute_as(
     }
     let mut pipeline = Pipeline {
         collection_dir: input.collection_dir,
+        request_rel: input.request_rel,
         collection,
         folders: storage::load_folder_chain(input.collection_dir, input.request_rel)?,
         request: input.request.clone(),
@@ -196,14 +198,14 @@ pub async fn execute_as(
             .await?
             .build()
             .map_err(|e| SendError::Tls(e.to_string()))?;
-        let auth_values = apply_auth(
-            &mut prepared,
-            &resolved.auth,
-            input.oauth,
-            &token_client,
-            &cancel,
-        )
-        .await?;
+        let on_exchange = label_exchanges(&input, on_console);
+        let call = TokenCall {
+            client: &token_client,
+            cancel: &cancel,
+            on_exchange: &on_exchange,
+            environment: environment_label(&input),
+        };
+        let auth_values = apply_auth(&mut prepared, &resolved.auth, input.oauth, &call).await?;
         sensitive.extend(auth_values);
     }
     // The URL may contain secrets, so it is only logged at debug level (CLAUDE.md).
@@ -228,10 +230,12 @@ pub async fn execute_as(
 }
 
 /// Fetches new tokens for every OAuth2 scheme that applies to the request ("Get new token"),
-/// ignoring the cache. Returns all cached tokens afterwards, for the token viewer.
+/// ignoring the cache. Returns all cached tokens afterwards, for the token viewer (see
+/// [`list_tokens`]).
 pub async fn fetch_tokens(
     input: ExecuteInput<'_>,
     cancel: CancellationToken,
+    on_console: &(dyn Fn(ConsoleEvent) + Send + Sync),
 ) -> Result<Vec<TokenInfo>> {
     let resolved = load_and_resolve(&input)?;
     let ctx = RequestContext {
@@ -246,12 +250,68 @@ pub async fn fetch_tokens(
         .await?
         .build()
         .map_err(|e| SendError::Tls(e.to_string()))?;
-    for scheme in &resolved.auth {
-        if let AuthScheme::OAuth2(config) = scheme {
-            input.oauth.fetch_new(config, &client, &cancel).await?;
-        }
+    let on_exchange = label_exchanges(&input, on_console);
+    let call = TokenCall {
+        client: &client,
+        cancel: &cancel,
+        on_exchange: &on_exchange,
+        environment: environment_label(&input),
+    };
+    let configs = oauth2_configs(&resolved.auth);
+    for config in &configs {
+        input.oauth.fetch_new(config, &call).await?;
     }
-    Ok(input.oauth.list())
+    Ok(input.oauth.list(&configs))
+}
+
+/// All cached OAuth2 tokens, for the token viewer. Those the request would use (with its
+/// variables resolved in the active environments) are marked current and come first.
+pub fn list_tokens(input: &ExecuteInput<'_>) -> Result<Vec<TokenInfo>> {
+    let resolved = load_and_resolve(input)?;
+    Ok(input.oauth.list(&oauth2_configs(&resolved.auth)))
+}
+
+/// The OAuth2 configs among `schemes`.
+fn oauth2_configs(schemes: &[AuthScheme]) -> Vec<&OAuth2Config> {
+    schemes
+        .iter()
+        .filter_map(|scheme| match scheme {
+            // `&**`: from `&Box<OAuth2Config>` to `&OAuth2Config` (the box is an owning pointer).
+            AuthScheme::OAuth2(config) => Some(&**config),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The active environments as the token viewer shows them: `dev · shared` (collection ·
+/// global), or just the one that is set.
+fn environment_label(input: &ExecuteInput<'_>) -> Option<String> {
+    let names: Vec<&str> = [input.collection_env, input.global_env]
+        .into_iter()
+        .flatten()
+        .map(|env| env.name.as_str())
+        .collect();
+    (!names.is_empty()).then(|| names.join(" · "))
+}
+
+/// Passes token requests made for `input`'s request on to the console, labelled with that
+/// request (`Get order › OAuth2 token (client_credentials)`) and its path.
+///
+/// Returns `impl Fn`: a closure type the compiler names, like returning a lambda in Java.
+/// It borrows `on_console` (hence `'a`) and owns the copied name and path (`move`).
+fn label_exchanges<'a>(
+    input: &ExecuteInput<'_>,
+    on_console: &'a (dyn Fn(ConsoleEvent) + Send + Sync),
+) -> impl Fn(ConsoleEntry) + Send + Sync + 'a {
+    let name = input.request.name.clone();
+    let path = input.request_rel.to_string();
+    move |entry: ConsoleEntry| {
+        on_console(ConsoleEvent::Exchange(Box::new(ConsoleEntry {
+            request_name: format!("{name} › {}", entry.request_name),
+            request_path: path.clone(),
+            ..entry
+        })))
+    }
 }
 
 /// "Copy as curl" (PLAN.md §11.3) for the request, with variables resolved or kept as

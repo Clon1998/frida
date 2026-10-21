@@ -7,10 +7,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use frida_core::auth::{BrowserOpener, OAuth2Manager};
-use frida_core::http::{self, ExecuteInput};
+use frida_core::http::{self, ConsoleEntry, ConsoleEvent, ExecuteInput};
 use frida_core::model::{
-    ApiKeyLocation, Auth, AuthScheme, Collection, OAuth2ClientAuth, OAuth2Config, OAuth2Grant,
-    Request, TokenPlacement,
+    ApiKeyLocation, Auth, AuthScheme, Collection, Environment, OAuth2ClientAuth, OAuth2Config,
+    OAuth2Grant, Request, TokenPlacement,
 };
 use frida_core::storage;
 use serde_json::Value;
@@ -133,7 +133,7 @@ async fn client_credentials_token_is_fetched_and_cached() {
     // The second send reuses the cached token.
     let second = send(dir.path(), &rel, &request, &oauth).await;
     assert_eq!(second["authorization"], auth);
-    assert_eq!(oauth.list().len(), 1);
+    assert_eq!(oauth.list(&[]).len(), 1);
 }
 
 #[tokio::test]
@@ -556,6 +556,7 @@ async fn get_new_token_and_clear_tokens() {
             oauth: &oauth,
         },
         CancellationToken::new(),
+        &|_| {},
     )
     .await
     .unwrap();
@@ -572,7 +573,7 @@ async fn get_new_token_and_clear_tokens() {
 
     // "Clear": the token is gone, and the next send fetches another one.
     oauth.clear(None);
-    assert!(oauth.list().is_empty());
+    assert!(oauth.list(&[]).is_empty());
     let third = authorization(&send(dir.path(), &rel, &request, &oauth).await);
     assert!(third != first && third != fresh, "{third}");
 }
@@ -605,9 +606,181 @@ async fn auth_values_printed_by_scripts_are_masked() {
             oauth: &oauth,
         },
         CancellationToken::new(),
-        &|log| logs.lock().unwrap().push(log.message),
+        &|event| {
+            if let http::ConsoleEvent::Log(log) = event {
+                logs.lock().unwrap().push(log.message);
+            }
+        },
     )
     .await
     .unwrap();
     assert_eq!(*logs.lock().unwrap(), ["Bearer ***"]);
+}
+
+/// Sends with `env` as the collection environment and returns the result plus the HTTP
+/// exchanges reported to the console on the way (token requests).
+async fn send_collecting(
+    dir: &Path,
+    rel: &str,
+    request: &Request,
+    oauth: &OAuth2Manager,
+    env: Option<&Environment>,
+) -> (frida_core::Result<http::Executed>, Vec<ConsoleEntry>) {
+    let session = http::SessionStore::default();
+    let exchanges = std::sync::Mutex::new(Vec::new());
+    let result = http::execute(
+        ExecuteInput {
+            collection_dir: dir,
+            request_rel: rel,
+            request,
+            collection_env: env,
+            global_env: None,
+            session: session.session(None),
+            cookies: None,
+            oauth,
+        },
+        CancellationToken::new(),
+        &|event| {
+            if let ConsoleEvent::Exchange(entry) = event {
+                exchanges.lock().unwrap().push(*entry);
+            }
+        },
+    )
+    .await;
+    (result, exchanges.into_inner().unwrap())
+}
+
+/// A client credentials scheme with the client secret sent in the body (the test server only
+/// accepts `secret`).
+fn body_secret_scheme(addr: SocketAddr, secret: &str) -> AuthScheme {
+    let AuthScheme::OAuth2(mut config) = oauth2(addr, OAuth2Grant::ClientCredentials, "frida")
+    else {
+        unreachable!()
+    };
+    config.client_secret = secret.into();
+    config.client_auth = OAuth2ClientAuth::Body;
+    AuthScheme::OAuth2(config)
+}
+
+#[tokio::test]
+async fn token_requests_show_up_in_the_console_masked() {
+    let addr = server().await;
+    let (dir, rel, request) = collection_with(
+        Auth::Custom {
+            schemes: vec![body_secret_scheme(addr, "secret")],
+        },
+        addr,
+    );
+    let oauth = OAuth2Manager::new(simulated_browser());
+    let (result, exchanges) = send_collecting(dir.path(), &rel, &request, &oauth, None).await;
+    let executed = result.unwrap();
+    let echoed: Value = serde_json::from_slice(&executed.response.body).unwrap();
+    let token = authorization(&echoed["headers"]).replace("Bearer ", "");
+
+    assert_eq!(exchanges.len(), 1, "one token request");
+    let entry = &exchanges[0];
+    assert_eq!(
+        entry.request_name,
+        "Echo › OAuth2 token (client_credentials)"
+    );
+    assert_eq!(entry.request_path, rel);
+    assert_eq!(entry.method, "POST");
+    assert_eq!(entry.url, format!("http://{addr}/oauth/token"));
+    assert_eq!(entry.response.as_ref().unwrap().status, 200);
+    let body = &entry.request_body.as_ref().unwrap().text;
+    assert!(body.contains("grant_type=client_credentials"), "{body}");
+    // `secret` is masked wherever it appears, also inside the field name `client_secret`.
+    assert!(body.ends_with("=***"), "{body}");
+    // Neither the client secret nor the issued token appears anywhere.
+    let json = serde_json::to_string(entry).unwrap();
+    assert!(!json.contains(&token), "{json}");
+    assert!(!json.contains("=secret"), "{json}");
+
+    // A cached token means no token request on the next send.
+    let (_, exchanges) = send_collecting(dir.path(), &rel, &request, &oauth, None).await;
+    assert!(exchanges.is_empty());
+}
+
+#[tokio::test]
+async fn rejected_token_requests_show_up_in_the_console_with_the_response() {
+    let addr = server().await;
+    let (dir, rel, request) = collection_with(
+        Auth::Custom {
+            schemes: vec![body_secret_scheme(addr, "wrong-s3cret")],
+        },
+        addr,
+    );
+    let oauth = OAuth2Manager::new(simulated_browser());
+    let (result, exchanges) = send_collecting(dir.path(), &rel, &request, &oauth, None).await;
+    assert!(result.is_err());
+    assert_eq!(exchanges.len(), 1);
+    let response = exchanges[0].response.as_ref().unwrap();
+    assert_eq!(response.status, 401);
+    assert!(
+        response
+            .body
+            .as_ref()
+            .unwrap()
+            .text
+            .contains("invalid_client"),
+        "{response:?}"
+    );
+    let json = serde_json::to_string(&exchanges[0]).unwrap();
+    assert!(!json.contains("wrong-s3cret"), "{json}");
+}
+
+#[tokio::test]
+async fn the_token_list_marks_the_current_tokens_and_their_environment() {
+    let addr = server().await;
+    let (dir, rel, request) = collection_with(
+        Auth::Custom {
+            schemes: vec![oauth2(addr, OAuth2Grant::ClientCredentials, "frida")],
+        },
+        addr,
+    );
+    let oauth = OAuth2Manager::new(simulated_browser());
+    let dev = Environment::new("dev");
+    send_collecting(dir.path(), &rel, &request, &oauth, Some(&dev))
+        .await
+        .0
+        .unwrap();
+    // Another token (another scope), from a request with its own auth.
+    let AuthScheme::OAuth2(mut config) = oauth2(addr, OAuth2Grant::ClientCredentials, "frida")
+    else {
+        unreachable!()
+    };
+    config.scope = "orders/write".into();
+    let mut other = request.clone();
+    other.auth = Auth::Custom {
+        schemes: vec![AuthScheme::OAuth2(config)],
+    };
+    send_collecting(dir.path(), &rel, &other, &oauth, None)
+        .await
+        .0
+        .unwrap();
+
+    let session = http::SessionStore::default();
+    let tokens = http::list_tokens(&ExecuteInput {
+        collection_dir: dir.path(),
+        request_rel: &rel,
+        request: &request,
+        collection_env: Some(&dev),
+        global_env: None,
+        session: session.session(None),
+        cookies: None,
+        oauth: &oauth,
+    })
+    .unwrap();
+    let summary: Vec<(&str, bool, Option<&str>)> = tokens
+        .iter()
+        .map(|t| (t.scope.as_str(), t.current, t.environment.as_deref()))
+        .collect();
+    // The request's own token first, marked current, with the environment it came from.
+    assert_eq!(
+        summary,
+        [
+            ("orders/read", true, Some("dev")),
+            ("orders/write", false, None)
+        ]
+    );
 }

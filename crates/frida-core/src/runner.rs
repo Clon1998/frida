@@ -20,7 +20,7 @@ use tokio_util::sync::CancellationToken;
 use crate::auth::OAuth2Manager;
 use crate::error::{CoreError, Result};
 use crate::http::{
-    self, CookieJar, ExecuteInput, Executed, ExecutionMode, RunnerFlow, ScriptLog, Session,
+    self, ConsoleEvent, CookieJar, ExecuteInput, Executed, ExecutionMode, RunnerFlow, Session,
 };
 use crate::model::{Environment, Request};
 use crate::storage::{self, TreeNode};
@@ -186,7 +186,7 @@ pub async fn run(
     items: &[RunItem],
     options: &RunOptions,
     cancel: CancellationToken,
-    on_log: &(dyn Fn(ScriptLog) + Send + Sync),
+    on_console: &(dyn Fn(ConsoleEvent) + Send + Sync),
     on_step: &mut (dyn FnMut(RunStep) + Send),
 ) -> RunSummary {
     let started = Instant::now();
@@ -216,7 +216,7 @@ pub async fn run(
         }
 
         let item = &items[index];
-        let (request, executed) = send_one(&input, item, &cancel, on_log).await;
+        let (request, executed) = send_one(&input, item, &cancel, on_console).await;
         let (result, flow) = to_result(step as u32, item, &executed);
         match result.outcome {
             RunOutcome::Passed => summary.passed += 1,
@@ -264,7 +264,7 @@ async fn send_one(
     input: &RunInput<'_>,
     item: &RunItem,
     cancel: &CancellationToken,
-    on_log: &(dyn Fn(ScriptLog) + Send + Sync),
+    on_console: &(dyn Fn(ConsoleEvent) + Send + Sync),
 ) -> (Option<Request>, std::result::Result<Executed, CoreError>) {
     let request = match storage::read_request(input.collection_dir, &item.path) {
         Ok(request) => request,
@@ -285,7 +285,7 @@ async fn send_one(
         execute_input,
         ExecutionMode::Runner,
         cancel.child_token(),
-        on_log,
+        on_console,
     )
     .await;
     (Some(request), executed)

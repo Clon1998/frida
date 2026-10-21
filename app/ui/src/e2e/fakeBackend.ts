@@ -24,6 +24,7 @@ import type {
   HistorySummary,
   Request,
   ResponseView,
+  TokenInfo,
   TreeNode,
   UpdateInfo,
   WorkspaceOverview,
@@ -153,7 +154,45 @@ function initialState() {
     savedBodies: new Map<string, string>(),
     /** The options of the last "save file" dialog (e.g. the suggested file name). */
     lastSaveDialog: null as unknown,
+    /** Cached OAuth2 tokens: one from another environment and token URL to start with. */
+    oauthTokens: [
+      oauthToken("https://login.prod.example.com/oauth2/token", "prod", "other-token-value"),
+    ] as TokenInfo[],
+    /** What the last "Get new token" sent along (path and the auth as edited). */
+    lastTokenFetch: null as unknown,
   };
+}
+
+function oauthToken(tokenUrl: string, environment: string | null, accessToken: string): TokenInfo {
+  return {
+    tokenUrl,
+    clientId: "frida",
+    scope: "orders/read",
+    grant: "client_credentials",
+    username: "",
+    accessToken,
+    tokenType: "Bearer",
+    hasRefreshToken: false,
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    expired: false,
+    claims: JSON.stringify({ sub: "frida", scope: "orders/read" }, null, 2),
+    environment,
+    fetchedAt: new Date().toISOString(),
+    current: false,
+  };
+}
+
+/** The token URL of the OAuth2 scheme in `auth`, if it has one. */
+function oauthTokenUrl(auth: unknown): string | null {
+  const schemes = (auth as { schemes?: { type: string; tokenUrl?: string }[] } | null)?.schemes;
+  return schemes?.find((s) => s.type === "oauth2")?.tokenUrl ?? null;
+}
+
+/** All tokens, the ones for `auth` marked current and first (like the real backend). */
+function tokensFor(auth: unknown): TokenInfo[] {
+  const url = oauthTokenUrl(auth);
+  const marked = state.oauthTokens.map((t) => ({ ...t, current: t.tokenUrl === url }));
+  return [...marked.filter((t) => t.current), ...marked.filter((t) => !t.current)];
 }
 
 let state = initialState();
@@ -709,6 +748,24 @@ const handlers: Record<string, (args: any) => unknown> = {
     };
   },
   send_request: send,
+  fetch_oauth2_tokens: ({ path, request, auth }) => {
+    state.lastTokenFetch = { path, auth };
+    const url = oauthTokenUrl(auth ?? request?.auth);
+    if (!url) throw { code: "invalid_input", message: "OAuth2 is missing a token URL", hint: null };
+    const env = state.active.collection;
+    state.oauthTokens = [
+      ...state.oauthTokens.filter((t) => t.tokenUrl !== url),
+      oauthToken(url, env, `token-${state.oauthTokens.length + 1}-abcdefghijklmnopqrstuvwxyz`),
+    ];
+    return tokensFor(auth ?? request?.auth);
+  },
+  list_oauth2_tokens: ({ request, auth }) => tokensFor(auth ?? request?.auth),
+  clear_oauth2_tokens: ({ token }) => {
+    state.oauthTokens = token
+      ? state.oauthTokens.filter((t) => t.tokenUrl !== (token as TokenInfo).tokenUrl)
+      : [];
+    return null;
+  },
   cancel_request: ({ requestId }) => {
     state.cancelled.add(requestId);
     return null;

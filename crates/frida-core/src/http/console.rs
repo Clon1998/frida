@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::prepare::{PreparedBody, PreparedRequest};
+use super::scripting::ScriptLog;
 use super::send::HttpResponse;
 use crate::mask::Masker;
 use crate::model::KeyValue;
@@ -12,6 +13,25 @@ use crate::vars::iso_timestamp;
 
 /// Bodies are shown up to this size in the console; it is a log, not the response viewer.
 pub const MAX_CONSOLE_BODY: usize = 64 * 1024;
+
+/// What a send reports to the console while it runs, besides the request itself (which the
+/// caller logs from the result).
+///
+/// Senders take it as `on_console: &(dyn Fn(ConsoleEvent) + Send + Sync)`: a trait object
+/// rather than a generic parameter, so the send functions stay plain functions, and
+/// `Send + Sync` because sends run on tokio's worker threads (like a Java
+/// `Consumer<ConsoleEvent>` that is safe to call from any thread). It's spelled out instead of
+/// a type alias on purpose: in an alias, `dyn Fn` would mean `dyn Fn + 'static`, which rejects
+/// closures that borrow something (such as the app handle).
+#[derive(Debug, Clone)]
+pub enum ConsoleEvent {
+    /// A script's `console.log`, or a warning about a script's side effect.
+    Log(ScriptLog),
+    /// Another HTTP exchange made on the way: an OAuth2 token request or `fri.sendRequest`.
+    /// Boxed because an entry is much larger than a log line, and an enum is as large as its
+    /// largest variant.
+    Exchange(Box<ConsoleEntry>),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
