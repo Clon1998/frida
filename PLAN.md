@@ -1170,6 +1170,8 @@ Deviations from and clarifications of this plan, newest last.
   tokens it would use. "Get new token" and the token list take the auth as edited (`auth`), which replaces the saved
   auth of the request, folder or collection. Renaming in a tab is a draft change; saving writes the document and
   then renames the file (`rename_item`), so the sidebar's Rename stays a direct file operation.
+  Confirmed with Patrick: inherited auth always comes from the *saved* folder/collection, never from unsaved
+  edits in another open tab (only the item's own tab uses its unsaved auth).
 
 ## 17. Testing strategy
 
