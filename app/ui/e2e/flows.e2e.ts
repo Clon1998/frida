@@ -26,8 +26,15 @@ test("find bar counts matches in the response body", async ({ app }) => {
 
   // The response body is the last editor on the page; its search button opens the find bar.
   await app.getByRole("button", { name: "Find" }).last().click();
-  await app.keyboard.type("e");
+  // Key by key: jumping to the first match after each letter used to select the field's text,
+  // so the next letter replaced it.
+  await app.keyboard.type("method");
+  await expect(app.getByRole("textbox", { name: "Find" })).toHaveValue("method");
   await expect(app.locator(".cm-frida-search-count")).toHaveText(/^\d+ of \d+$/);
+  // Enter (next match) leaves the query alone too.
+  await app.keyboard.press("Enter");
+  await app.keyboard.type('"');
+  await expect(app.getByRole("textbox", { name: "Find" })).toHaveValue('method"');
   await app.keyboard.press("Escape");
   await expect(app.locator(".cm-frida-search")).toHaveCount(0);
 });

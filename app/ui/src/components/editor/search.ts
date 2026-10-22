@@ -67,6 +67,19 @@ function createPanel(view: EditorView): Panel {
   let query = getSearchQuery(view.state);
   input.value = query.search;
 
+  /**
+   * Runs CodeMirror's `findNext`/`findPrevious` without its side effect on the field: they
+   * select all of its text afterwards (so the next keystroke would replace the query). That
+   * broke typing, which jumps to the first match after every letter, so the caret is put back.
+   */
+  const find = (command: (view: EditorView) => boolean) => {
+    const { selectionStart, selectionEnd, selectionDirection } = input;
+    command(view);
+    if (input.ownerDocument.activeElement === input && selectionStart !== null) {
+      input.setSelectionRange(selectionStart, selectionEnd, selectionDirection ?? undefined);
+    }
+  };
+
   const toggle = (label: string, title: string, get: () => boolean, set: (on: boolean) => void) => {
     const el = button(label, title, () => {
       set(!get());
@@ -100,7 +113,7 @@ function createPanel(view: EditorView): Panel {
       // same match selected instead of skipping to the one after it.
       const from = view.state.selection.main.from;
       view.dispatch({ selection: EditorSelection.cursor(from) });
-      findNext(view);
+      find(findNext);
     }
   };
 
@@ -123,8 +136,8 @@ function createPanel(view: EditorView): Panel {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (e.shiftKey) findPrevious(view);
-      else findNext(view);
+      if (e.shiftKey) find(findPrevious);
+      else find(findNext);
     } else if (e.key === "Escape") {
       e.preventDefault();
       closeSearchPanel(view);
@@ -137,8 +150,8 @@ function createPanel(view: EditorView): Panel {
     count,
     caseButton,
     regexButton,
-    button("↑", "Previous match (Shift+Enter)", () => findPrevious(view)),
-    button("↓", "Next match (Enter)", () => findNext(view)),
+    button("↑", "Previous match (Shift+Enter)", () => find(findPrevious)),
+    button("↓", "Next match (Enter)", () => find(findNext)),
     button("✕", "Close (Escape)", () => {
       closeSearchPanel(view);
       view.focus();
