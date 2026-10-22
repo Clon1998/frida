@@ -162,7 +162,9 @@ pnpm build                         # the static site in site/dist/
   and Linux x64, uploaded as `frida-http-<platform>` artifacts.
 
 `.github/workflows/site.yml` builds the website when `site/`, `docs/` or the app icon change (pull requests only
-build) and when a release is published, and deploys `main` to GitHub Pages. `ci.yml` skips site-only changes.
+build) and when a release is published, and deploys `main` to GitHub Pages. A published release starts the workflow
+on `main` (the `github-pages` environment only accepts deployments from `main`, not from the release's tag).
+`ci.yml` skips site-only changes.
 
 ## Conventions
 

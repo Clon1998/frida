@@ -3,6 +3,10 @@ name: Site
 # Builds the website (site/: landing page + the docs/ folder) and deploys it to GitHub Pages.
 # Runs when the site or the docs change, and when a release is published, so the download
 # buttons point at the new version's files.
+#
+# A published release doesn't deploy by itself: its run belongs to the release's tag, and the
+# github-pages environment only accepts deployments from main. It starts this workflow on main
+# instead (the `redeploy` job), which builds and deploys as usual.
 on:
   push:
     branches: [main]
@@ -19,8 +23,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  redeploy:
+    name: Deploy from main after the release
+    if: github.event_name == 'release'
+    runs-on: ubuntu-22.04
+    permissions:
+      # The built-in token may start workflow_dispatch runs (unlike most events it causes).
+      actions: write
+    steps:
+      - run: gh workflow run site.yml --ref main --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   build:
     name: Build
+    if: github.event_name != 'release'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
@@ -52,7 +69,7 @@ jobs:
   deploy:
     name: Deploy
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.event_name != 'release'
     runs-on: ubuntu-22.04
     permissions:
       pages: write
