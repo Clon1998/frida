@@ -267,7 +267,8 @@ auth:
 
 ### 4.6 Local (non-git) state
 Stored in the OS app data dir, never in the repo:
-- `settings.json`: recent workspaces, the last selected collection per workspace (selected again when the
+- `settings.json`: recent workspaces, the workspace open when the app quit (opened again on start; cleared by
+  "Close workspace"), the last selected collection per workspace (selected again when the
   workspace is opened), active global environment and AWS profile per global env, and the
   `preferences` edited in the Settings dialog (theme, accent color, UI size, editor font size, history size,
   git program, AWS config/credentials files and secret cache time).

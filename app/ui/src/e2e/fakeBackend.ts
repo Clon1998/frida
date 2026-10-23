@@ -538,11 +538,13 @@ const handlers: Record<string, (args: any) => unknown> = {
   },
   open_workspace: () => {
     state.workspaceOpen = true;
+    state.settings.lastOpenWorkspace = WORKSPACE;
     return overview();
   },
   reload_workspace: () => overview(),
   close_workspace: () => {
     state.workspaceOpen = false;
+    state.settings.lastOpenWorkspace = null;
     return null;
   },
   get_collection_state: ({ collectionId }) =>

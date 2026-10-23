@@ -68,6 +68,10 @@ export const commands = {
 	openWorkspace: (dir: string) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("open_workspace", { dir })),
 	/**  Reloads the open workspace, e.g. after `frida-workspace.yaml` changed on disk. */
 	reloadWorkspace: () => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("reload_workspace")),
+	/**
+	 *  Closes the open workspace. The app then starts on the start screen next time, instead of
+	 *  opening it again.
+	 */
 	closeWorkspace: () => __TAURI_INVOKE<void>("close_workspace"),
 	/**
 	 *  Creates a new collection at `<workspace>/collections/<name>` and adds it to the workspace.
@@ -431,6 +435,11 @@ export type AppSettings = {
 	 *  the start screen however many others are opened.
 	 */
 	pinnedWorkspaces?: string[],
+	/**
+	 *  The workspace that was open when the app quit, opened again on start. `None` after
+	 *  "Close workspace", so the app then starts on the start screen.
+	 */
+	lastOpenWorkspace?: string | null,
 	/**
 	 *  The collection the user last had selected, per workspace folder (both absolute). Opening
 	 *  the workspace again selects it instead of the first collection.

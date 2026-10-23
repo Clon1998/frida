@@ -21,7 +21,14 @@ interface WorkspaceState {
   /** The collection whose tree and tabs are shown. Collections are keyed by their folder. */
   activeCollectionDir: string | null;
   trees: Record<string, TreeNode[]>;
+  /** True while `start` opens the last workspace again. */
+  reopening: boolean;
 
+  /**
+   * Runs once when the app starts: loads the settings and opens the workspace that was open
+   * when the app quit. If that fails (e.g. the folder is gone), the start screen shows instead.
+   */
+  start: () => Promise<void>;
   loadSettings: () => Promise<void>;
   /** "Remove from list": takes a workspace off the recent and pinned lists. */
   forgetWorkspace: (dir: string) => Promise<void>;
@@ -61,6 +68,9 @@ interface WorkspaceState {
   reloadTree: (dir: string) => Promise<void>;
 }
 
+/** Whether `start` already ran. Outside the store, so `setState` in tests can't undo it. */
+let started = false;
+
 export const useWorkspace = create<WorkspaceState>((set, get) => {
   /** Saves `dir` as the workspace's selected collection, for the next time it is opened. */
   const rememberActive = async (workspace: WorkspaceOverview, dir: string) => {
@@ -95,6 +105,24 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
     workspace: null,
     activeCollectionDir: null,
     trees: {},
+    reopening: false,
+
+    start: async () => {
+      // React's StrictMode runs effects twice in development; open the workspace only once.
+      if (started) return;
+      started = true;
+      await get().loadSettings();
+      const last = get().settings?.lastOpenWorkspace;
+      if (!last) return;
+      set({ reopening: true });
+      try {
+        await get().openWorkspace(last);
+        // Don't try the same folder again on every start.
+        if (!get().workspace) await get().closeWorkspace();
+      } finally {
+        set({ reopening: false });
+      }
+    },
 
     loadSettings: async () => {
       set({ settings: await commands.getSettings() });

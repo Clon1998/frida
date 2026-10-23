@@ -82,9 +82,17 @@ pub fn reload_workspace(state: State<'_, AppState>) -> ApiResult<WorkspaceOvervi
     state.refresh_workspace(&dir)
 }
 
+/// Closes the open workspace. The app then starts on the start screen next time, instead of
+/// opening it again.
 #[tauri::command]
 #[specta::specta]
 pub fn close_workspace(state: State<'_, AppState>) {
+    let mut settings = state.local.load_settings();
+    settings.last_open_workspace = None;
+    if let Err(err) = state.local.save_settings(&settings) {
+        // Not worth failing the close for: the workspace would just open again on next start.
+        tracing::warn!(%err, "could not save settings after closing the workspace");
+    }
     let previous = state
         .workspace
         .lock()

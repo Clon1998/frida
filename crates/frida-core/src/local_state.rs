@@ -24,6 +24,9 @@ pub struct AppSettings {
     /// Workspaces the user pinned, in the order they were pinned. They stay in the menu and on
     /// the start screen however many others are opened.
     pub pinned_workspaces: Vec<String>,
+    /// The workspace that was open when the app quit, opened again on start. `None` after
+    /// "Close workspace", so the app then starts on the start screen.
+    pub last_open_workspace: Option<String>,
     /// The collection the user last had selected, per workspace folder (both absolute). Opening
     /// the workspace again selects it instead of the first collection.
     pub active_collections: std::collections::BTreeMap<String, String>,
@@ -162,6 +165,7 @@ pub enum Accent {
 impl AppSettings {
     /// Moves `workspace` to the top of the recent list.
     pub fn remember_workspace(&mut self, workspace: &str) {
+        self.last_open_workspace = Some(workspace.to_string());
         self.recent_workspaces.retain(|w| w != workspace);
         self.recent_workspaces.insert(0, workspace.to_string());
         self.recent_workspaces.truncate(MAX_RECENT_WORKSPACES);
@@ -173,6 +177,9 @@ impl AppSettings {
         self.recent_workspaces.retain(|w| w != workspace);
         self.pinned_workspaces.retain(|w| w != workspace);
         self.active_collections.remove(workspace);
+        if self.last_open_workspace.as_deref() == Some(workspace) {
+            self.last_open_workspace = None;
+        }
     }
 
     /// Whether the app should look for an update on its own at `now` (unix seconds): switched on
@@ -416,9 +423,12 @@ mod tests {
         settings
             .active_collections
             .insert("/a".into(), "/a/collections/x".into());
+        settings.remember_workspace("/a");
+        assert_eq!(settings.last_open_workspace.as_deref(), Some("/a"));
         settings.forget_workspace("/a");
         assert!(settings.pinned_workspaces.is_empty());
         assert!(settings.active_collections.is_empty());
+        assert_eq!(settings.last_open_workspace, None);
         assert_eq!(settings.recent_workspaces, ["/b"]);
     }
 

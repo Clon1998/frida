@@ -11,7 +11,8 @@ import { useWorkspace } from "@/stores/workspace";
 
 export default function App() {
   const hasWorkspace = useWorkspace((s) => s.workspace !== null);
-  const loadSettings = useWorkspace((s) => s.loadSettings);
+  const reopening = useWorkspace((s) => s.reopening);
+  const start = useWorkspace((s) => s.start);
   const preferences = useWorkspace((s) => s.settings?.preferences);
   const theme = preferences?.theme ?? "system";
 
@@ -20,8 +21,8 @@ export default function App() {
     if (preferences) applyAppearance(preferences);
   }, [preferences]);
   useEffect(() => {
-    void loadSettings();
-  }, [loadSettings]);
+    void start();
+  }, [start]);
   // Rust decides whether the check is due (switched on, once a day, not in dev builds).
   useEffect(() => {
     void useUpdate.getState().checkOnStart();
@@ -29,7 +30,8 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      {hasWorkspace ? <AppShell /> : <StartScreen />}
+      {/* Nothing while the last workspace opens again, so the start screen doesn't flash. */}
+      {hasWorkspace ? <AppShell /> : !reopening && <StartScreen />}
       <SettingsDialog />
       <UpdateDialog />
       <Toaster position="bottom-right" />
