@@ -36,6 +36,19 @@ test("preview tabs, tab menu actions and tabs restored with the workspace", asyn
   await expect(tab(app, "health.yaml")).toBeVisible();
 });
 
+test("reopening a workspace selects the collection used last", async ({ app }) => {
+  await openWorkspace(app);
+  const picker = app.locator("aside").getByRole("button", { name: "Echo API" });
+  await picker.click();
+  await app.getByRole("menuitem", { name: "Billing" }).click();
+  await expect(app.locator("aside").getByRole("button", { name: "Billing" })).toBeVisible();
+
+  await app.getByRole("button", { name: "Fake workspace" }).click();
+  await app.getByRole("menuitem", { name: "Close workspace" }).click();
+  await openWorkspace(app);
+  await expect(app.locator("aside").getByRole("button", { name: "Billing" })).toBeVisible();
+});
+
 test("run a folder, then stop a collection run", async ({ app }) => {
   await openWorkspace(app);
   await app.locator("aside").getByText("Orders", { exact: true }).click({ button: "right" });

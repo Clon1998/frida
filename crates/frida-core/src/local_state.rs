@@ -24,6 +24,9 @@ pub struct AppSettings {
     /// Workspaces the user pinned, in the order they were pinned. They stay in the menu and on
     /// the start screen however many others are opened.
     pub pinned_workspaces: Vec<String>,
+    /// The collection the user last had selected, per workspace folder (both absolute). Opening
+    /// the workspace again selects it instead of the first collection.
+    pub active_collections: std::collections::BTreeMap<String, String>,
     /// The active global environment per workspace folder.
     pub active_global_environments: std::collections::BTreeMap<String, String>,
     /// The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`.
@@ -169,6 +172,7 @@ impl AppSettings {
     pub fn forget_workspace(&mut self, workspace: &str) {
         self.recent_workspaces.retain(|w| w != workspace);
         self.pinned_workspaces.retain(|w| w != workspace);
+        self.active_collections.remove(workspace);
     }
 
     /// Whether the app should look for an update on its own at `now` (unix seconds): switched on
@@ -409,8 +413,12 @@ mod tests {
         assert_eq!(settings.pinned_workspaces, ["/a", "/c"]);
         settings.pin_workspace("/c", false);
         assert_eq!(settings.pinned_workspaces, ["/a"]);
+        settings
+            .active_collections
+            .insert("/a".into(), "/a/collections/x".into());
         settings.forget_workspace("/a");
         assert!(settings.pinned_workspaces.is_empty());
+        assert!(settings.active_collections.is_empty());
         assert_eq!(settings.recent_workspaces, ["/b"]);
     }
 

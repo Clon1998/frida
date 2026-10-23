@@ -108,6 +108,7 @@ function initialState() {
     settings: {
       recentWorkspaces: [WORKSPACE],
       pinnedWorkspaces: [],
+      activeCollections: {},
       activeGlobalEnvironments: {},
       awsProfiles: {},
       // Complete, like the real backend's defaults.
@@ -529,6 +530,10 @@ const handlers: Record<string, (args: any) => unknown> = {
   pin_workspace: ({ dir, pinned }) => {
     const list = (state.settings.pinnedWorkspaces ?? []).filter((d) => d !== dir);
     state.settings.pinnedWorkspaces = pinned ? [...list, dir] : list;
+    return state.settings;
+  },
+  set_active_collection: ({ dir }) => {
+    state.settings.activeCollections = { ...state.settings.activeCollections, [WORKSPACE]: dir };
     return state.settings;
   },
   open_workspace: () => {

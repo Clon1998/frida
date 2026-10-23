@@ -62,12 +62,31 @@ interface WorkspaceState {
 }
 
 export const useWorkspace = create<WorkspaceState>((set, get) => {
-  /** Applies a fresh overview: keeps the active collection if it still exists. */
+  /** Saves `dir` as the workspace's selected collection, for the next time it is opened. */
+  const rememberActive = async (workspace: WorkspaceOverview, dir: string) => {
+    if (get().settings?.activeCollections?.[workspace.dir] === dir) return;
+    try {
+      set({ settings: await unwrap(commands.setActiveCollection(dir)) });
+    } catch (e) {
+      showError(e);
+    }
+  };
+
+  /**
+   * Applies a fresh overview: keeps the active collection if it still exists, else selects the
+   * one last used in this workspace, else the first.
+   */
   const applyOverview = async (workspace: WorkspaceOverview) => {
     const usable = workspace.collections.filter((c) => c.error === null);
     const current = get().activeCollectionDir;
-    const active = usable.find((c) => c.dir === current)?.dir ?? usable[0]?.dir ?? null;
+    const remembered = get().settings?.activeCollections?.[workspace.dir];
+    const active =
+      usable.find((c) => c.dir === current)?.dir ??
+      usable.find((c) => c.dir === remembered)?.dir ??
+      usable[0]?.dir ??
+      null;
     set({ workspace, activeCollectionDir: active });
+    if (active) await rememberActive(workspace, active);
     await Promise.all(usable.map((c) => get().reloadTree(c.dir)));
   };
 
@@ -194,7 +213,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       }
     },
 
-    setActiveCollection: (dir) => set({ activeCollectionDir: dir }),
+    setActiveCollection: (dir) => {
+      set({ activeCollectionDir: dir });
+      const workspace = get().workspace;
+      if (workspace) void rememberActive(workspace, dir);
+    },
 
     reloadTree: async (dir) => {
       try {

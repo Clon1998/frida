@@ -60,6 +60,20 @@ pub fn pin_workspace(
     Ok(settings)
 }
 
+/// Remembers `dir` as the selected collection of the open workspace, so opening the workspace
+/// again selects it. Returns the new settings.
+#[tauri::command]
+#[specta::specta]
+pub fn set_active_collection(state: State<'_, AppState>, dir: String) -> ApiResult<AppSettings> {
+    // Only collections of the open workspace, like every other command taking a folder.
+    state.collection_dir(&dir)?;
+    let workspace = state.workspace_dir()?.to_string_lossy().to_string();
+    let mut settings = state.local.load_settings();
+    settings.active_collections.insert(workspace, dir);
+    state.local.save_settings(&settings)?;
+    Ok(settings)
+}
+
 /// Reloads the open workspace, e.g. after `frida-workspace.yaml` changed on disk.
 #[tauri::command]
 #[specta::specta]

@@ -94,6 +94,11 @@ export const commands = {
 	forgetWorkspace: (dir: string) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("forget_workspace", { dir })),
 	/**  Pins or unpins the workspace `dir` in the workspace menu. Returns the new settings. */
 	pinWorkspace: (dir: string, pinned: boolean) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("pin_workspace", { dir, pinned })),
+	/**
+	 *  Remembers `dir` as the selected collection of the open workspace, so opening the workspace
+	 *  again selects it. Returns the new settings.
+	 */
+	setActiveCollection: (dir: string) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("set_active_collection", { dir })),
 	/**  What importing the OpenAPI spec at `file` would create (counts, base URL, warnings). */
 	previewOpenapi: (file: string, grouping: OpenApiGrouping) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file, grouping })),
 	/**
@@ -426,6 +431,11 @@ export type AppSettings = {
 	 *  the start screen however many others are opened.
 	 */
 	pinnedWorkspaces?: string[],
+	/**
+	 *  The collection the user last had selected, per workspace folder (both absolute). Opening
+	 *  the workspace again selects it instead of the first collection.
+	 */
+	activeCollections?: { [key in string]: string },
 	/**  The active global environment per workspace folder. */
 	activeGlobalEnvironments?: { [key in string]: string },
 	/**  The AWS profile per global environment, keyed by `"<workspace folder>|<environment>"`. */
