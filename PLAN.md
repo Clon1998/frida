@@ -832,6 +832,16 @@ token list marks current tokens with their environment), `tests/console.rs` (`fr
 Playwright `e2e/auth.e2e.ts` (unsaved auth reaches "Get new token", token list, copy, decode, rename in the tab).
 *Status 2026-10-21: done.*
 
+### M20: Feedback round 5
+- [x] Opening a workspace selects the collection used last in it, not the first one.
+- [x] The app opens the workspace that was open when it quit, instead of the start screen. "Close workspace"
+  goes back to starting on the start screen.
+
+**Acceptance:** `crates/frida-core/src/local_state.rs` tests (forgetting a workspace clears both), Vitest
+`stores/workspace.test.ts` (reopen with the last collection, only once, a folder that is gone is forgotten),
+Playwright `e2e/workflow.e2e.ts` (reopening a workspace selects the collection used last).
+*Status 2026-10-23: in progress.*
+
 ### Later (backlog, not scheduled)
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
@@ -1174,6 +1184,15 @@ Deviations from and clarifications of this plan, newest last.
   then renames the file (`rename_item`), so the sidebar's Rename stays a direct file operation.
   Confirmed with Patrick: inherited auth always comes from the *saved* folder/collection, never from unsaved
   edits in another open tab (only the item's own tab uses its unsaved auth).
+
+- **2026-10-23 (M20) Remember the last workspace and collection (requested by Patrick).** Both are local state in
+  `settings.json` (§4.6), no repo format change: `lastOpenWorkspace` is set by `open_workspace` and cleared by
+  `close_workspace` and "Remove from list"; `activeCollections` maps a workspace folder to its last selected
+  collection (`set_active_collection`, checked against the open workspace). On start the UI loads the settings and
+  opens `lastOpenWorkspace`; while it does, neither start screen nor shell is shown (no flash), but the start screen
+  still renders right away while settings load. A folder that can't be opened shows the error and is cleared, so it
+  isn't retried on every start. When the workspace list refreshes, the collection selected in this session wins over
+  the remembered one, then the first usable collection.
 
 ## 17. Testing strategy
 
