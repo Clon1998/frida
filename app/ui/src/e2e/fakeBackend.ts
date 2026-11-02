@@ -131,6 +131,8 @@ function initialState() {
     proxyPassword: null as string | null,
     /** What `check_for_update` finds (set by a test through `offerUpdate`). */
     update: null as UpdateInfo | null,
+    /** The order of the collections in `frida-workspace.yaml`. */
+    collectionOrder: [COLLECTION, OTHER_COLLECTION],
     /** How often `install_update` ran (the real one restarts the app). */
     updateInstalls: 0,
     workspaceOpen: false,
@@ -204,15 +206,11 @@ let state = initialState();
 const overview = (): WorkspaceOverview => ({
   dir: WORKSPACE,
   name: "Fake workspace",
-  collections: [
-    { dir: COLLECTION, id: state.collection.id, name: state.collection.name, error: null },
-    {
-      dir: OTHER_COLLECTION,
-      id: "b111ing0-0000-4000-8000-000000000002",
-      name: "Billing",
-      error: null,
-    },
-  ],
+  collections: state.collectionOrder.map((dir) =>
+    dir === COLLECTION
+      ? { dir, id: state.collection.id, name: state.collection.name, error: null }
+      : { dir, id: "b111ing0-0000-4000-8000-000000000002", name: "Billing", error: null },
+  ),
 });
 
 const slug = (name: string) =>
@@ -547,6 +545,11 @@ const handlers: Record<string, (args: any) => unknown> = {
     const list = (state.settings.pinnedWorkspaces ?? []).filter((d) => d !== dir);
     state.settings.pinnedWorkspaces = pinned ? [...list, dir] : list;
     return state.settings;
+  },
+  move_collection: ({ dir, index }) => {
+    state.collectionOrder = state.collectionOrder.filter((d) => d !== dir);
+    state.collectionOrder.splice(index, 0, dir);
+    return overview();
   },
   set_show_all_collections: ({ on }) => {
     state.settings.showAllCollections = on;

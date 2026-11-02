@@ -859,10 +859,12 @@ the scrollbar puts it, and the Wrap toggle).
 - [x] Working in a section (opening a request, its menus) selects that collection, so tabs, environment, History and
   Git follow. Expanding or collapsing a section doesn't.
 - [x] The toggle is remembered (`showAllCollections` in `settings.json`).
+- [x] Collections are reordered by dragging a section's header. The order is the `collections:` list in
+  `frida-workspace.yaml`, so it is shared through git; the collection picker follows it.
 
 **Acceptance:** `crates/frida-core/src/local_state.rs` tests (older settings load with the toggle off), Vitest
 `lib/tree.test.ts` (`countRequests`), Playwright `e2e/workflow.e2e.ts` (all collections: sections, switching, the
-toggle is remembered).
+toggle is remembered; reordering by drag), `crates/frida-core/tests/storage.rs` (`move_collection`).
 *Status 2026-11-02: done.*
 
 ### Later (backlog, not scheduled)
@@ -1230,6 +1232,10 @@ Deviations from and clarifications of this plan, newest last.
   doesn't select it, so you can look into another collection without the tab bar switching. The toggle is local state
   (`showAllCollections` in `settings.json`, §4.6), no repo format change. Which sections are expanded is kept for the
   session only. Collections that can't be loaded are left out of the list (the picker still shows them as missing).
+- **2026-11-02 (M22) The collection order is shared.** Reordering rewrites the `collections:` list in
+  `frida-workspace.yaml` (format unchanged, only the order), so the team sees the same order and the move shows up as
+  a small diff. Chosen over a per-machine order in `settings.json`, which would have left the file alone but given
+  everyone their own order. Moving a collection to where it already is doesn't rewrite the file.
 
 ## 17. Testing strategy
 

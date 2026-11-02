@@ -18,7 +18,7 @@ import {
   Settings,
   SquareTerminal,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { TreeNode } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,7 +65,16 @@ const NO_NODES: TreeNode[] = [];
  * `section` (the "all collections" view) it has a sticky header with the collection's name,
  * collapses, and grows with its content inside the list that scrolls all collections.
  */
-export function CollectionTree({ dir, section = false }: { dir: string; section?: boolean }) {
+export function CollectionTree({
+  dir,
+  section = false,
+  dropEdge = null,
+}: {
+  dir: string;
+  section?: boolean;
+  /** While a section is dragged over this one: where it would go (the line to draw). */
+  dropEdge?: "before" | "after" | null;
+}) {
   const tree = useWorkspace((s) => s.trees[dir]) ?? NO_NODES;
   const expanded = useTabs((s) => s.byCollection[dir]?.expanded) ?? NO_FOLDERS;
   const active = useTabs((s) => s.byCollection[dir]?.active ?? null);
@@ -155,72 +164,74 @@ export function CollectionTree({ dir, section = false }: { dir: string; section?
     </ContextMenuContent>
   );
 
-  const content = (
-    <>
-      {section && (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            {/* Sticky: the collection's name stays at the top while its requests scroll by.
-                The background mixes like the sidebar's (`bg-muted/30`), but opaque. */}
-            <div
+  // The header of a section in the "all collections" view.
+  const sectionHeader = (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        {/* The background mixes like the sidebar's (`bg-muted/30`), but opaque, as the
+            header sticks over the rows (see `SectionFrame`). */}
+        <div
+          className={cn(
+            "group flex h-8 items-center gap-1 border-b pr-2 pl-1 select-none",
+            "bg-[color-mix(in_oklch,var(--muted)_30%,var(--background))]",
+            isActiveCollection && "shadow-[inset_2px_0_0_var(--primary)]",
+          )}
+        >
+          <button
+            type="button"
+            aria-expanded={open}
+            className="flex h-full min-w-0 flex-1 items-center gap-1 text-left text-sm"
+            // Only expands or collapses: looking into a collection doesn't switch to it.
+            onClick={() => setOpen(dir, !open)}
+          >
+            <ChevronRight
               className={cn(
-                "group sticky top-0 z-10 flex h-8 items-center gap-1 border-b pr-2 pl-1 select-none",
-                "bg-[color-mix(in_oklch,var(--muted)_30%,var(--background))]",
-                isActiveCollection && "shadow-[inset_2px_0_0_var(--primary)]",
+                "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-90",
+              )}
+            />
+            <span
+              className={cn(
+                "truncate",
+                isActiveCollection ? "font-medium" : "text-muted-foreground",
               )}
             >
-              <button
-                type="button"
-                aria-expanded={open}
-                className="flex h-full min-w-0 flex-1 items-center gap-1 text-left text-sm"
-                // Only expands or collapses: looking into a collection doesn't switch to it.
-                onClick={() => setOpen(dir, !open)}
-              >
-                <ChevronRight
-                  className={cn(
-                    "size-3.5 shrink-0 text-muted-foreground transition-transform",
-                    open && "rotate-90",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "truncate",
-                    isActiveCollection ? "font-medium" : "text-muted-foreground",
-                  )}
-                >
-                  {name}
-                </span>
-              </button>
-              {!open && (
-                <span
-                  className="text-xs text-muted-foreground tabular-nums group-hover:hidden"
-                  title="Requests in this collection"
-                >
-                  {countRequests(tree)}
-                </span>
-              )}
-              <span className="hidden items-center group-hover:flex has-[[data-state=open]]:flex">
-                <AddMenu
-                  onRequest={() => menu.newRequest("")}
-                  onFolder={() => menu.newFolder("")}
-                  onCurl={() => menu.fromCurl("")}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-5"
-                  title="Collection settings"
-                  aria-label={`${name} settings`}
-                  onClick={() => menu.folderSettings("")}
-                >
-                  <Settings className="size-3.5" />
-                </Button>
-              </span>
-            </div>
-          </ContextMenuTrigger>
-          {rootMenu}
-        </ContextMenu>
-      )}
+              {name}
+            </span>
+          </button>
+          {!open && (
+            <span
+              className="text-xs text-muted-foreground tabular-nums group-hover:hidden"
+              title="Requests in this collection"
+            >
+              {countRequests(tree)}
+            </span>
+          )}
+          <span className="hidden items-center group-hover:flex has-[[data-state=open]]:flex">
+            <AddMenu
+              onRequest={() => menu.newRequest("")}
+              onFolder={() => menu.newFolder("")}
+              onCurl={() => menu.fromCurl("")}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-5"
+              title="Collection settings"
+              aria-label={`${name} settings`}
+              onClick={() => menu.folderSettings("")}
+            >
+              <Settings className="size-3.5" />
+            </Button>
+          </span>
+        </div>
+      </ContextMenuTrigger>
+      {rootMenu}
+    </ContextMenu>
+  );
+
+  const content = (
+    <>
       {!section && (
         <div className="flex h-8 shrink-0 items-center justify-between px-3">
           <span className="text-xs font-medium text-muted-foreground">Requests</span>
@@ -315,7 +326,56 @@ export function CollectionTree({ dir, section = false }: { dir: string; section?
   );
 
   // A section's header sticks to the top of the scrolling list only while its own rows pass.
-  return section ? <section aria-label={name}>{content}</section> : content;
+  return section ? (
+    <SectionFrame dir={dir} name={name ?? ""} dropEdge={dropEdge} header={sectionHeader}>
+      {content}
+    </SectionFrame>
+  ) : (
+    content
+  );
+}
+
+/**
+ * A collection in the "all collections" view. The header sticks to the top of the scrolling
+ * list while the section's own rows pass, and is the handle to drag the collection to another
+ * place (the `DndContext` is in `Sidebar`; the rows have their own one inside).
+ */
+function SectionFrame({
+  dir,
+  name,
+  dropEdge,
+  header,
+  children,
+}: {
+  dir: string;
+  name: string;
+  dropEdge: "before" | "after" | null;
+  header: ReactNode;
+  children: ReactNode;
+}) {
+  const { setNodeRef: dragRef, listeners, isDragging } = useDraggable({ id: dir });
+  const { setNodeRef: dropRef } = useDroppable({ id: dir });
+  return (
+    <section
+      ref={dropRef}
+      aria-label={name}
+      // The drop line is drawn above everything, as the opaque header would cover a border.
+      className={cn(
+        "relative",
+        isDragging && "opacity-40",
+        dropEdge === "before" &&
+          "before:absolute before:inset-x-0 before:top-0 before:z-20 before:h-0.5 before:bg-ring",
+        dropEdge === "after" &&
+          "after:absolute after:inset-x-0 after:bottom-0 after:z-20 after:h-0.5 after:bg-ring",
+      )}
+    >
+      {/* Only the listeners, not dnd-kit's `role="button"`: the header has its own buttons. */}
+      <div ref={dragRef} {...listeners} className="sticky top-0 z-10">
+        {header}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 interface TreeRowProps {

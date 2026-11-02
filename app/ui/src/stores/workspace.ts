@@ -65,6 +65,8 @@ interface WorkspaceState {
   importArchive: (file: string, target: ImportTarget) => Promise<ImportedArchive>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
+  /** Moves a collection to `index` in the workspace's order (`frida-workspace.yaml`). */
+  moveCollection: (dir: string, index: number) => Promise<void>;
   /** Switches the sidebar between the active collection and all collections (remembered). */
   setShowAllCollections: (on: boolean) => Promise<void>;
   reloadTree: (dir: string) => Promise<void>;
@@ -238,6 +240,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
     removeCollection: async (dir) => {
       try {
         await applyOverview(await unwrap(commands.removeCollection(dir)));
+      } catch (e) {
+        showError(e);
+      }
+    },
+
+    moveCollection: async (dir, index) => {
+      try {
+        await applyOverview(await unwrap(commands.moveCollection(dir, index)));
       } catch (e) {
         showError(e);
       }

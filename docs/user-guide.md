@@ -20,6 +20,8 @@ Workspace                 frida-workspace.yaml + global environments
 - The sidebar shows one collection at a time; pick another with the menu at the top. The **Show all collections**
   button next to it lists every collection instead, each with a collapsible header that stays on top while you
   scroll. Opening a request in a collection selects it, and its tabs, environment, History and Git come along.
+  Drag a collection's header to reorder the list; the order is saved in `frida-workspace.yaml`, so your team sees it
+  too.
 - Everything is a plain YAML file. Commit the collection to git and your team gets the same requests, with clean
   diffs. Nothing machine-specific (open tabs, AWS profiles, history, secret values) goes into those files.
 

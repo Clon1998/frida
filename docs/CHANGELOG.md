@@ -6,12 +6,18 @@
 - **Show all collections**: a toggle next to the collection picker lists every collection as a section with a sticky,
   collapsible header (request count, "+", settings, right-click menu). Opening something in a section selects that
   collection; the toggle is remembered in `settings.json`.
+- **Reorder collections** by dragging a section's header. The order is saved in `frida-workspace.yaml`, so it is
+  shared with the team; the collection picker uses it too.
 
 ### Rust things worth understanding in this milestone
 1. **`#[serde(default)]` on a struct** (`crates/frida-core/src/local_state.rs`, `AppSettings`). Every field missing
    from the JSON gets its `Default` value, so adding `show_all_collections: bool` needs no migration: an older
    `settings.json` loads with `false`. Like Jackson with `FAIL_ON_MISSING_PROPERTIES` off and a field initializer.
    The test `settings_from_before_a_field_existed_load_with_its_default` pins that down.
+2. **`Vec::remove` + `Vec::insert` instead of index juggling** (`crates/frida-core/src/storage/workspace.rs`,
+   `move_collection`). `remove` hands back the owned entry (no clone), and `index.min(len)` clamps the target, so
+   "past the end" simply means last. `position(...).ok_or_else(...)?` turns "not found" into an error in one line,
+   like `Optional.orElseThrow` in Java.
 
 ## M21: Feedback round 6, response body (2026-11-02)
 

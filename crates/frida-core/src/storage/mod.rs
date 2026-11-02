@@ -19,5 +19,5 @@ pub use paths::{COLLECTION_FILE, FOLDER_FILE, WORKSPACE_FILE, slugify};
 pub use workspace::{
     COLLECTIONS_DIR, CollectionSummary, WorkspaceOverview, add_collection, collection_dir,
     create_collection_in_workspace, create_named_collection, create_workspace, load_overview,
-    new_collection_dir, open_workspace, remove_collection, save_workspace,
+    move_collection, new_collection_dir, open_workspace, remove_collection, save_workspace,
 };

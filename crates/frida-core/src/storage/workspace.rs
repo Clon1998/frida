@@ -153,6 +153,28 @@ pub fn remove_collection(workspace_dir: &Path, collection_dir: &Path) -> Result<
     save_workspace(workspace_dir, &workspace)
 }
 
+/// Moves a collection to position `index` of the workspace list (the order the sidebar shows).
+/// `index` counts the other collections, so `0` is the top and anything past the end is the
+/// bottom. Only the order in `frida-workspace.yaml` changes; the entries stay as they are.
+pub fn move_collection(workspace_dir: &Path, collection_dir: &Path, index: usize) -> Result<()> {
+    let mut workspace = open_workspace(workspace_dir)?;
+    let from = workspace
+        .collections
+        .iter()
+        .position(|entry| same_dir(&self::collection_dir(workspace_dir, entry), collection_dir))
+        .ok_or_else(|| CoreError::NotFound {
+            path: collection_dir.to_path_buf(),
+        })?;
+    let entry = workspace.collections.remove(from);
+    let index = index.min(workspace.collections.len());
+    if index == from {
+        // Already there: don't rewrite the file (it may be formatted by hand).
+        return Ok(());
+    }
+    workspace.collections.insert(index, entry);
+    save_workspace(workspace_dir, &workspace)
+}
+
 fn register(workspace_dir: &Path, collection_dir: &Path) -> Result<()> {
     let mut workspace = open_workspace(workspace_dir)?;
     let already_listed = workspace

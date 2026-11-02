@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { TreeNode } from "@/bindings";
-import { childrenOf, countRequests, dropPosition, folderTrail, moveTarget, parentOf } from "./tree";
+import {
+  childrenOf,
+  collectionMoveIndex,
+  countRequests,
+  dropPosition,
+  folderTrail,
+  moveTarget,
+  parentOf,
+} from "./tree";
 
 const request = (path: string): TreeNode => ({
   kind: "request",
@@ -74,5 +82,20 @@ describe("countRequests", () => {
   it("counts the requests in every folder", () => {
     expect(countRequests(tree)).toBe(4);
     expect(countRequests([])).toBe(0);
+  });
+});
+
+describe("collectionMoveIndex", () => {
+  const dirs = ["/a", "/b", "/c"];
+  it("counts the index among the other collections", () => {
+    expect(collectionMoveIndex(dirs, "/c", "/a", "before")).toBe(0);
+    expect(collectionMoveIndex(dirs, "/a", "/c", "after")).toBe(2);
+    expect(collectionMoveIndex(dirs, "/a", "/b", "after")).toBe(1);
+  });
+  it("returns null when the order stays the same", () => {
+    expect(collectionMoveIndex(dirs, "/a", "/a", "after")).toBeNull();
+    expect(collectionMoveIndex(dirs, "/a", "/b", "before")).toBeNull();
+    expect(collectionMoveIndex(dirs, "/b", "/a", "after")).toBeNull();
+    expect(collectionMoveIndex(dirs, "/a", "/gone", "after")).toBeNull();
   });
 });

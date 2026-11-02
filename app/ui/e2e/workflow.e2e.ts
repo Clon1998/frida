@@ -84,6 +84,39 @@ test("the sidebar can list all collections, and working in one selects it", asyn
   await expect(aside.getByText("Health", { exact: true })).toBeVisible();
 });
 
+test("collections are reordered by dragging their header", async ({ app }) => {
+  await openWorkspace(app);
+  const aside = app.locator("aside");
+  await aside.getByRole("button", { name: "Show all collections" }).click();
+  const regions = aside.getByRole("region");
+  await expect(regions).toHaveCount(2);
+  await expect(regions.first()).toHaveAccessibleName("Echo API");
+
+  // Drag Billing's header onto the top half of Echo API's section.
+  const box = async (name: string) => {
+    const found = await aside.getByRole("button", { name, exact: true }).last().boundingBox();
+    if (!found) throw new Error(`${name} has no box`);
+    return found;
+  };
+  const from = await box("Billing");
+  const to = await box("Echo API");
+  await app.mouse.move(from.x + 20, from.y + from.height / 2);
+  await app.mouse.down();
+  await app.mouse.move(to.x + 20, to.y + 2, { steps: 10 });
+  await app.mouse.up();
+
+  await expect(regions.first()).toHaveAccessibleName("Billing");
+  expect((await backend(app)).collectionOrder).toEqual([
+    "/fake/workspace/collections/billing",
+    "/fake/workspace/collections/echo-api",
+  ]);
+  // A drag doesn't count as a click: Billing is still collapsed.
+  await expect(aside.getByRole("button", { name: "Billing", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+});
+
 test("run a folder, then stop a collection run", async ({ app }) => {
   await openWorkspace(app);
   await app.locator("aside").getByText("Orders", { exact: true }).click({ button: "right" });

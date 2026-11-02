@@ -108,6 +108,8 @@ export const commands = {
 	 *  settings.
 	 */
 	setShowAllCollections: (on: boolean) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("set_show_all_collections", { on })),
+	/**  Moves a collection to position `index` in the open workspace's list (`frida-workspace.yaml`). */
+	moveCollection: (dir: string, index: number) => typedError<WorkspaceOverview, ApiError>(__TAURI_INVOKE("move_collection", { dir, index })),
 	/**  What importing the OpenAPI spec at `file` would create (counts, base URL, warnings). */
 	previewOpenapi: (file: string, grouping: OpenApiGrouping) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file, grouping })),
 	/**

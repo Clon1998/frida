@@ -1,3 +1,11 @@
+import {
+  DndContext,
+  type DragEndEvent,
+  type DragMoveEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   ChevronsUpDown,
@@ -21,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/workspace/ConfirmDialog";
 import { NameDialog } from "@/components/workspace/NameDialog";
+import { collectionMoveIndex, dropPosition } from "@/lib/tree";
 import { exportArchive } from "@/stores/actions";
 import { useDialogs } from "@/stores/dialogs";
 import { useTabs } from "@/stores/tabs";
@@ -194,13 +203,7 @@ export function Sidebar() {
           <HistoryPanel key={active.dir} dir={active.dir} />
         </div>
       ) : active && showAll ? (
-        <div className="mt-2 min-h-0 flex-1 overflow-auto border-t">
-          {workspace.collections
-            .filter((c) => c.error === null)
-            .map((c) => (
-              <CollectionTree key={c.dir} dir={c.dir} section />
-            ))}
-        </div>
+        <AllCollections dirs={workspace.collections.map((c) => c.dir)} />
       ) : active ? (
         <CollectionTree key={active.dir} dir={active.dir} />
       ) : (
@@ -240,5 +243,56 @@ export function Sidebar() {
         }}
       />
     </aside>
+  );
+}
+
+/**
+ * Every collection as a section (the "all collections" view). Dragging a section's header
+ * moves the collection, which changes the order in `frida-workspace.yaml` for everyone.
+ */
+function AllCollections({ dirs }: { dirs: string[] }) {
+  const collections = useWorkspace((s) => s.workspace?.collections ?? []);
+  const moveCollection = useWorkspace((s) => s.moveCollection);
+  const [drop, setDrop] = useState<{ over: string; position: "before" | "after" } | null>(null);
+  // Like the request tree: dragging starts after a few pixels, so clicks still expand.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  const onDragMove = (event: DragMoveEvent) => {
+    const { over, activatorEvent, delta } = event;
+    if (!over || !(activatorEvent instanceof PointerEvent)) {
+      setDrop(null);
+      return;
+    }
+    const position = dropPosition(activatorEvent.clientY + delta.y, over.rect, false);
+    setDrop({ over: String(over.id), position: position === "before" ? "before" : "after" });
+  };
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const dragged = String(event.active.id);
+    const index = drop && collectionMoveIndex(dirs, dragged, drop.over, drop.position);
+    setDrop(null);
+    if (index !== null) void moveCollection(dragged, index);
+  };
+
+  return (
+    <div className="mt-2 min-h-0 flex-1 overflow-auto border-t">
+      <DndContext
+        sensors={sensors}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setDrop(null)}
+      >
+        {collections
+          .filter((c) => c.error === null)
+          .map((c) => (
+            <CollectionTree
+              key={c.dir}
+              dir={c.dir}
+              section
+              dropEdge={drop?.over === c.dir ? drop.position : null}
+            />
+          ))}
+      </DndContext>
+    </div>
   );
 }

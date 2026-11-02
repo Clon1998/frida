@@ -157,6 +157,19 @@ pub fn remove_collection(state: State<'_, AppState>, dir: String) -> ApiResult<W
     state.refresh_workspace(&ws)
 }
 
+/// Moves a collection to position `index` in the open workspace's list (`frida-workspace.yaml`).
+#[tauri::command]
+#[specta::specta]
+pub fn move_collection(
+    state: State<'_, AppState>,
+    dir: String,
+    index: u32,
+) -> ApiResult<WorkspaceOverview> {
+    let ws = state.workspace_dir()?;
+    storage::move_collection(&ws, Path::new(&dir), index as usize)?;
+    state.refresh_workspace(&ws)
+}
+
 /// What importing the OpenAPI spec at `file` would create (counts, base URL, warnings).
 #[tauri::command]
 #[specta::specta]

@@ -81,6 +81,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             workspace::pin_workspace,
             workspace::set_active_collection,
             workspace::set_show_all_collections,
+            workspace::move_collection,
             workspace::preview_openapi,
             workspace::import_openapi,
             git::git_info,

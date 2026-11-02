@@ -262,6 +262,54 @@ fn paths_outside_the_collection_are_rejected() {
 }
 
 #[test]
+fn collections_can_be_reordered_in_the_workspace() {
+    let ws = tempfile::tempdir().unwrap();
+    let ws_dir = ws.path();
+    storage::create_workspace(ws_dir, "EIP").unwrap();
+    for name in ["A", "B", "C"] {
+        storage::create_named_collection(ws_dir, name).unwrap();
+    }
+    let order = || -> Vec<String> {
+        storage::open_workspace(ws_dir)
+            .unwrap()
+            .collections
+            .into_iter()
+            .map(|c| c.path)
+            .collect()
+    };
+    let dir = |slug: &str| ws_dir.join("collections").join(slug);
+
+    storage::move_collection(ws_dir, &dir("c"), 0).unwrap();
+    assert_eq!(
+        order(),
+        ["./collections/c", "./collections/a", "./collections/b"]
+    );
+    // Past the end means last.
+    storage::move_collection(ws_dir, &dir("c"), 99).unwrap();
+    assert_eq!(
+        order(),
+        ["./collections/a", "./collections/b", "./collections/c"]
+    );
+    storage::move_collection(ws_dir, &dir("a"), 1).unwrap();
+    assert_eq!(
+        order(),
+        ["./collections/b", "./collections/a", "./collections/c"]
+    );
+
+    // Staying in place leaves the file alone.
+    let file = ws_dir.join("frida-workspace.yaml");
+    std::fs::write(&file, std::fs::read_to_string(&file).unwrap() + "# kept\n").unwrap();
+    storage::move_collection(ws_dir, &dir("a"), 1).unwrap();
+    assert!(
+        std::fs::read_to_string(&file)
+            .unwrap()
+            .ends_with("# kept\n")
+    );
+
+    assert!(storage::move_collection(ws_dir, &ws_dir.join("nope"), 0).is_err());
+}
+
+#[test]
 fn workspace_add_create_and_remove_collections() {
     let ws = tempfile::tempdir().unwrap();
     let ws_dir = ws.path();

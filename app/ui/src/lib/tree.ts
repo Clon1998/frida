@@ -112,3 +112,21 @@ export function flattenRequests(nodes: TreeNode[], folder: string[] = []): Reque
     return [];
   });
 }
+
+/**
+ * Where collection `dragged` goes in `dirs` (the workspace's order) when it is dropped before
+ * or after `over`: its index among the other collections, or `null` when nothing changes.
+ */
+export function collectionMoveIndex(
+  dirs: string[],
+  dragged: string,
+  over: string,
+  position: "before" | "after",
+): number | null {
+  if (dragged === over) return null;
+  const others = dirs.filter((d) => d !== dragged);
+  const at = others.indexOf(over);
+  if (at === -1) return null;
+  const index = position === "after" ? at + 1 : at;
+  return index === dirs.indexOf(dragged) ? null : index;
+}
