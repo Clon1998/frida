@@ -1,5 +1,18 @@
 # Changelog
 
+## M21: Feedback round 6, response body (2026-11-02)
+
+### What was built
+- **Find bar survives sending again**: the response body's search reopens for the next response with the same query,
+  matches marked and the first one selected, without taking the focus.
+- **Exact scrollbar for large bodies**: the response body no longer wraps long lines by default (a **Wrap** toggle,
+  remembered per request tab, turns it on), so dragging the scrollbar keeps the content under the mouse.
+
+### Rust things worth understanding in this milestone
+UI only, no Rust changes. Worth knowing instead: CodeMirror only draws the visible lines and estimates the height of
+the rest (`app/ui/src/components/editor/CodeEditor.tsx`, `wrap`). Wrapped lines can't be estimated exactly, so
+the scroll position is corrected as they are drawn, which WebKit's scrollbar drag turns into drift.
+
 ## M19: Feedback round 4, auth (2026-10-21)
 
 ### What was built
