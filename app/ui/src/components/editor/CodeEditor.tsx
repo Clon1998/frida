@@ -14,7 +14,8 @@ import { basicSetup, minimalSetup } from "codemirror";
 import { Search } from "lucide-react";
 import { cn } from "cn";
 import { useContext, useEffect, useRef } from "react";
-import { searchExtension } from "./search";
+import { useSubTabs } from "@/stores/subTabs";
+import { restoreSearch, savedSearch, searchExtension } from "./search";
 import { editorTheme } from "./theme";
 import {
   setVariables,
@@ -51,6 +52,18 @@ interface CodeEditorProps {
    * top right corner. Default: on for multi-line editors.
    */
   searchButton?: boolean;
+  /**
+   * Remembers the find bar under this key (in the sub-tab store), so an editor created later
+   * with the same key opens it again with the same search. The response body uses it, so the
+   * search survives sending the request again.
+   */
+  searchKey?: string;
+  /**
+   * Wrap long lines (default). Wrapped lines have heights CodeMirror can only estimate until
+   * they are drawn, so in long documents the scrollbar thumb drifts away from the mouse while
+   * dragging it. Without wrapping every line is one line high and the scrollbar is exact.
+   */
+  wrap?: boolean;
 }
 
 const languageExtension = (language: CodeLanguage): Extension => {
@@ -141,6 +154,8 @@ export function CodeEditor({
   placeholder,
   onPasteText,
   searchButton = !singleLine,
+  searchKey,
+  wrap = true,
 }: CodeEditorProps) {
   const contextVariables = useContext(VariablesContext) ?? null;
   const variables = variablesProp === undefined ? contextVariables : variablesProp;
@@ -151,12 +166,15 @@ export function CodeEditor({
   const onPasteRef = useRef(onPasteText);
   const languageSlot = useRef(new Compartment());
   const readOnlySlot = useRef(new Compartment());
+  const wrapSlot = useRef(new Compartment());
+  const searchKeyRef = useRef(searchKey);
 
   useEffect(() => {
     onChangeRef.current = onChange;
     onEnterRef.current = onEnter;
     onPasteRef.current = onPasteText;
-  }, [onChange, onEnter, onPasteText]);
+    searchKeyRef.current = searchKey;
+  }, [onChange, onEnter, onPasteText, searchKey]);
 
   // Create the editor once.
   useEffect(() => {
@@ -184,7 +202,7 @@ export function CodeEditor({
             ]),
           ),
         ]
-      : [basicSetup, searchExtension(), EditorView.lineWrapping];
+      : [basicSetup, searchExtension(), wrapSlot.current.of(wrap ? EditorView.lineWrapping : [])];
     const editor = new EditorView({
       parent: host.current,
       state: EditorState.create({
@@ -216,11 +234,21 @@ export function CodeEditor({
             if (update.docChanged && !fromOutside) {
               onChangeRef.current?.(update.state.doc.toString());
             }
+            const key = searchKeyRef.current;
+            if (key && update.transactions.length > 0) {
+              const saved = savedSearch(update.state);
+              const value = saved ? JSON.stringify(saved) : "";
+              if ((useSubTabs.getState().open[key] ?? "") !== value) {
+                useSubTabs.getState().set(key, value);
+              }
+            }
           }),
         ],
       }),
     });
     view.current = editor;
+    const saved = searchKey ? useSubTabs.getState().open[searchKey] : undefined;
+    if (saved) restoreSearch(editor, JSON.parse(saved));
     return () => editor.destroy();
     // Only on mount: later changes are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,6 +276,13 @@ export function CodeEditor({
       effects: readOnlySlot.current.reconfigure(readOnlyExtension(readOnly, singleLine)),
     });
   }, [readOnly, singleLine]);
+
+  useEffect(() => {
+    if (singleLine) return;
+    view.current?.dispatch({
+      effects: wrapSlot.current.reconfigure(wrap ? EditorView.lineWrapping : []),
+    });
+  }, [wrap, singleLine]);
 
   useEffect(() => {
     view.current?.dispatch({ effects: setVariables.of(variables ?? null) });

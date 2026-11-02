@@ -842,6 +842,16 @@ Playwright `e2e/auth.e2e.ts` (unsaved auth reaches "Get new token", token list, 
 Playwright `e2e/workflow.e2e.ts` (reopening a workspace selects the collection used last).
 *Status 2026-10-23: in progress.*
 
+### M21: Feedback round 6
+- [x] The response body's find bar stays open when the request is sent again: the new body is searched with the
+  same query right away (matches marked, first one selected), without taking the focus.
+- [x] Dragging the scrollbar of a large response body keeps the content under the mouse. The body no longer wraps
+  long lines by default; a "Wrap" toggle (remembered per request tab) turns it on.
+
+**Acceptance:** Playwright `e2e/flows.e2e.ts` (the find bar survives sending again; a large body scrolls exactly where
+the scrollbar puts it, and the Wrap toggle).
+*Status 2026-11-02: done.*
+
 ### Later (backlog, not scheduled)
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
@@ -1193,6 +1203,13 @@ Deviations from and clarifications of this plan, newest last.
   still renders right away while settings load. A folder that can't be opened shows the error and is cleared, so it
   isn't retried on every start. When the workspace list refreshes, the collection selected in this session wins over
   the remembered one, then the first usable collection.
+
+- **2026-11-02 (M21) Response body doesn't wrap by default.** CodeMirror draws only the visible lines and
+  estimates the height of the others. Wrapped lines can only be estimated, so as they are drawn CodeMirror corrects
+  the scroll position by a few hundred pixels. WebKit applies a scrollbar drag as deltas, so these corrections added
+  up and the content ran ahead of the mouse. Unwrapped lines all have the same height, so the estimate is exact
+  (measured: 0 px drift vs. 100–750 px per jump). Request body and script editors still wrap: they are small and
+  are typed in.
 
 ## 17. Testing strategy
 

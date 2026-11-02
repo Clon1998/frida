@@ -337,10 +337,23 @@ function gitInfo(): GitInfo {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** A response that echoes the request as JSON. */
+/** A response that echoes the request as JSON. URLs containing "large" also get 3000 items. */
 function echo(r: Request, id: string): ResponseView {
   const url = resolve(r.url ?? "");
-  const body = JSON.stringify({ method: r.method, url, echo: true }, null, 2);
+  const items = url.includes("large")
+    ? Array.from({ length: 3000 }, (_, i) => ({
+        id: i,
+        name: `item ${i}`,
+        // Every 7th item has a line long enough to wrap.
+        note:
+          i % 50 === 0
+            ? "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo".repeat(150)
+            : i % 7 === 0
+              ? "lorem ipsum dolor sit amet ".repeat(12)
+              : "short",
+      }))
+    : undefined;
+  const body = JSON.stringify({ method: r.method, url, echo: true, items }, null, 2);
   return {
     id,
     status: 200,

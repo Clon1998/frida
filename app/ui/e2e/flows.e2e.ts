@@ -39,6 +39,63 @@ test("find bar counts matches in the response body", async ({ app }) => {
   await expect(app.locator(".cm-frida-search")).toHaveCount(0);
 });
 
+// Feedback round 6: sending again closed the find bar and forgot the search.
+test("the response body's find bar stays open with its search when sending again", async ({
+  app,
+}) => {
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+  await app.getByRole("button", { name: "Send" }).click();
+  await app.getByRole("button", { name: "Find" }).last().click();
+  await app.keyboard.type("method");
+  await expect(app.locator(".cm-frida-search-count")).toHaveText("1 of 1");
+
+  await app.getByRole("button", { name: "Send" }).click();
+  await expect(app.getByText("Waiting for response…")).toHaveCount(0);
+  // The new body is searched right away, without taking the focus.
+  await expect(app.getByRole("textbox", { name: "Find" })).toHaveValue("method");
+  await expect(app.locator(".cm-frida-search-count")).toHaveText("1 of 1");
+  await expect(app.getByRole("textbox", { name: "Find" })).not.toBeFocused();
+
+  // Closed stays closed.
+  await app.getByRole("button", { name: "Close (Escape)" }).click();
+  await app.getByRole("button", { name: "Send" }).click();
+  await expect(app.getByText("200 OK")).toBeVisible();
+  await expect(app.locator(".cm-frida-search")).toHaveCount(0);
+});
+
+// Feedback round 6: dragging the scrollbar of a large body, the content ran ahead of the mouse.
+// CodeMirror only estimates the height of wrapped lines it hasn't drawn yet and corrects the
+// scroll position once it has; unwrapped, every line has the same height, so there's nothing
+// to correct.
+test("a large response body scrolls exactly where the scrollbar puts it", async ({ app }) => {
+  await openWorkspace(app);
+  await openRequest(app, "Health");
+  await setUrl(app, "http://localhost/large");
+  await app.getByRole("button", { name: "Send" }).click();
+  const scroller = app.locator(".cm-scroller").last();
+  await expect(scroller).toContainText('"item 0"');
+
+  for (const fraction of [0.1, 0.5, 0.9]) {
+    const target = await scroller.evaluate((el, f) => {
+      el.scrollTop = Math.round(f * el.scrollHeight);
+      return el.scrollTop;
+    }, fraction);
+    // Give CodeMirror time to draw and measure the lines it scrolled to.
+    await app.waitForTimeout(200);
+    expect(await scroller.evaluate((el) => el.scrollTop)).toBe(target);
+  }
+
+  // Wrapping is a toggle (off by default), and stays on for the next response.
+  const content = app.locator(".cm-content").last();
+  await expect(content).not.toHaveClass(/cm-lineWrapping/);
+  await app.getByRole("button", { name: "Wrap" }).click();
+  await expect(content).toHaveClass(/cm-lineWrapping/);
+  await app.getByRole("button", { name: "Send" }).click();
+  await expect(scroller).toContainText('"item 0"');
+  await expect(app.getByRole("button", { name: "Wrap" })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("create, rename and delete a request", async ({ app }) => {
   await openWorkspace(app);
   await app.getByLabel("Add request or folder").first().click();

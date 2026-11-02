@@ -3,8 +3,10 @@ import {
   findNext,
   findPrevious,
   getSearchQuery,
+  openSearchPanel,
   search,
   SearchQuery,
+  searchPanelOpen,
   setSearchQuery,
 } from "@codemirror/search";
 import { EditorSelection, type EditorState, type Extension } from "@codemirror/state";
@@ -29,6 +31,39 @@ export function countMatches(
     if (total >= MAX_COUNT) return { total, current, capped: true };
   }
   return { total, current, capped: false };
+}
+
+/** An open find bar: what it searches for, so a new editor for the same view can show it again. */
+export interface SavedSearch {
+  search: string;
+  caseSensitive: boolean;
+  regexp: boolean;
+}
+
+/** The open find bar of `state`, or `null` while it is closed or empty. */
+export function savedSearch(state: EditorState): SavedSearch | null {
+  const query = getSearchQuery(state);
+  if (!searchPanelOpen(state) || !query.search) return null;
+  return { search: query.search, caseSensitive: query.caseSensitive, regexp: query.regexp };
+}
+
+/** Editors whose find bar is being reopened by {@link restoreSearch}: it doesn't take the focus. */
+const restoring = new WeakSet<EditorView>();
+
+/**
+ * Reopens the find bar with `saved` (e.g. for the next response of the same request): the
+ * matches are marked and the first one is selected, without taking the focus from where the
+ * user is (the URL bar after Cmd/Ctrl+Enter).
+ */
+export function restoreSearch(view: EditorView, saved: SavedSearch) {
+  view.dispatch({ effects: setSearchQuery.of(new SearchQuery(saved)) });
+  restoring.add(view);
+  try {
+    openSearchPanel(view);
+  } finally {
+    restoring.delete(view);
+  }
+  findNext(view);
 }
 
 function button(label: string, title: string, onClick: () => void): HTMLButtonElement {
@@ -163,8 +198,9 @@ function createPanel(view: EditorView): Panel {
     dom,
     top: true,
     // Focus the field when the bar opens (Cmd/Ctrl+F or the search button), so typing searches.
+    // Not when the bar is reopened for a new response (`restoreSearch`).
     mount() {
-      input.select();
+      if (!restoring.has(view)) input.select();
     },
     update(update: ViewUpdate) {
       const latest = getSearchQuery(update.state);

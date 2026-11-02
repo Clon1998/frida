@@ -7,6 +7,7 @@ import {
   Download,
   Filter,
   Loader2,
+  WrapText,
   X,
   XCircle,
 } from "lucide-react";
@@ -165,6 +166,10 @@ export function ResponsePanel({
   const [format, setFormat] = useSubTab(`format:${viewKey}`, "pretty");
   const pretty = format === "pretty";
   const setPretty = (on: boolean) => setFormat(on ? "pretty" : "raw");
+  // Off by default: without wrapping, dragging the scrollbar of a large body stays exact (see
+  // `wrap` in `CodeEditor`).
+  const [wrapSetting, setWrapSetting] = useSubTab(`wrap:${viewKey}`, "off");
+  const wrap = wrapSetting === "on";
   const kind = bodyKind(response.contentType, response.bodyText);
   const text = response.bodyText ?? "";
   const jsonFilter = useJsonFilter(response, kind === "json", uncached, viewKey);
@@ -244,68 +249,82 @@ export function ResponsePanel({
         </TabsList>
 
         <TabsContent value="body" className="flex min-h-0 flex-col p-2">
-          {kind === "json" && (
+          {response.bodyText !== null && (
             <div className="mb-2 flex flex-wrap items-center gap-1">
-              <Button
-                size="sm"
-                variant={pretty ? "secondary" : "ghost"}
-                disabled={jsonFilter.result !== null}
-                onClick={() => setPretty(true)}
-              >
-                Pretty
-              </Button>
-              <Button
-                size="sm"
-                variant={pretty ? "ghost" : "secondary"}
-                disabled={jsonFilter.result !== null}
-                onClick={() => setPretty(false)}
-              >
-                Raw
-              </Button>
-              {filterOpen || jsonFilter.path ? (
-                <div className="relative min-w-40 flex-1">
-                  <Filter className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    className="h-8 pr-8 pl-7 font-mono text-xs md:text-xs"
-                    placeholder="JSONPath, e.g. $.items[*].id"
-                    aria-label="JSONPath filter"
-                    spellCheck={false}
-                    value={jsonFilter.path}
-                    onChange={(e) => jsonFilter.setPath(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        jsonFilter.setPath("");
-                        setFilterOpen(false);
-                      }
-                    }}
-                  />
+              {kind === "json" && (
+                <>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-1 right-1 size-6"
-                    title="Remove the filter (Escape)"
-                    aria-label="Remove filter"
-                    onClick={() => {
-                      jsonFilter.setPath("");
-                      setFilterOpen(false);
-                    }}
+                    size="sm"
+                    variant={pretty ? "secondary" : "ghost"}
+                    disabled={jsonFilter.result !== null}
+                    onClick={() => setPretty(true)}
                   >
-                    <X />
+                    Pretty
                   </Button>
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto text-muted-foreground"
-                  title="Filter with JSONPath"
-                  aria-label="Filter with JSONPath"
-                  onClick={() => setFilterOpen(true)}
-                >
-                  <Filter /> Filter
-                </Button>
+                  <Button
+                    size="sm"
+                    variant={pretty ? "ghost" : "secondary"}
+                    disabled={jsonFilter.result !== null}
+                    onClick={() => setPretty(false)}
+                  >
+                    Raw
+                  </Button>
+                  {filterOpen || jsonFilter.path ? (
+                    <div className="relative min-w-40 flex-1">
+                      <Filter className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
+                      <Input
+                        autoFocus
+                        className="h-8 pr-8 pl-7 font-mono text-xs md:text-xs"
+                        placeholder="JSONPath, e.g. $.items[*].id"
+                        aria-label="JSONPath filter"
+                        spellCheck={false}
+                        value={jsonFilter.path}
+                        onChange={(e) => jsonFilter.setPath(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            jsonFilter.setPath("");
+                            setFilterOpen(false);
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 size-6"
+                        title="Remove the filter (Escape)"
+                        aria-label="Remove filter"
+                        onClick={() => {
+                          jsonFilter.setPath("");
+                          setFilterOpen(false);
+                        }}
+                      >
+                        <X />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto text-muted-foreground"
+                      title="Filter with JSONPath"
+                      aria-label="Filter with JSONPath"
+                      onClick={() => setFilterOpen(true)}
+                    >
+                      <Filter /> Filter
+                    </Button>
+                  )}
+                </>
               )}
+              <Button
+                size="sm"
+                variant={wrap ? "secondary" : "ghost"}
+                className={cn(kind !== "json" && "ml-auto", !wrap && "text-muted-foreground")}
+                title="Wrap long lines"
+                aria-pressed={wrap}
+                onClick={() => setWrapSetting(wrap ? "off" : "on")}
+              >
+                <WrapText /> Wrap
+              </Button>
               {jsonFilter.error && (
                 <p className="w-full text-xs text-destructive">{jsonFilter.error}</p>
               )}
@@ -319,6 +338,8 @@ export function ResponsePanel({
                 kind === "json" ? "json" : kind === "xml" || kind === "html" ? "xml" : "text"
               }
               readOnly
+              wrap={wrap}
+              searchKey={`search:${viewKey}`}
             />
           ) : (
             <p className="p-2 text-sm text-muted-foreground">
