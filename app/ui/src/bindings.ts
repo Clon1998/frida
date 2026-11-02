@@ -103,6 +103,11 @@ export const commands = {
 	 *  again selects it. Returns the new settings.
 	 */
 	setActiveCollection: (dir: string) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("set_active_collection", { dir })),
+	/**
+	 *  Switches the sidebar between the selected collection and all collections. Returns the new
+	 *  settings.
+	 */
+	setShowAllCollections: (on: boolean) => typedError<AppSettings, ApiError>(__TAURI_INVOKE("set_show_all_collections", { on })),
 	/**  What importing the OpenAPI spec at `file` would create (counts, base URL, warnings). */
 	previewOpenapi: (file: string, grouping: OpenApiGrouping) => typedError<ImportSummary, ApiError>(__TAURI_INVOKE("preview_openapi", { file, grouping })),
 	/**
@@ -460,6 +465,11 @@ export type AppSettings = {
 	 *  seconds fit until 2106.
 	 */
 	lastUpdateCheck?: number | null,
+	/**
+	 *  The sidebar lists every collection of the workspace as a section, instead of only the
+	 *  selected one.
+	 */
+	showAllCollections?: boolean,
 	/**
 	 *  What the user chooses in the Settings dialog. The fields above are state the app keeps
 	 *  by itself.

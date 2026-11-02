@@ -38,14 +38,17 @@ export const test = base.extend<{ app: Page }>({
 
 export { expect };
 
-/** From the start screen into the fake workspace, with the request tree loaded. */
-export async function openWorkspace(page: Page) {
+/**
+ * From the start screen into the fake workspace, with the request tree loaded. `request` is a
+ * request the selected collection shows (the Billing collection has only "List invoices").
+ */
+export async function openWorkspace(page: Page, request = "Health") {
   await page
     .getByRole("button", { name: /workspace$/ })
     .first()
     .waitFor();
   await page.getByText("/fake/workspace").click();
-  await expect(page.locator("aside").getByText("Health", { exact: true })).toBeVisible();
+  await expect(page.locator("aside").getByText(request, { exact: true })).toBeVisible();
 }
 
 /** Opens a request of the fake collection as a normal (not preview) tab. */

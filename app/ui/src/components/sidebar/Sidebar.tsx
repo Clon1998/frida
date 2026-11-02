@@ -5,6 +5,7 @@ import {
   FileArchive,
   FileUp,
   FolderPlus,
+  Library,
   Plus,
   Settings,
 } from "lucide-react";
@@ -46,6 +47,8 @@ export function Sidebar() {
   const setView = useUi((s) => s.setSidebarView);
   const [removing, setRemoving] = useState(false);
   const openTab = useTabs((s) => s.openTab);
+  const showAll = useWorkspace((s) => s.settings?.showAllCollections ?? false);
+  const setShowAll = useWorkspace((s) => s.setShowAllCollections);
 
   // Load the history in the background as soon as a collection is active, so the history tab
   // has its list ready when it is opened.
@@ -54,6 +57,12 @@ export function Sidebar() {
     if (activeDir && useHistory.getState().entries[activeDir] === undefined)
       void useHistory.getState().load(activeDir, "");
   }, [activeDir]);
+
+  // In the "all collections" view the active collection is expanded, also after picking it in
+  // the menu. Others stay as the user left them (collapsed at first).
+  useEffect(() => {
+    if (showAll && activeDir) useUi.getState().setCollectionOpen(activeDir, true);
+  }, [showAll, activeDir]);
 
   if (!workspace) return null;
 
@@ -131,6 +140,19 @@ export function Sidebar() {
         </DropdownMenu>
         {active && (
           <Button
+            variant={showAll ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8"
+            title={showAll ? "Show only this collection" : "Show all collections"}
+            aria-label="Show all collections"
+            aria-pressed={showAll}
+            onClick={() => void setShowAll(!showAll)}
+          >
+            <Library />
+          </Button>
+        )}
+        {active && !showAll && (
+          <Button
             variant="ghost"
             size="icon"
             className="size-8"
@@ -170,6 +192,14 @@ export function Sidebar() {
       ) : active && view === "history" ? (
         <div className="flex min-h-0 flex-1 flex-col pt-2">
           <HistoryPanel key={active.dir} dir={active.dir} />
+        </div>
+      ) : active && showAll ? (
+        <div className="mt-2 min-h-0 flex-1 overflow-auto border-t">
+          {workspace.collections
+            .filter((c) => c.error === null)
+            .map((c) => (
+              <CollectionTree key={c.dir} dir={c.dir} section />
+            ))}
         </div>
       ) : active ? (
         <CollectionTree key={active.dir} dir={active.dir} />

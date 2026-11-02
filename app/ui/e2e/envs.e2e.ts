@@ -48,7 +48,7 @@ test("move an environment to global and copy one to another collection", async (
   await app.getByRole("menuitem", { name: "Global (workspace)" }).click();
   await expect(entry(app, "prod")).toHaveCount(0);
   // The toast leads to the moved environment, now on the Global tab.
-  await app.getByRole("button", { name: "Show" }).click();
+  await app.getByRole("button", { name: "Show", exact: true }).click();
   await expect(app.getByRole("tab", { name: "Global (workspace)" })).toHaveAttribute(
     "data-state",
     "active",

@@ -852,6 +852,19 @@ Playwright `e2e/workflow.e2e.ts` (reopening a workspace selects the collection u
 the scrollbar puts it, and the Wrap toggle).
 *Status 2026-11-02: done.*
 
+### M22: All collections in the sidebar
+- [x] A toggle next to the collection picker lists every collection of the workspace in the sidebar, as sections with
+  a sticky, collapsible header (request count while collapsed, "+" and settings on hover, the collection's menu on
+  right-click). The active collection is marked and expanded; others start collapsed.
+- [x] Working in a section (opening a request, its menus) selects that collection, so tabs, environment, History and
+  Git follow. Expanding or collapsing a section doesn't.
+- [x] The toggle is remembered (`showAllCollections` in `settings.json`).
+
+**Acceptance:** `crates/frida-core/src/local_state.rs` tests (older settings load with the toggle off), Vitest
+`lib/tree.test.ts` (`countRequests`), Playwright `e2e/workflow.e2e.ts` (all collections: sections, switching, the
+toggle is remembered).
+*Status 2026-11-02: done.*
+
 ### Later (backlog, not scheduled)
 - Declarative assertions (Bruno `assert` style).
 - OpenAPI re-sync that preserves user edits. OpenAPI import from URL.
@@ -1210,6 +1223,13 @@ Deviations from and clarifications of this plan, newest last.
   up and the content ran ahead of the mouse. Unwrapped lines all have the same height, so the estimate is exact
   (measured: 0 px drift vs. 100–750 px per jump). Request body and script editors still wrap: they are small and
   are typed in.
+
+- **2026-11-02 (M22) All collections in the sidebar (requested by Patrick).** Patrick picked stacked sections with
+  sticky headers over a collection rail and a plain Bruno-style tree. Tabs, environments, History and Git stay per
+  collection: the list only changes how you get to a collection, and working in one selects it. Expanding a section
+  doesn't select it, so you can look into another collection without the tab bar switching. The toggle is local state
+  (`showAllCollections` in `settings.json`, §4.6), no repo format change. Which sections are expanded is kept for the
+  session only. Collections that can't be loaded are left out of the list (the picker still shows them as missing).
 
 ## 17. Testing strategy
 

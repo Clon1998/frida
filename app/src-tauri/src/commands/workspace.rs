@@ -74,6 +74,17 @@ pub fn set_active_collection(state: State<'_, AppState>, dir: String) -> ApiResu
     Ok(settings)
 }
 
+/// Switches the sidebar between the selected collection and all collections. Returns the new
+/// settings.
+#[tauri::command]
+#[specta::specta]
+pub fn set_show_all_collections(state: State<'_, AppState>, on: bool) -> ApiResult<AppSettings> {
+    let mut settings = state.local.load_settings();
+    settings.show_all_collections = on;
+    state.local.save_settings(&settings)?;
+    Ok(settings)
+}
+
 /// Reloads the open workspace, e.g. after `frida-workspace.yaml` changed on disk.
 #[tauri::command]
 #[specta::specta]

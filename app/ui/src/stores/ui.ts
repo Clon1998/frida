@@ -25,6 +25,12 @@ interface UiState {
   /** What the sidebar shows below the collection picker. */
   sidebarView: "tree" | "history" | "git";
   setSidebarView: (view: "tree" | "history" | "git") => void;
+  /**
+   * Which collections are expanded in the "all collections" view, by folder. Collections not
+   * in here are collapsed, except the active one when the view opens (see `Sidebar`).
+   */
+  openCollections: Record<string, boolean>;
+  setCollectionOpen: (dir: string, open: boolean) => void;
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -46,4 +52,7 @@ export const useUi = create<UiState>((set) => ({
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   sidebarView: "tree",
   setSidebarView: (sidebarView) => set({ sidebarView }),
+  openCollections: {},
+  setCollectionOpen: (dir, open) =>
+    set((s) => ({ openCollections: { ...s.openCollections, [dir]: open } })),
 }));

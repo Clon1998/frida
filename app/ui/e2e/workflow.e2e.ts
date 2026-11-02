@@ -45,8 +45,43 @@ test("reopening a workspace selects the collection used last", async ({ app }) =
 
   await app.getByRole("button", { name: "Fake workspace" }).click();
   await app.getByRole("menuitem", { name: "Close workspace" }).click();
-  await openWorkspace(app);
+  await openWorkspace(app, "List invoices");
   await expect(app.locator("aside").getByRole("button", { name: "Billing" })).toBeVisible();
+});
+
+// Feedback round 6: switching collections through the menu was clumsy.
+test("the sidebar can list all collections, and working in one selects it", async ({ app }) => {
+  await openWorkspace(app);
+  const aside = app.locator("aside");
+  await aside.getByRole("button", { name: "Show all collections" }).click();
+
+  // The active collection is expanded, the others collapsed with their request count.
+  const echo = aside.getByRole("region", { name: "Echo API" });
+  const billing = aside.getByRole("region", { name: "Billing" });
+  await expect(echo.getByText("Health", { exact: true })).toBeVisible();
+  await expect(billing.getByRole("button", { name: "Billing" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(billing.getByTitle("Requests in this collection")).toHaveText("1");
+
+  // Expanding doesn't switch collections; opening a request does, tab bar included.
+  await billing.getByRole("button", { name: "Billing" }).click();
+  const picker = (name: string) => aside.locator("button[aria-haspopup='menu']", { hasText: name });
+  await expect(picker("Echo API")).toBeVisible();
+  await billing.getByText("List invoices").click();
+  await expect(tab(app, "invoices.yaml")).toBeVisible();
+  await expect(picker("Billing")).toBeVisible();
+  // Echo API stays expanded, and its requests open in its own tabs again.
+  await echo.getByText("Health", { exact: true }).click();
+  await expect(tab(app, "health.yaml")).toBeVisible();
+  await expect(tab(app, "invoices.yaml")).toHaveCount(0);
+
+  // The view is remembered.
+  expect((await backend(app)).settings.showAllCollections).toBe(true);
+  await aside.getByRole("button", { name: "Show all collections" }).click();
+  await expect(aside.getByRole("region")).toHaveCount(0);
+  await expect(aside.getByText("Health", { exact: true })).toBeVisible();
 });
 
 test("run a folder, then stop a collection run", async ({ app }) => {

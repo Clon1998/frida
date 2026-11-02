@@ -66,6 +66,9 @@ const request = (name: string, method: string, url: string, seq: number): Reques
   docs: "",
 });
 
+/** The "Billing" collection's only request (read-only: editing it isn't faked). */
+const BILLING_REQUEST = request("List invoices", "GET", "{{baseUrl}}/invoices", 1);
+
 /** Everything the fake keeps; `reset` starts every test from the same state. */
 function initialState() {
   const collection: Collection = {
@@ -545,6 +548,10 @@ const handlers: Record<string, (args: any) => unknown> = {
     state.settings.pinnedWorkspaces = pinned ? [...list, dir] : list;
     return state.settings;
   },
+  set_show_all_collections: ({ on }) => {
+    state.settings.showAllCollections = on;
+    return state.settings;
+  },
   set_active_collection: ({ dir }) => {
     state.settings.activeCollections = { ...state.settings.activeCollections, [WORKSPACE]: dir };
     return state.settings;
@@ -597,8 +604,12 @@ const handlers: Record<string, (args: any) => unknown> = {
     state.collection = collection;
     return null;
   },
-  get_tree: () => tree(),
-  read_request: ({ path }) => {
+  get_tree: ({ dir }) =>
+    dir === OTHER_COLLECTION
+      ? [{ kind: "request", path: "invoices.yaml", name: "List invoices", seq: 1, method: "GET" }]
+      : tree(),
+  read_request: ({ dir, path }) => {
+    if (dir === OTHER_COLLECTION && path === "invoices.yaml") return BILLING_REQUEST;
     const r = state.requests.get(path);
     if (!r) throw { code: "not_found", message: `${path} was not found`, hint: null };
     return r;

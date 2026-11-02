@@ -1,5 +1,18 @@
 # Changelog
 
+## M22: All collections in the sidebar (2026-11-02)
+
+### What was built
+- **Show all collections**: a toggle next to the collection picker lists every collection as a section with a sticky,
+  collapsible header (request count, "+", settings, right-click menu). Opening something in a section selects that
+  collection; the toggle is remembered in `settings.json`.
+
+### Rust things worth understanding in this milestone
+1. **`#[serde(default)]` on a struct** (`crates/frida-core/src/local_state.rs`, `AppSettings`). Every field missing
+   from the JSON gets its `Default` value, so adding `show_all_collections: bool` needs no migration: an older
+   `settings.json` loads with `false`. Like Jackson with `FAIL_ON_MISSING_PROPERTIES` off and a field initializer.
+   The test `settings_from_before_a_field_existed_load_with_its_default` pins that down.
+
 ## M21: Feedback round 6, response body (2026-11-02)
 
 ### What was built

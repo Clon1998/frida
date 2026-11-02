@@ -41,6 +41,9 @@ pub struct AppSettings {
     /// once a day (PLAN.md M14). `u32` because TypeScript numbers can't hold every `u64`;
     /// seconds fit until 2106.
     pub last_update_check: Option<u32>,
+    /// The sidebar lists every collection of the workspace as a section, instead of only the
+    /// selected one.
+    pub show_all_collections: bool,
     /// What the user chooses in the Settings dialog. The fields above are state the app keeps
     /// by itself.
     pub preferences: Preferences,
@@ -344,6 +347,18 @@ mod tests {
         assert_eq!(prefs.aws.config_file.as_deref(), Some("/x/config"));
         assert_eq!(prefs.aws.cache_minutes, 1);
         assert_eq!(Preferences::default().sanitized(), Preferences::default());
+    }
+
+    #[test]
+    fn settings_from_before_a_field_existed_load_with_its_default() {
+        let settings: AppSettings =
+            serde_json::from_str(r#"{ "recentWorkspaces": ["/a"] }"#).unwrap();
+        assert_eq!(settings.recent_workspaces, ["/a"]);
+        assert!(!settings.show_all_collections);
+
+        let settings: AppSettings =
+            serde_json::from_str(r#"{ "showAllCollections": true }"#).unwrap();
+        assert!(settings.show_all_collections);
     }
 
     #[test]

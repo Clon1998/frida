@@ -13,6 +13,16 @@ export function isUnder(candidate: string, path: string): boolean {
   return candidate === path || candidate.startsWith(`${path}/`);
 }
 
+/** How many requests `nodes` hold, in all folders. */
+export function countRequests(nodes: TreeNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    if (node.kind === "request") count++;
+    if (node.kind === "folder") count += countRequests(node.children);
+  }
+  return count;
+}
+
 /** The children of folder `parent` (`""` = collection root). */
 export function childrenOf(tree: TreeNode[], parent: string): TreeNode[] {
   if (parent === "") return tree;

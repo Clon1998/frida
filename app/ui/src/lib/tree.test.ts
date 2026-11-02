@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TreeNode } from "@/bindings";
-import { childrenOf, dropPosition, folderTrail, moveTarget, parentOf } from "./tree";
+import { childrenOf, countRequests, dropPosition, folderTrail, moveTarget, parentOf } from "./tree";
 
 const request = (path: string): TreeNode => ({
   kind: "request",
@@ -67,5 +67,12 @@ describe("folderTrail", () => {
       "orders/eu",
     ]);
     expect(folderTrail(tree, "a.yaml")).toEqual([]);
+  });
+});
+
+describe("countRequests", () => {
+  it("counts the requests in every folder", () => {
+    expect(countRequests(tree)).toBe(4);
+    expect(countRequests([])).toBe(0);
   });
 });

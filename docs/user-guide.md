@@ -17,6 +17,9 @@ Workspace                 frida-workspace.yaml + global environments
   anywhere else, for example in the git repo of the API it describes.
 - **Collections**, **folders** and **requests** form the sidebar tree. Collections and folders can define headers,
   auth, variables, scripts, tests and settings that everything below them inherits.
+- The sidebar shows one collection at a time; pick another with the menu at the top. The **Show all collections**
+  button next to it lists every collection instead, each with a collapsible header that stays on top while you
+  scroll. Opening a request in a collection selects it, and its tabs, environment, History and Git come along.
 - Everything is a plain YAML file. Commit the collection to git and your team gets the same requests, with clean
   diffs. Nothing machine-specific (open tabs, AWS profiles, history, secret values) goes into those files.
 

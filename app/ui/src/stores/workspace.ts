@@ -65,6 +65,8 @@ interface WorkspaceState {
   importArchive: (file: string, target: ImportTarget) => Promise<ImportedArchive>;
   removeCollection: (dir: string) => Promise<void>;
   setActiveCollection: (dir: string) => void;
+  /** Switches the sidebar between the active collection and all collections (remembered). */
+  setShowAllCollections: (on: boolean) => Promise<void>;
   reloadTree: (dir: string) => Promise<void>;
 }
 
@@ -245,6 +247,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => {
       set({ activeCollectionDir: dir });
       const workspace = get().workspace;
       if (workspace) void rememberActive(workspace, dir);
+    },
+
+    setShowAllCollections: async (on) => {
+      try {
+        set({ settings: await unwrap(commands.setShowAllCollections(on)) });
+      } catch (e) {
+        showError(e);
+      }
     },
 
     reloadTree: async (dir) => {
